@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" id="htmlRoot">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>شجرة العائلة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;500;600;700;800&family=Lora:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F2E9D8; --paper-deep:#E9DCC0; --ink:#2B2118; --ink-soft:#5C4C3B;
+    --emerald:#0F5B4B; --emerald-deep:#0A4038; --gold:#B8862D; --gold-soft:#DFC998;
+    --teal:#1D6E77; --plum:#7A4869; --card:#FFFCF5; --line:#C9B98F; --danger:#9C3B2E;
+    --shadow: 0 1px 2px rgba(43,33,24,.06), 0 6px 18px rgba(43,33,24,.10);
+    --f-head:'Amiri', serif; --f-body:'Cairo', sans-serif;
+  }
+  html.lang-en{ --f-head:'Lora', serif; --f-body:'Inter','Cairo', sans-serif; }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{margin:0; padding:0; background:var(--paper); color:var(--ink); font-family:var(--f-body);}
+  body{
+    background-image:
+      radial-gradient(circle at 15% 8%, rgba(184,134,45,.10), transparent 40%),
+      radial-gradient(circle at 85% 92%, rgba(15,91,75,.08), transparent 45%);
+    min-height:100vh; overflow-x:hidden;
+  }
+  h1,h2,h3{font-family:var(--f-head); margin:0;}
+  button{font-family:var(--f-body); cursor:pointer;}
+  input, select{font-family:var(--f-body);}
+
+  .banner{ background: linear-gradient(155deg, var(--emerald) 0%, var(--emerald-deep) 78%); color:#F6EFDD; padding:22px 18px 26px; position:relative; overflow:hidden;}
+  .banner::after{ content:""; position:absolute; inset:0; background-image: radial-gradient(circle, rgba(246,239,221,.12) 1px, transparent 1.4px); background-size: 16px 16px; opacity:.4; pointer-events:none;}
+  .banner-row{display:flex; align-items:center; justify-content:space-between; gap:10px; position:relative; z-index:1;}
+  .family-title{ font-size:26px; line-height:1.3; font-weight:700; cursor:text; border-bottom:1.5px dashed transparent;}
+  .family-title:focus{outline:none; border-bottom-color: rgba(246,239,221,.6);}
+  .family-sub{font-size:12.5px; color:#CFE3DC; margin-top:4px;}
+  .banner-actions{display:flex; gap:8px;}
+  .icon-btn{ width:36px; height:36px; border-radius:10px; border:1px solid rgba(246,239,221,.35); background:rgba(246,239,221,.08); color:#F6EFDD; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700; transition:transform .15s ease, background .15s ease;}
+  .icon-btn:active{transform:scale(.92);}
+  .icon-btn:hover{background:rgba(246,239,221,.18);}
+
+  .stat-row{display:flex; gap:8px; margin-top:16px; position:relative; z-index:1;}
+  .stat-pill{ flex:1; background:rgba(246,239,221,.12); border:1px solid rgba(246,239,221,.22); border-radius:12px; padding:8px 10px; text-align:center;}
+  .stat-pill b{display:block; font-size:19px; font-weight:800;}
+  .stat-pill span{font-size:11px; color:#CFE3DC;}
+
+  .toolbar{ display:flex; align-items:center; gap:6px; padding:8px 10px; background:var(--paper-deep); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20; overflow-x:auto;}
+  .toolbar button{ display:flex; align-items:center; gap:5px; white-space:nowrap; background:var(--card); border:1px solid var(--line); color:var(--ink-soft); font-size:12.5px; font-weight:600; padding:7px 11px; border-radius:9px;}
+  .toolbar button:active{background:var(--paper);}
+  .zoom-group{display:flex; align-items:center; gap:2px; margin-inline-start:auto; background:var(--card); border:1px solid var(--line); border-radius:9px; overflow:hidden;}
+  .zoom-group button{border:none; border-radius:0; padding:7px 10px;}
+  .zoom-group span{font-size:11.5px; padding:0 4px; color:var(--ink-soft); min-width:34px; text-align:center;}
+
+  .storage-warn{ background:#F6E4CE; color:#7A4B12; font-size:12px; text-align:center; padding:6px 10px; border-bottom:1px solid #E5C79A; display:none;}
+
+  .stage{ position:relative; overflow:auto; height:calc(100vh - 168px); touch-action: pan-x pan-y;}
+  .canvas{ position:relative; min-width:100%; width:max-content; margin:0 auto; padding:46px 24px 90px; transform-origin: top center;}
+  svg.links{position:absolute; pointer-events:none; overflow:visible; z-index:1;}
+  svg.links path{ fill:none; stroke:var(--line); stroke-width:2; stroke-linecap:round;}
+  .canvas{position:relative; z-index:2;}
+
+  .unit{display:flex; flex-direction:column; align-items:center;}
+  .couple{display:flex; gap:14px; align-items:stretch; position:relative;}
+  .children-row{display:flex; gap:22px; margin-top:46px; align-items:flex-start;}
+  .children-row.collapsed{display:none;}
+
+  .card{ background:var(--card); border-radius:14px; box-shadow:var(--shadow); width:154px; padding:12px 10px 10px; position:relative; border-top:4px solid var(--emerald); text-align:center;}
+  .card.female{border-top-color:var(--gold);}
+  .card .avatar{ width:44px; height:44px; border-radius:50%; margin:0 auto 6px; display:flex; align-items:center; justify-content:center; font-size:19px; background: linear-gradient(155deg, var(--emerald), var(--emerald-deep)); color:#F6EFDD; overflow:hidden;}
+  .card.female .avatar{background: linear-gradient(155deg, var(--gold), #8f6620); color:#FCF6E6;}
+  .card .avatar img{width:100%; height:100%; object-fit:cover;}
+  .card .name{font-size:13.5px; font-weight:700; line-height:1.35; word-break:break-word;}
+  .card .gen-badge{ font-size:9.5px; color:var(--ink-soft); background:var(--paper); border-radius:6px; padding:1px 6px; display:inline-block; margin-top:4px;}
+  .card .meta-line{ font-size:10.5px; color:var(--ink-soft); margin-top:3px; display:flex; align-items:center; justify-content:center; gap:3px;}
+  .card .root-badge{ position:absolute; top:-9px; inset-inline-end:-6px; background:var(--gold); color:#3a2a08; font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:8px; box-shadow:var(--shadow);}
+  .card-actions{display:flex; gap:4px; justify-content:center; margin-top:8px; flex-wrap:wrap;}
+  .mini-btn{ width:24px; height:24px; border-radius:7px; border:1px solid var(--line); background:var(--paper); font-size:12px; display:flex; align-items:center; justify-content:center; color:var(--ink-soft);}
+  .mini-btn:active{background:var(--gold-soft);}
+  .mini-btn.danger{color:var(--danger); border-color:#E3B9AE;}
+
+  .toggle-branch{ position:absolute; bottom:-11px; left:50%; transform:translateX(-50%); width:22px; height:22px; border-radius:50%; background:var(--teal); color:#fff; border:2px solid var(--paper); font-size:11px; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); z-index:2;}
+
+  .empty-wrap{display:flex; align-items:center; justify-content:center; min-height:calc(100vh - 90px); padding:20px;}
+  .empty-card{ background:var(--card); border-radius:20px; box-shadow:var(--shadow); padding:26px 22px; max-width:340px; width:100%; text-align:center; border:1px solid var(--paper-deep);}
+  .empty-card .glyph{font-size:38px; margin-bottom:8px;}
+  .empty-card h2{font-size:21px; margin-bottom:6px;}
+  .empty-card p{font-size:13px; color:var(--ink-soft); line-height:1.7; margin:0 0 18px;}
+  .field{margin-bottom:12px; text-align:start;}
+  .field label{display:block; font-size:12px; color:var(--ink-soft); margin-bottom:5px; font-weight:600;}
+  .field input, .field select{ width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line); background:var(--paper); font-size:14px; color:var(--ink);}
+  .field input:focus, .field select:focus{outline:none; border-color:var(--emerald);}
+  .gender-toggle{display:flex; gap:8px;}
+  .gender-toggle button{ flex:1; padding:9px; border-radius:10px; border:1.5px solid var(--line); background:var(--paper); font-size:13px; font-weight:600; color:var(--ink-soft);}
+  .gender-toggle button.active-m{background:var(--emerald); border-color:var(--emerald); color:#F6EFDD;}
+  .gender-toggle button.active-f{background:var(--gold); border-color:var(--gold); color:#3a2a08;}
+  .primary-btn{ width:100%; padding:12px; border-radius:11px; border:none; background:var(--emerald); color:#F6EFDD; font-size:14.5px; font-weight:700; box-shadow:var(--shadow);}
+  .primary-btn:active{background:var(--emerald-deep);}
+
+  .photo-row{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
+  .photo-preview{ width:60px; height:60px; border-radius:50%; background:var(--paper); border:1.5px dashed var(--line); display:flex; align-items:center; justify-content:center; overflow:hidden; font-size:22px; color:var(--ink-soft); flex-shrink:0;}
+  .photo-preview img{width:100%; height:100%; object-fit:cover;}
+  .photo-btns{display:flex; flex-direction:column; gap:6px; flex:1;}
+  .photo-btns button{ padding:8px 10px; border-radius:9px; border:1.5px solid var(--line); background:var(--paper); font-size:12.5px; font-weight:600; color:var(--ink-soft);}
+
+  .overlay{ position:fixed; inset:0; background:rgba(43,33,24,.42); z-index:50; opacity:0; pointer-events:none; transition:opacity .2s ease;}
+  .overlay.open{opacity:1; pointer-events:auto;}
+  .sheet{ position:fixed; left:0; right:0; bottom:0; background:var(--card); z-index:51; border-radius:20px 20px 0 0; padding:16px 18px 22px; box-shadow:0 -8px 30px rgba(43,33,24,.25); transform:translateY(100%); transition:transform .25s cubic-bezier(.22,1,.36,1); max-height:85vh; overflow-y:auto;}
+  .sheet.open{transform:translateY(0);}
+  .sheet-handle{width:38px; height:4px; background:var(--line); border-radius:3px; margin:0 auto 14px;}
+  .sheet h3{font-size:17px; margin-bottom:3px;}
+  .sheet .context{font-size:12px; color:var(--ink-soft); margin-bottom:16px;}
+  .keep-open-row{display:flex; align-items:center; gap:8px; margin:4px 0 16px; font-size:12.5px; color:var(--ink-soft);}
+  .keep-open-row input{width:16px; height:16px;}
+
+  .confirm-box{padding:6px 2px;}
+  .confirm-box p{font-size:13.5px; line-height:1.7; color:var(--ink-soft); margin:0 0 18px;}
+  .confirm-actions{display:flex; gap:10px;}
+  .confirm-actions button{flex:1; padding:11px; border-radius:10px; font-size:13.5px; font-weight:700;}
+  .btn-cancel{background:var(--paper); border:1.5px solid var(--line); color:var(--ink-soft);}
+  .btn-danger{background:var(--danger); border:none; color:#FCEDE9;}
+
+  .toast{ position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:var(--paper); font-size:12.5px; padding:9px 16px; border-radius:20px; opacity:0; transition:all .25s ease; z-index:60; pointer-events:none; max-width:88%; text-align:center;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  @media print{
+    .toolbar, .storage-warn, .banner-actions, .card-actions, .toggle-branch{display:none !important;}
+    .stage{height:auto; overflow:visible;}
+    .canvas{transform:scale(1) !important; padding:10px;}
+    body{background:#fff;}
+  }
+
+  /* ---------- Auth gate ---------- */
+  #authGate{
+    position:fixed; inset:0; background:var(--paper); z-index:100;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  #authGate.hidden{display:none;}
+  .auth-card{
+    background:var(--card); border-radius:20px; box-shadow:var(--shadow); padding:26px 22px;
+    max-width:360px; width:100%; border:1px solid var(--paper-deep); text-align:center;
+  }
+  .auth-card .glyph{font-size:34px; margin-bottom:6px;}
+  .auth-card h2{font-size:20px; margin-bottom:4px;}
+  .auth-card .auth-sub{font-size:12.5px; color:var(--ink-soft); margin-bottom:16px;}
+  .auth-tabs{display:flex; gap:6px; background:var(--paper); border-radius:11px; padding:4px; margin-bottom:16px;}
+  .auth-tabs button{flex:1; padding:8px; border:none; border-radius:8px; background:transparent; font-size:13px; font-weight:700; color:var(--ink-soft);}
+  .auth-tabs button.active{background:var(--card); color:var(--emerald); box-shadow:var(--shadow);}
+  .auth-mode-toggle{display:flex; gap:8px; margin-bottom:14px;}
+  .auth-mode-toggle button{flex:1; padding:9px; border-radius:10px; border:1.5px solid var(--line); background:var(--paper); font-size:12.5px; font-weight:600; color:var(--ink-soft);}
+  .auth-mode-toggle button.active{background:var(--emerald); border-color:var(--emerald); color:#F6EFDD;}
+  .auth-error{ background:#F6E4CE; color:#7A4B12; font-size:12px; padding:8px 10px; border-radius:9px; margin-bottom:12px; text-align:start; display:none;}
+  .auth-error.show{display:block;}
+  .auth-loading{font-size:12.5px; color:var(--ink-soft); margin-top:10px; display:none;}
+  .auth-loading.show{display:block;}
+  .code-display{
+    background:var(--paper); border:1.5px dashed var(--line); border-radius:11px; padding:12px;
+    font-size:20px; font-weight:800; letter-spacing:3px; color:var(--emerald); margin-bottom:14px; text-align:center;
+  }
+  .cloud-status{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--ink-soft); justify-content:center; margin-top:4px;}
+  #cloudBtn{display:flex;}
+  #cloudBtn[data-status="syncing"]{ background:rgba(223,201,152,.45); border-color:rgba(223,201,152,.7); }
+  #cloudBtn[data-status="offline"]{ background:rgba(156,59,46,.30); border-color:rgba(156,59,46,.5); }
+  .primary-btn:disabled{opacity:.6;}
+</style>
+</head>
+<body>
+
+  <div id="authGate">
+    <div class="auth-card">
+      <div class="glyph">🌳</div>
+      <h2 id="authTitle">شجرة العائلة</h2>
+      <div class="auth-sub" id="authSub">سجّل الدخول لمزامنة شجرتك مع أفراد عائلتك</div>
+
+      <div class="auth-tabs">
+        <button type="button" id="tabLogin" class="active">تسجيل الدخول</button>
+        <button type="button" id="tabSignup">حساب جديد</button>
+      </div>
+
+      <div id="authErr" class="auth-error"></div>
+
+      <div class="field"><label>البريد الإلكتروني</label><input type="email" id="authEmail" autocomplete="email"></div>
+      <div class="field"><label>كلمة المرور</label><input type="password" id="authPass" autocomplete="current-password"></div>
+
+      <div id="signupModeBox" style="display:none;">
+        <div class="auth-mode-toggle">
+          <button type="button" id="modeCreate" class="active">إنشاء عائلة جديدة</button>
+          <button type="button" id="modeJoin">الانضمام لعائلة</button>
+        </div>
+        <div class="field" id="joinCodeField" style="display:none;">
+          <label>رمز العائلة</label>
+          <input type="text" id="joinCode" placeholder="مثال: 7K9QXZ" style="text-transform:uppercase;">
+        </div>
+      </div>
+
+      <button class="primary-btn" id="authSubmitBtn">دخول</button>
+      <div class="auth-loading" id="authLoading">جارِ التحقق…</div>
+    </div>
+  </div>
+
+  <div class="banner">
+    <div class="banner-row">
+      <div>
+        <h1 class="family-title" id="familyTitle" contenteditable="true" spellcheck="false">شجرة العائلة</h1>
+        <div class="family-sub" id="editHint">اضغط على الاسم لتعديله</div>
+      </div>
+      <div class="banner-actions">
+        <button class="icon-btn" id="cloudBtn" title="Cloud sync" style="display:none;">☁</button>
+        <button class="icon-btn" id="langBtn" title="Language">EN</button>
+        <button class="icon-btn" id="printBtn" title="Print">🖨</button>
+        <button class="icon-btn" id="menuBtn" title="Menu">⋮</button>
+      </div>
+    </div>
+    <div class="stat-row" id="statRow"></div>
+  </div>
+
+  <div class="storage-warn" id="storageWarn"></div>
+
+  <div class="toolbar" id="toolbar" style="display:none;">
+    <button id="exportBtn"></button>
+    <button id="importBtn"></button>
+    <input type="file" id="importFile" accept=".json,application/json,text/plain" style="display:none;">
+    <button id="resetBtn"></button>
+    <div class="zoom-group">
+      <button id="zoomOut">−</button>
+      <span id="zoomLabel">100%</span>
+      <button id="zoomIn">+</button>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <svg class="links" id="linksSvg"></svg>
+    <div class="empty-wrap" id="emptyWrap">
+      <div class="empty-card">
+        <div class="glyph">🌳</div>
+        <h2 id="emptyTitle"></h2>
+        <p id="emptyDesc"></p>
+        <div class="field">
+          <label id="rootNameLabel"></label>
+          <input type="text" id="rootName">
+        </div>
+        <div class="field">
+          <label id="rootSpouseLabel"></label>
+          <input type="text" id="rootSpouseName">
+        </div>
+        <button class="primary-btn" id="createRootBtn"></button>
+        <button class="primary-btn" id="restoreBtnEmpty" style="background:var(--teal); margin-top:10px;"></button>
+      </div>
+    </div>
+    <div class="canvas" id="canvas" style="display:none;">
+      <div id="treeRoot"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <div id="sheetBody"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============== i18n ============== */
+  var I18N = {
+    appName:{ar:'شجرة العائلة', en:'Family Tree'},
+    editHint:{ar:'اضغط على الاسم لتعديله', en:'Tap the name to edit it'},
+    statMembers:{ar:'فرد', en:'Members'},
+    statGenerations:{ar:'جيل', en:'Generations'},
+    statRoot:{ar:'الجذر', en:'Root unit'},
+    storageWarn:{ar:'⚠️ التخزين الدائم غير متاح الآن — التعديلات لن تُحفظ بعد إغلاق الصفحة. يمكنك تصدير نسخة احتياطية يدويًا.', en:'⚠️ Permanent storage is unavailable right now — changes won\'t be saved after closing this page. You can export a backup manually.'},
+    tbBackup:{ar:'⬇ نسخة احتياطية', en:'⬇ Backup'},
+    tbImport:{ar:'⬆ استيراد', en:'⬆ Import'},
+    tbReset:{ar:'↺ شجرة جديدة', en:'↺ New tree'},
+    emptyTitle:{ar:'ابدأ بشجرة عائلتك', en:'Start your family tree'},
+    emptyDesc:{ar:'أدخل اسم الجد الأعلى — وزوجته إن أردت — لتبدأ في بناء الشجرة، ثم أضف الأبناء والأحفاد خطوة بخطوة.', en:'Enter the eldest ancestor\'s name — and their spouse if you like — to begin. Then add children and grandchildren step by step.'},
+    rootNameLabel:{ar:'اسم الجد الأعلى *', en:'Eldest ancestor\'s name *'},
+    rootNamePh:{ar:'مثال: عبد الله بن محمد', en:'e.g. John Smith'},
+    rootSpouseLabel:{ar:'اسم الجدة (اختياري)', en:'Spouse\'s name (optional)'},
+    rootSpousePh:{ar:'مثال: فاطمة', en:'e.g. Mary'},
+    createBtn:{ar:'إنشاء الشجرة', en:'Create tree'},
+    restoreBackup:{ar:'⬆ أو استعادة نسخة احتياطية', en:'⬆ Or restore a backup'},
+    male:{ar:'ذكر', en:'Male'},
+    female:{ar:'أنثى', en:'Female'},
+    nameLabel:{ar:'الاسم *', en:'Name *'},
+    namePh:{ar:'اكتب الاسم هنا', en:'Enter name'},
+    genderLabel:{ar:'النوع', en:'Gender'},
+    birthLabel:{ar:'تاريخ الميلاد (اختياري)', en:'Date of birth (optional)'},
+    residenceLabel:{ar:'مكان الإقامة (اختياري)', en:'Place of residence (optional)'},
+    residencePh:{ar:'مثال: القاهرة، مصر', en:'e.g. Cairo, Egypt'},
+    photoLabel:{ar:'الصورة الشخصية (اختياري)', en:'Photo (optional)'},
+    photoChoose:{ar:'اختيار صورة', en:'Choose photo'},
+    photoRemove:{ar:'إزالة الصورة', en:'Remove photo'},
+    keepAdding:{ar:'إضافة المزيد من الأبناء بعد الحفظ', en:'Keep adding more children after saving'},
+    saveBtn:{ar:'حفظ', en:'Save'},
+    addChildTitle:{ar:'إضافة ابن / ابنة', en:'Add child'},
+    addSpouseTitle:{ar:'إضافة زوج / زوجة', en:'Add spouse'},
+    editTitle:{ar:'تعديل البيانات', en:'Edit details'},
+    contextChild:{ar:'سيُضاف كابن/ابنة لـ «{name}»', en:'Will be added as a child of "{name}"'},
+    contextSpouse:{ar:'سيُضاف كزوج/زوجة لـ «{name}»', en:'Will be added as a spouse of "{name}"'},
+    contextEdit:{ar:'تعديل بيانات «{name}»', en:'Editing "{name}"'},
+    deleteTitle:{ar:'حذف «{name}»؟', en:'Delete "{name}"?'},
+    deleteWarnN:{ar:'سيتم أيضًا حذف {n} فرد من ذريته.', en:'This will also delete {n} of their descendants.'},
+    deleteWarnNone:{ar:'لا توجد ذرية مرتبطة بهذا الفرد.', en:'No descendants are linked to this person.'},
+    deleteCancel:{ar:'إلغاء', en:'Cancel'},
+    deleteConfirm:{ar:'حذف نهائيًا', en:'Delete permanently'},
+    resetTitle:{ar:'بدء شجرة جديدة؟', en:'Start a new tree?'},
+    resetDesc:{ar:'سيتم حذف جميع بيانات الشجرة الحالية نهائيًا. يُنصح بتنزيل نسخة احتياطية أولاً.', en:'All current tree data will be permanently deleted. Downloading a backup first is recommended.'},
+    resetConfirm:{ar:'حذف والبدء من جديد', en:'Delete and start over'},
+    menuTitle:{ar:'خيارات', en:'Options'},
+    menuDesc:{ar:'إدارة بيانات الشجرة', en:'Manage tree data'},
+    menuExport:{ar:'⬇ تنزيل نسخة احتياطية', en:'⬇ Download backup'},
+    menuImport:{ar:'⬆ استيراد نسخة', en:'⬆ Import a backup'},
+    menuReset:{ar:'↺ بدء شجرة جديدة', en:'↺ Start a new tree'},
+    toastNameRequired:{ar:'يرجى إدخال الاسم', en:'Please enter a name'},
+    toastSaved:{ar:'تم الحفظ بنجاح', en:'Saved successfully'},
+    toastDeleted:{ar:'تم الحذف', en:'Deleted'},
+    toastRootCreated:{ar:'تم إنشاء شجرة العائلة', en:'Family tree created'},
+    toastBackup:{ar:'تم تنزيل النسخة الاحتياطية', en:'Backup downloaded'},
+    toastImported:{ar:'تم استيراد البيانات بنجاح', en:'Data imported successfully'},
+    toastImportError:{ar:'تعذر قراءة الملف — تأكد أنه نسخة احتياطية صحيحة', en:'Could not read the file — make sure it\'s a valid backup'},
+    rootBadge:{ar:'الجذر', en:'Root'},
+    familyPrefix:{ar:'عائلة ', en:''},
+    familySuffix:{ar:'', en:' Family'}
+  };
+  var genLabelsMap = {
+    ar:["الجيل الأول","الجيل الثاني","الجيل الثالث","الجيل الرابع","الجيل الخامس","الجيل السادس","الجيل السابع","الجيل الثامن"],
+    en:["Generation 1","Generation 2","Generation 3","Generation 4","Generation 5","Generation 6","Generation 7","Generation 8"]
+  };
+
+  function t(key){
+    var entry = I18N[key];
+    if(!entry) return key;
+    var v = entry[state.lang];
+    return v !== undefined ? v : key;
+  }
+  function tf(key, vars){
+    var s = t(key);
+    Object.keys(vars||{}).forEach(function(k){ s = s.replace('{'+k+'}', vars[k]); });
+    return s;
+  }
+  function genLabel(depth){
+    var arr = genLabelsMap[state.lang];
+    return arr[depth] || (t('statGenerations') + ' ' + (depth+1));
+  }
+  function ageText(n){
+    if(state.lang === 'ar'){
+      if(n < 1) return 'أقل من سنة';
+      if(n === 1) return 'سنة واحدة';
+      if(n === 2) return 'سنتان';
+      if(n >= 3 && n <= 10) return n + ' سنوات';
+      return n + ' سنة';
+    }
+    return n + (n === 1 ? ' year' : ' years');
+  }
+
+  /* ============== State ============== */
+  var STORAGE_KEY = "family-tree:data";
+  var state = { rootId: null, familyName: "", people: {}, lang: 'ar' };
+  var zoom = 1;
+  var saveTimer = null;
+  var pendingPhoto = null;
+
+  function uid(){ return 'p_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+
+  function newPerson(name, gender, parentId){
+    return { id: uid(), name: name, gender: gender, parentId: parentId || null,
+      spouseIds: [], childrenIds: [], collapsed: false,
+      birthDate: null, residence: '', photo: null };
+  }
+
+  function migratePerson(p){
+    if(p.birthDate === undefined) p.birthDate = null;
+    if(p.residence === undefined) p.residence = '';
+    if(p.photo === undefined) p.photo = null;
+    return p;
+  }
+
+  /* ============== Persistence ============== */
+  function scheduleSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(save, 350); }
+
+  function save(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      hideStorageWarn();
+    }catch(e){ showStorageWarn(); }
+    if(window.__ftCloud && window.__ftCloud.onLocalSave) window.__ftCloud.onLocalSave(state);
+  }
+
+  function load(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        var parsed = JSON.parse(raw);
+        if(parsed && parsed.people){
+          state = parsed;
+          state.lang = state.lang || 'ar';
+          Object.keys(state.people).forEach(function(id){ migratePerson(state.people[id]); });
+        }
+      }
+    }catch(e){ showStorageWarn(); }
+    afterLoad();
+  }
+
+  /* Bridge for the Firebase cloud-sync module (loaded separately). It calls this
+     when a remote update arrives; we don't re-push it back up (avoids echo loops). */
+  window.__ftApplyRemote = function(remoteState){
+    if(!remoteState || !remoteState.people) return;
+    state = remoteState;
+    state.lang = state.lang || 'ar';
+    Object.keys(state.people).forEach(function(id){ migratePerson(state.people[id]); });
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+    applyLang(); render();
+  };
+  window.__ftGetState = function(){ return state; };
+
+  function showStorageWarn(){ var w = document.getElementById('storageWarn'); w.textContent = t('storageWarn'); w.style.display = 'block'; }
+  function hideStorageWarn(){ document.getElementById('storageWarn').style.display = 'none'; }
+
+  function afterLoad(){ applyLang(); render(); }
+
+  /* ============== Language ============== */
+  function applyLang(){
+    var html = document.getElementById('htmlRoot');
+    html.setAttribute('lang', state.lang);
+    html.setAttribute('dir', state.lang === 'ar' ? 'rtl' : 'ltr');
+    html.className = state.lang === 'en' ? 'lang-en' : '';
+    document.getElementById('langBtn').textContent = state.lang === 'ar' ? 'EN' : 'AR';
+    document.getElementById('editHint').textContent = t('editHint');
+    document.getElementById('exportBtn').textContent = t('tbBackup');
+    document.getElementById('importBtn').textContent = t('tbImport');
+    document.getElementById('resetBtn').textContent = t('tbReset');
+    document.getElementById('emptyTitle').textContent = t('emptyTitle');
+    document.getElementById('emptyDesc').textContent = t('emptyDesc');
+    document.getElementById('rootNameLabel').textContent = t('rootNameLabel');
+    document.getElementById('rootName').placeholder = t('rootNamePh');
+    document.getElementById('rootSpouseLabel').textContent = t('rootSpouseLabel');
+    document.getElementById('rootSpouseName').placeholder = t('rootSpousePh');
+    document.getElementById('createRootBtn').textContent = t('createBtn');
+    document.getElementById('restoreBtnEmpty').textContent = t('restoreBackup');
+  }
+
+  document.getElementById('langBtn').addEventListener('click', function(){
+    state.lang = state.lang === 'ar' ? 'en' : 'ar';
+    scheduleSave();
+    applyLang();
+    closeSheet();
+    render();
+  });
+
+  /* ============== Helpers ============== */
+  function getPerson(id){ return state.people[id]; }
+  function genOfPerson(id){ var p = getPerson(id), depth = 0; while(p && p.parentId){ depth++; p = getPerson(p.parentId); } return depth; }
+  var genColors = ["var(--emerald)","var(--teal)","var(--gold)","var(--plum)"];
+
+  function calcAge(birthDateStr){
+    if(!birthDateStr) return null;
+    var b = new Date(birthDateStr);
+    if(isNaN(b.getTime())) return null;
+    var today = new Date();
+    var age = today.getFullYear() - b.getFullYear();
+    var m = today.getMonth() - b.getMonth();
+    if(m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
+    return age >= 0 ? age : null;
+  }
+
+  function toast(msg){
+    var el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(function(){ el.classList.remove('show'); }, 2200);
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+  }
+
+  /* ============== Photo handling ============== */
+  function resizeImage(file, maxSize, cb){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var img = new Image();
+      img.onload = function(){
+        var w = img.width, h = img.height;
+        var scale = Math.min(1, maxSize / Math.max(w, h));
+        var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+        var canvas = document.createElement('canvas');
+        canvas.width = cw; canvas.height = ch;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, cw, ch);
+        cb(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      img.onerror = function(){ cb(null); };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /* ============== Mutations ============== */
+  function createRoot(name, spouseName){
+    var root = newPerson(name, 'm', null);
+    state.people[root.id] = root;
+    state.rootId = root.id;
+    if(spouseName && spouseName.trim()){
+      var sp = newPerson(spouseName.trim(), 'f', null);
+      state.people[sp.id] = sp;
+      root.spouseIds.push(sp.id);
+      sp.spouseIds.push(root.id);
+    }
+    if(!state.familyName){ state.familyName = t('familyPrefix') + name.split(' ')[0] + t('familySuffix'); }
+    scheduleSave(); render();
+  }
+
+  function addChild(parentId, name, gender){
+    var child = newPerson(name, gender, parentId);
+    state.people[child.id] = child;
+    getPerson(parentId).childrenIds.push(child.id);
+    scheduleSave(); render();
+  }
+
+  function addSpouse(personId, name, gender){
+    var sp = newPerson(name, gender, null);
+    state.people[sp.id] = sp;
+    getPerson(personId).spouseIds.push(sp.id);
+    sp.spouseIds.push(personId);
+    scheduleSave(); render();
+  }
+
+  function updatePerson(id, data){
+    var p = getPerson(id);
+    p.name = data.name; p.gender = data.gender;
+    p.birthDate = data.birthDate || null;
+    p.residence = data.residence || '';
+    if(data.photo !== undefined) p.photo = data.photo;
+    scheduleSave(); render();
+  }
+
+  function countDescendants(id){
+    var p = getPerson(id), n = 0;
+    (p.childrenIds || []).forEach(function(cid){ n += 1 + countDescendants(cid); });
+    return n;
+  }
+
+  function deletePerson(id){
+    var p = getPerson(id);
+    if(!p) return;
+    (p.childrenIds || []).slice().forEach(deletePerson);
+    (p.spouseIds || []).forEach(function(sid){
+      var sp = getPerson(sid);
+      if(sp) sp.spouseIds = sp.spouseIds.filter(function(x){ return x !== id; });
+    });
+    if(p.parentId){
+      var parent = getPerson(p.parentId);
+      if(parent) parent.childrenIds = parent.childrenIds.filter(function(x){ return x !== id; });
+    }
+    delete state.people[id];
+    if(state.rootId === id){ state.rootId = null; state.familyName = ""; }
+    scheduleSave(); render();
+  }
+
+  function toggleCollapse(id){ getPerson(id).collapsed = !getPerson(id).collapsed; scheduleSave(); render(); }
+
+  /* ============== Rendering ============== */
+  function totalMembers(){ return Object.keys(state.people).length; }
+  function maxGeneration(){
+    var max = 0;
+    Object.keys(state.people).forEach(function(id){ max = Math.max(max, genOfPerson(id)); });
+    return max + 1;
+  }
+
+  function renderStats(){
+    var row = document.getElementById('statRow');
+    if(!state.rootId){ row.innerHTML = ''; return; }
+    var total = totalMembers(), gens = maxGeneration();
+    var rootUnit = getPerson(state.rootId) ? 1 + getPerson(state.rootId).spouseIds.length : 0;
+    row.innerHTML =
+      '<div class="stat-pill"><b>'+total+'</b><span>'+t('statMembers')+'</span></div>'+
+      '<div class="stat-pill"><b>'+gens+'</b><span>'+t('statGenerations')+'</span></div>'+
+      '<div class="stat-pill"><b>'+rootUnit+'</b><span>'+t('statRoot')+'</span></div>';
+  }
+
+  function personCard(id){
+    var p = getPerson(id);
+    var depth = genOfPerson(id);
+    var isRoot = id === state.rootId;
+    var el = document.createElement('div');
+    el.className = 'card ' + (p.gender === 'f' ? 'female' : 'male');
+    el.style.borderTopColor = genColors[depth % genColors.length];
+    el.dataset.id = id;
+    var childCount = p.childrenIds.length;
+    var age = calcAge(p.birthDate);
+    var avatarInner = p.photo ? '<img src="'+p.photo+'" alt="">' : (p.gender==='f' ? '👩' : '👨');
+    el.innerHTML =
+      (isRoot ? '<div class="root-badge">'+t('rootBadge')+'</div>' : '') +
+      '<div class="avatar">'+avatarInner+'</div>' +
+      '<div class="name">'+escapeHtml(p.name)+'</div>' +
+      '<div class="gen-badge">'+genLabel(depth)+'</div>' +
+      (age !== null ? '<div class="meta-line">🎂 '+ageText(age)+'</div>' : '') +
+      (p.residence ? '<div class="meta-line">📍 '+escapeHtml(p.residence)+'</div>' : '') +
+      '<div class="card-actions">' +
+        '<button class="mini-btn" data-act="child" data-id="'+id+'" title="'+t('addChildTitle')+'">＋👶</button>' +
+        (p.spouseIds.length < 4 ? '<button class="mini-btn" data-act="spouse" data-id="'+id+'" title="'+t('addSpouseTitle')+'">＋💍</button>' : '') +
+        '<button class="mini-btn" data-act="edit" data-id="'+id+'" title="'+t('editTitle')+'">✎</button>' +
+        '<button class="mini-btn danger" data-act="delete" data-id="'+id+'" title="delete">🗑</button>' +
+      '</div>';
+    if(childCount > 0){
+      var tog = document.createElement('div');
+      tog.className = 'toggle-branch';
+      tog.dataset.act = 'toggle'; tog.dataset.id = id;
+      tog.textContent = p.collapsed ? '+' : '−';
+      el.appendChild(tog);
+    }
+    return el;
+  }
+
+  function renderUnit(id){
+    var p = getPerson(id);
+    var unit = document.createElement('div');
+    unit.className = 'unit';
+    var couple = document.createElement('div');
+    couple.className = 'couple';
+    couple.dataset.coupleFor = id;
+    couple.appendChild(personCard(id));
+    p.spouseIds.forEach(function(sid){ if(getPerson(sid)) couple.appendChild(personCard(sid)); });
+    unit.appendChild(couple);
+    if(p.childrenIds.length > 0){
+      var row = document.createElement('div');
+      row.className = 'children-row' + (p.collapsed ? ' collapsed' : '');
+      row.dataset.parentUnit = id;
+      p.childrenIds.forEach(function(cid){ if(getPerson(cid)) row.appendChild(renderUnit(cid)); });
+      unit.appendChild(row);
+    }
+    return unit;
+  }
+
+  function render(){
+    renderStats();
+    var emptyWrap = document.getElementById('emptyWrap');
+    var canvas = document.getElementById('canvas');
+    var toolbar = document.getElementById('toolbar');
+
+    if(!state.rootId || !getPerson(state.rootId)){
+      emptyWrap.style.display = 'flex'; canvas.style.display = 'none'; toolbar.style.display = 'none';
+      var svgEmpty = document.getElementById('linksSvg');
+      svgEmpty.innerHTML = '';
+      svgEmpty.style.width = '0px'; svgEmpty.style.height = '0px';
+      return;
+    }
+    emptyWrap.style.display = 'none'; canvas.style.display = 'block'; toolbar.style.display = 'flex';
+
+    var treeRoot = document.getElementById('treeRoot');
+    treeRoot.innerHTML = '';
+    treeRoot.appendChild(renderUnit(state.rootId));
+    document.getElementById('familyTitle').textContent = state.familyName || t('appName');
+
+    requestAnimationFrame(drawLinks);
+  }
+
+  function drawLinks(){
+    var svg = document.getElementById('linksSvg');
+    var canvas = document.getElementById('canvas');
+    var stage = document.getElementById('stage');
+    svg.innerHTML = '';
+    var canvasRect = canvas.getBoundingClientRect();
+    var stageRect = stage.getBoundingClientRect();
+    /* Position the svg to exactly overlay canvas's current rendered box, expressed in
+       stage's SCROLLABLE CONTENT coordinates (not viewport coordinates). Once set, the
+       svg is a normal sibling within the same scrolling content as canvas, so it scrolls
+       natively with it in the browser's own compositor — no scroll-event syncing needed. */
+    svg.style.left = (canvasRect.left - stageRect.left + stage.scrollLeft) + 'px';
+    svg.style.top = (canvasRect.top - stageRect.top + stage.scrollTop) + 'px';
+    svg.style.width = canvasRect.width + 'px';
+    svg.style.height = canvasRect.height + 'px';
+
+    document.querySelectorAll('.children-row').forEach(function(row){
+      if(row.classList.contains('collapsed')) return;
+      var parentId = row.dataset.parentUnit;
+      var coupleEl = document.querySelector('.couple[data-couple-for="'+parentId+'"]');
+      if(!coupleEl) return;
+      var coupleRect = coupleEl.getBoundingClientRect();
+      var startX = (coupleRect.left + coupleRect.right)/2 - canvasRect.left;
+      var startY = coupleRect.bottom - canvasRect.top;
+      var childUnits = row.children;
+      for(var i=0;i<childUnits.length;i++){
+        var childCouple = childUnits[i].querySelector('.couple');
+        if(!childCouple) continue;
+        var cRect = childCouple.getBoundingClientRect();
+        var endX = (cRect.left + cRect.right)/2 - canvasRect.left;
+        var endY = cRect.top - canvasRect.top;
+        var midY = startY + (endY - startY) * 0.55;
+        var path = document.createElementNS('http://www.w3.org/2000/svg','path');
+        path.setAttribute('d', 'M '+startX+' '+startY+' C '+startX+' '+midY+', '+endX+' '+midY+', '+endX+' '+endY);
+        svg.appendChild(path);
+      }
+    });
+  }
+  window.addEventListener('resize', function(){ requestAnimationFrame(drawLinks); });
+
+  /* ============== Sheets ============== */
+  var overlay = document.getElementById('overlay');
+  var sheet = document.getElementById('sheet');
+  var sheetBody = document.getElementById('sheetBody');
+
+  function openSheet(html){ sheetBody.innerHTML = html; overlay.classList.add('open'); sheet.classList.add('open'); }
+  function closeSheet(){ overlay.classList.remove('open'); sheet.classList.remove('open'); pendingPhoto = undefined; }
+  overlay.addEventListener('click', closeSheet);
+
+  function photoRowHtml(existingPhoto){
+    return '<div class="field"><label>'+t('photoLabel')+'</label>'+
+      '<div class="photo-row">'+
+        '<div class="photo-preview" id="pf_photoPreview">'+(existingPhoto ? '<img src="'+existingPhoto+'">' : '👤')+'</div>'+
+        '<div class="photo-btns">'+
+          '<button type="button" id="pf_choosePhoto">'+t('photoChoose')+'</button>'+
+          '<button type="button" id="pf_removePhoto" style="'+(existingPhoto?'':'display:none;')+'">'+t('photoRemove')+'</button>'+
+        '</div>'+
+        '<input type="file" id="pf_photoFile" accept="image/*" style="display:none;">'+
+      '</div></div>';
+  }
+
+  function wirePhotoRow(existingPhoto){
+    pendingPhoto = existingPhoto || null;
+    document.getElementById('pf_choosePhoto').onclick = function(){ document.getElementById('pf_photoFile').click(); };
+    document.getElementById('pf_photoFile').onchange = function(e){
+      var file = e.target.files[0];
+      if(!file) return;
+      resizeImage(file, 220, function(dataUrl){
+        if(!dataUrl) return;
+        pendingPhoto = dataUrl;
+        document.getElementById('pf_photoPreview').innerHTML = '<img src="'+dataUrl+'">';
+        document.getElementById('pf_removePhoto').style.display = '';
+      });
+    };
+    document.getElementById('pf_removePhoto').onclick = function(){
+      pendingPhoto = null;
+      document.getElementById('pf_photoPreview').innerHTML = '👤';
+      document.getElementById('pf_removePhoto').style.display = 'none';
+    };
+  }
+
+  function openPersonForm(mode, targetId){
+    var isEdit = mode === 'edit';
+    var target = getPerson(targetId);
+    var titleTxt = mode === 'child' ? t('addChildTitle') : (mode === 'spouse' ? t('addSpouseTitle') : t('editTitle'));
+    var contextTxt = mode === 'child' ? tf('contextChild', {name: escapeHtml(target.name)})
+      : mode === 'spouse' ? tf('contextSpouse', {name: escapeHtml(target.name)})
+      : tf('contextEdit', {name: escapeHtml(target.name)});
+
+    openSheet(
+      '<h3>'+titleTxt+'</h3>'+
+      '<div class="context">'+contextTxt+'</div>'+
+      '<div class="field"><label>'+t('nameLabel')+'</label><input type="text" id="pf_name" placeholder="'+t('namePh')+'" value="'+(isEdit ? escapeHtml(target.name) : '')+'"></div>'+
+      '<div class="field"><label>'+t('genderLabel')+'</label>'+
+        '<div class="gender-toggle">'+
+          '<button type="button" id="pf_male" class="'+(!isEdit || target.gender==='m' ? 'active-m':'')+'">'+t('male')+'</button>'+
+          '<button type="button" id="pf_female" class="'+(isEdit && target.gender==='f' ? 'active-f':'')+'">'+t('female')+'</button>'+
+        '</div>'+
+      '</div>'+
+      (isEdit ? photoRowHtml(target.photo) : '') +
+      (isEdit ? '<div class="field"><label>'+t('birthLabel')+'</label><input type="date" id="pf_birth" value="'+(target.birthDate||'')+'"></div>' : '') +
+      (isEdit ? '<div class="field"><label>'+t('residenceLabel')+'</label><input type="text" id="pf_residence" placeholder="'+t('residencePh')+'" value="'+escapeHtml(target.residence||'')+'"></div>' : '') +
+      (mode === 'child' ? '<div class="keep-open-row"><input type="checkbox" id="pf_keep" checked><label for="pf_keep">'+t('keepAdding')+'</label></div>' : '') +
+      '<button class="primary-btn" id="pf_save">'+t('saveBtn')+'</button>'
+    );
+
+    var gender = isEdit ? target.gender : 'm';
+    document.getElementById('pf_male').onclick = function(){ gender='m'; this.className='active-m'; document.getElementById('pf_female').className=''; };
+    document.getElementById('pf_female').onclick = function(){ gender='f'; this.className='active-f'; document.getElementById('pf_male').className=''; };
+    if(isEdit) wirePhotoRow(target.photo);
+    document.getElementById('pf_name').focus();
+
+    document.getElementById('pf_save').onclick = function(){
+      var name = document.getElementById('pf_name').value.trim();
+      if(!name){ toast(t('toastNameRequired')); return; }
+      if(mode === 'child') addChild(targetId, name, gender);
+      else if(mode === 'spouse') addSpouse(targetId, name, gender);
+      else {
+        updatePerson(targetId, {
+          name: name, gender: gender,
+          birthDate: document.getElementById('pf_birth').value || null,
+          residence: document.getElementById('pf_residence').value.trim(),
+          photo: pendingPhoto
+        });
+      }
+      toast(t('toastSaved'));
+      var keepOpen = mode === 'child' && document.getElementById('pf_keep') && document.getElementById('pf_keep').checked;
+      if(keepOpen){ openPersonForm('child', targetId); } else { closeSheet(); }
+    };
+  }
+
+  function openDeleteConfirm(id){
+    var p = getPerson(id);
+    var n = countDescendants(id);
+    var warn = n > 0 ? tf('deleteWarnN', {n: n}) : t('deleteWarnNone');
+    openSheet(
+      '<h3>'+tf('deleteTitle', {name: escapeHtml(p.name)})+'</h3>'+
+      '<div class="confirm-box"><p>'+warn+'</p>'+
+        '<div class="confirm-actions">'+
+          '<button class="btn-cancel" id="cf_cancel">'+t('deleteCancel')+'</button>'+
+          '<button class="btn-danger" id="cf_ok">'+t('deleteConfirm')+'</button>'+
+        '</div></div>'
+    );
+    document.getElementById('cf_cancel').onclick = closeSheet;
+    document.getElementById('cf_ok').onclick = function(){ deletePerson(id); closeSheet(); toast(t('toastDeleted')); };
+  }
+
+  document.getElementById('treeRoot').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-act]');
+    if(!btn) return;
+    var act = btn.dataset.act, id = btn.dataset.id;
+    if(act === 'child') openPersonForm('child', id);
+    else if(act === 'spouse') openPersonForm('spouse', id);
+    else if(act === 'edit') openPersonForm('edit', id);
+    else if(act === 'delete') openDeleteConfirm(id);
+    else if(act === 'toggle') toggleCollapse(id);
+  });
+
+  document.getElementById('createRootBtn').addEventListener('click', function(){
+    var name = document.getElementById('rootName').value.trim();
+    var spouse = document.getElementById('rootSpouseName').value.trim();
+    if(!name){ toast(t('toastNameRequired')); return; }
+    createRoot(name, spouse);
+    toast(t('toastRootCreated'));
+  });
+
+  var titleEl = document.getElementById('familyTitle');
+  titleEl.addEventListener('blur', function(){
+    var v = titleEl.textContent.trim() || t('appName');
+    state.familyName = v; titleEl.textContent = v; scheduleSave();
+  });
+  titleEl.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); titleEl.blur(); } });
+
+  document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
+
+  document.getElementById('exportBtn').addEventListener('click', function(){
+    var blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = (state.familyName || t('appName')) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast(t('toastBackup'));
+  });
+
+  document.getElementById('importBtn').addEventListener('click', function(){ document.getElementById('importFile').click(); });
+  document.getElementById('restoreBtnEmpty').addEventListener('click', function(){ document.getElementById('importFile').click(); });
+  document.getElementById('importFile').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      try{
+        var parsed = JSON.parse(ev.target.result);
+        if(!parsed || typeof parsed.people !== 'object') throw new Error('bad file');
+        parsed.lang = (parsed.lang === 'en' || parsed.lang === 'ar') ? parsed.lang : state.lang;
+        Object.keys(parsed.people).forEach(function(id){ migratePerson(parsed.people[id]); });
+        state = parsed;
+        scheduleSave(); applyLang(); render();
+        toast(t('toastImported'));
+      }catch(err){ toast(t('toastImportError')); }
+    };
+    reader.onerror = function(){ toast(t('toastImportError')); };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', function(){
+    openSheet(
+      '<h3>'+t('resetTitle')+'</h3>'+
+      '<div class="confirm-box"><p>'+t('resetDesc')+'</p>'+
+        '<div class="confirm-actions">'+
+          '<button class="btn-cancel" id="rs_cancel">'+t('deleteCancel')+'</button>'+
+          '<button class="btn-danger" id="rs_ok">'+t('resetConfirm')+'</button>'+
+        '</div></div>'
+    );
+    document.getElementById('rs_cancel').onclick = closeSheet;
+    document.getElementById('rs_ok').onclick = function(){
+      state = { rootId: null, familyName: '', people: {}, lang: state.lang };
+      scheduleSave(); render(); closeSheet();
+    };
+  });
+
+  document.getElementById('menuBtn').addEventListener('click', function(){
+    openSheet(
+      '<h3>'+t('menuTitle')+'</h3>'+
+      '<div class="context">'+t('menuDesc')+'</div>'+
+      '<button class="primary-btn" id="mn_export" style="margin-bottom:10px;">'+t('menuExport')+'</button>'+
+      '<button class="primary-btn" id="mn_import" style="margin-bottom:10px; background:var(--teal);">'+t('menuImport')+'</button>'+
+      '<button class="primary-btn" id="mn_reset" style="background:var(--danger);">'+t('menuReset')+'</button>'
+    );
+    document.getElementById('mn_export').onclick = function(){ closeSheet(); document.getElementById('exportBtn').click(); };
+    document.getElementById('mn_import').onclick = function(){ closeSheet(); document.getElementById('importBtn').click(); };
+    document.getElementById('mn_reset').onclick = function(){ closeSheet(); document.getElementById('resetBtn').click(); };
+  });
+
+  function applyZoom(){
+    document.getElementById('canvas').style.transform = 'scale('+zoom+')';
+    document.getElementById('zoomLabel').textContent = Math.round(zoom*100)+'%';
+  }
+  document.getElementById('zoomIn').addEventListener('click', function(){ zoom = Math.min(1.6, zoom + 0.1); applyZoom(); requestAnimationFrame(drawLinks); });
+  document.getElementById('zoomOut').addEventListener('click', function(){ zoom = Math.max(0.4, zoom - 0.1); applyZoom(); requestAnimationFrame(drawLinks); });
+
+  load();
+})();
+</script>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+  import {
+    getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+    createUserWithEmailAndPassword, signOut
+  } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCU4IJudvRs8PTElMNtbP8WsKhzly5MnNA",
+    authDomain: "family-tree-app-d9238.firebaseapp.com",
+    projectId: "family-tree-app-d9238",
+    storageBucket: "family-tree-app-d9238.firebasestorage.app",
+    messagingSenderId: "706249260228",
+    appId: "1:706249260228:web:be1afb1a46170ec3d85d91"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  var currentUid = null;
+  var currentTreeId = null;
+  var unsubTree = null;
+  var applyingRemote = false;
+  var pushTimer = null;
+  var MAX_DOC_BYTES = 900000; // safety margin under Firestore's 1MB document limit
+
+  var authGate = document.getElementById('authGate');
+  var cloudBtn = document.getElementById('cloudBtn');
+  var authErr = document.getElementById('authErr');
+  var authLoading = document.getElementById('authLoading');
+  var authSubmitBtn = document.getElementById('authSubmitBtn');
+
+  function showErr(msg){ authErr.textContent = msg; authErr.classList.add('show'); }
+  function clearErr(){ authErr.classList.remove('show'); authErr.textContent=''; }
+  function setLoading(on){ authLoading.classList.toggle('show', on); authSubmitBtn.disabled = on; }
+
+  function friendlyAuthError(code){
+    var map = {
+      'auth/invalid-email':'صيغة البريد الإلكتروني غير صحيحة',
+      'auth/user-not-found':'لا يوجد حساب بهذا البريد',
+      'auth/wrong-password':'كلمة المرور غير صحيحة',
+      'auth/invalid-credential':'البريد أو كلمة المرور غير صحيحة',
+      'auth/email-already-in-use':'هذا البريد مستخدم بالفعل — جرّب تسجيل الدخول',
+      'auth/weak-password':'كلمة المرور ضعيفة جدًا (6 أحرف على الأقل)',
+      'auth/network-request-failed':'تعذّر الاتصال بالإنترنت'
+    };
+    return map[code] || ('حدث خطأ: ' + code);
+  }
+
+  var mode = 'login';
+  var signupMode = 'create';
+  var tabLogin = document.getElementById('tabLogin');
+  var tabSignup = document.getElementById('tabSignup');
+  var signupModeBox = document.getElementById('signupModeBox');
+  var modeCreate = document.getElementById('modeCreate');
+  var modeJoin = document.getElementById('modeJoin');
+  var joinCodeField = document.getElementById('joinCodeField');
+
+  function refreshAuthUI(){
+    tabLogin.classList.toggle('active', mode==='login');
+    tabSignup.classList.toggle('active', mode==='signup');
+    signupModeBox.style.display = mode==='signup' ? 'block' : 'none';
+    joinCodeField.style.display = (mode==='signup' && signupMode==='join') ? 'block' : 'none';
+    authSubmitBtn.textContent = mode==='login' ? 'دخول' : (signupMode==='create' ? 'إنشاء الحساب والعائلة' : 'إنشاء الحساب والانضمام');
+    clearErr();
+  }
+  tabLogin.onclick = function(){ mode='login'; refreshAuthUI(); };
+  tabSignup.onclick = function(){ mode='signup'; refreshAuthUI(); };
+  modeCreate.onclick = function(){ signupMode='create'; modeCreate.classList.add('active'); modeJoin.classList.remove('active'); refreshAuthUI(); };
+  modeJoin.onclick = function(){ signupMode='join'; modeJoin.classList.add('active'); modeCreate.classList.remove('active'); refreshAuthUI(); };
+  refreshAuthUI();
+
+  function genFamilyCode(){
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    var s = '';
+    for(var i=0;i<6;i++) s += chars[Math.floor(Math.random()*chars.length)];
+    return s;
+  }
+
+  authSubmitBtn.onclick = async function(){
+    clearErr();
+    var email = document.getElementById('authEmail').value.trim();
+    var pass = document.getElementById('authPass').value;
+    if(!email || !pass){ showErr('يرجى إدخال البريد وكلمة المرور'); return; }
+    setLoading(true);
+    try{
+      if(mode === 'login'){
+        await signInWithEmailAndPassword(auth, email, pass);
+      } else if(signupMode === 'join'){
+        var code = document.getElementById('joinCode').value.trim().toUpperCase();
+        if(!code){ setLoading(false); showErr('يرجى إدخال رمز العائلة'); return; }
+        var treeSnap = await getDoc(doc(db, 'trees', code));
+        if(!treeSnap.exists()){ setLoading(false); showErr('رمز العائلة غير صحيح'); return; }
+        var cred = await createUserWithEmailAndPassword(auth, email, pass);
+        await setDoc(doc(db, 'trees', code, 'members', cred.user.uid), { email: email, joinedAt: serverTimestamp() });
+        await setDoc(doc(db, 'users', cred.user.uid), { email: email, treeId: code });
+      } else {
+        var cred2 = await createUserWithEmailAndPassword(auth, email, pass);
+        var newCode = genFamilyCode();
+        await setDoc(doc(db, 'trees', newCode, 'members', cred2.user.uid), { email: email, joinedAt: serverTimestamp() });
+        await setDoc(doc(db, 'trees', newCode), { familyName:'', lang:'ar', rootId:null, people:{}, updatedAt: serverTimestamp() });
+        await setDoc(doc(db, 'users', cred2.user.uid), { email: email, treeId: newCode });
+      }
+    }catch(err){
+      setLoading(false);
+      showErr(friendlyAuthError(err.code || err.message));
+    }
+  };
+
+  onAuthStateChanged(auth, async function(user){
+    if(!user){
+      currentUid = null; currentTreeId = null;
+      if(unsubTree){ unsubTree(); unsubTree = null; }
+      cloudBtn.style.display = 'none';
+      authGate.classList.remove('hidden');
+      setLoading(false);
+      return;
+    }
+    currentUid = user.uid;
+    setLoading(true);
+    try{
+      var userSnap = await getDoc(doc(db, 'users', user.uid));
+      if(!userSnap.exists() || !userSnap.data().treeId){
+        setLoading(false);
+        showErr('تعذّر العثور على عائلة مرتبطة بحسابك. تواصل مع الدعم.');
+        return;
+      }
+      currentTreeId = userSnap.data().treeId;
+      subscribeTree(currentTreeId);
+      authGate.classList.add('hidden');
+      cloudBtn.style.display = 'flex';
+      setLoading(false);
+    }catch(err){
+      setLoading(false);
+      showErr('تعذّر تحميل بيانات الحساب: ' + (err.message||err.code));
+    }
+  });
+
+  function subscribeTree(treeId){
+    if(unsubTree) unsubTree();
+    unsubTree = onSnapshot(doc(db, 'trees', treeId), function(snap){
+      if(!snap.exists()) return;
+      var data = snap.data();
+      applyingRemote = true;
+      if(window.__ftApplyRemote) window.__ftApplyRemote({
+        familyName: data.familyName || '', lang: data.lang || 'ar',
+        rootId: data.rootId || null, people: data.people || {}
+      });
+      applyingRemote = false;
+      cloudBtn.dataset.status = 'online';
+    }, function(){
+      cloudBtn.dataset.status = 'offline';
+    });
+  }
+
+  window.__ftCloud = {
+    onLocalSave: function(state){
+      if(!currentTreeId || applyingRemote) return;
+      clearTimeout(pushTimer);
+      cloudBtn.dataset.status = 'syncing';
+      pushTimer = setTimeout(function(){ pushToCloud(state); }, 500);
+    }
+  };
+
+  async function pushToCloud(state){
+    if(!currentTreeId) return;
+    var payload = {
+      familyName: state.familyName || '', lang: state.lang || 'ar',
+      rootId: state.rootId || null, people: state.people || {},
+      updatedAt: serverTimestamp()
+    };
+    var size = new Blob([JSON.stringify(payload)]).size;
+    if(size > MAX_DOC_BYTES){
+      cloudBtn.dataset.status = 'offline';
+      alert('حجم بيانات الشجرة كبير جدًا للمزامنة السحابية — قد تحتاج لتقليل حجم الصور أو عدد الأفراد. تم الحفظ محليًا فقط.');
+      return;
+    }
+    try{
+      await setDoc(doc(db, 'trees', currentTreeId), payload, { merge: true });
+      cloudBtn.dataset.status = 'online';
+    }catch(err){
+      cloudBtn.dataset.status = 'offline';
+    }
+  }
+
+  cloudBtn.addEventListener('click', function(){
+    var overlay = document.getElementById('overlay');
+    var sheet = document.getElementById('sheet');
+    var body = document.getElementById('sheetBody');
+    body.innerHTML =
+      '<h3>المزامنة السحابية</h3>' +
+      '<div class="context">شارك هذا الرمز مع أفراد عائلتك للانضمام لنفس الشجرة</div>' +
+      '<div class="code-display">' + currentTreeId + '</div>' +
+      '<button class="primary-btn" id="cf_copyCode" style="margin-bottom:10px;">نسخ الرمز</button>' +
+      '<button class="primary-btn" id="cf_signout" style="background:var(--danger);">تسجيل الخروج</button>';
+    document.getElementById('cf_copyCode').onclick = function(){
+      navigator.clipboard.writeText(currentTreeId).catch(function(){});
+      this.textContent = 'تم النسخ ✓';
+    };
+    document.getElementById('cf_signout').onclick = function(){
+      signOut(auth);
+      overlay.classList.remove('open'); sheet.classList.remove('open');
+    };
+    overlay.classList.add('open'); sheet.classList.add('open');
+  });
+</script>
+</body>
+</html>

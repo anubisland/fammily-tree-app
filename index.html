@@ -986,6 +986,8 @@
     return s;
   }
 
+  var manualAuthFlow = false;
+
   authSubmitBtn.onclick = async function(){
     clearErr();
     var email = document.getElementById('authEmail').value.trim();
@@ -995,28 +997,45 @@
     try{
       if(mode === 'login'){
         await signInWithEmailAndPassword(auth, email, pass);
+        // onAuthStateChanged handles the rest for a normal login.
       } else if(signupMode === 'join'){
         var code = document.getElementById('joinCode').value.trim().toUpperCase();
         if(!code){ setLoading(false); showErr('يرجى إدخال رمز العائلة'); return; }
         var treeSnap = await getDoc(doc(db, 'trees', code));
         if(!treeSnap.exists()){ setLoading(false); showErr('رمز العائلة غير صحيح'); return; }
+        manualAuthFlow = true;
         var cred = await createUserWithEmailAndPassword(auth, email, pass);
         await setDoc(doc(db, 'trees', code, 'members', cred.user.uid), { email: email, joinedAt: serverTimestamp() });
         await setDoc(doc(db, 'users', cred.user.uid), { email: email, treeId: code });
+        currentUid = cred.user.uid; currentTreeId = code;
+        subscribeTree(currentTreeId);
+        authGate.classList.add('hidden');
+        cloudBtn.style.display = 'flex';
+        setLoading(false);
+        manualAuthFlow = false;
       } else {
+        manualAuthFlow = true;
         var cred2 = await createUserWithEmailAndPassword(auth, email, pass);
         var newCode = genFamilyCode();
         await setDoc(doc(db, 'trees', newCode, 'members', cred2.user.uid), { email: email, joinedAt: serverTimestamp() });
         await setDoc(doc(db, 'trees', newCode), { familyName:'', lang:'ar', rootId:null, people:{}, updatedAt: serverTimestamp() });
         await setDoc(doc(db, 'users', cred2.user.uid), { email: email, treeId: newCode });
+        currentUid = cred2.user.uid; currentTreeId = newCode;
+        subscribeTree(currentTreeId);
+        authGate.classList.add('hidden');
+        cloudBtn.style.display = 'flex';
+        setLoading(false);
+        manualAuthFlow = false;
       }
     }catch(err){
+      manualAuthFlow = false;
       setLoading(false);
       showErr(friendlyAuthError(err.code || err.message));
     }
   };
 
   onAuthStateChanged(auth, async function(user){
+    if(manualAuthFlow) return; // the signup/join flow above is handling this itself
     if(!user){
       currentUid = null; currentTreeId = null;
       if(unsubTree){ unsubTree(); unsubTree = null; }

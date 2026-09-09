@@ -507,7 +507,7 @@
       root.spouseIds.push(sp.id);
       sp.spouseIds.push(root.id);
     }
-    if(!state.familyName){ state.familyName = t('familyPrefix') + name.split(' ')[0] + t('familySuffix'); }
+    if(!state.familyName || state.familyName === t('appName')){ state.familyName = t('familyPrefix') + name.split(' ')[0] + t('familySuffix'); }
     scheduleSave(); render();
   }
 

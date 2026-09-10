@@ -160,6 +160,53 @@
   #cloudBtn[data-status="syncing"]{ background:rgba(223,201,152,.45); border-color:rgba(223,201,152,.7); }
   #cloudBtn[data-status="offline"]{ background:rgba(156,59,46,.30); border-color:rgba(156,59,46,.5); }
   .primary-btn:disabled{opacity:.6;}
+
+  /* ---------- Family moments feed ---------- */
+  #momentsScreen{
+    position:fixed; inset:0; background:var(--paper); z-index:80;
+    display:none; flex-direction:column;
+  }
+  #momentsScreen.open{display:flex;}
+  .moments-header{
+    background: linear-gradient(155deg, var(--emerald) 0%, var(--emerald-deep) 78%); color:#F6EFDD;
+    padding:14px 16px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+  }
+  .moments-header h2{font-size:17px; font-family:var(--f-head);}
+  .moments-list{flex:1; overflow-y:auto; padding:14px 14px 6px;}
+  .moment-card{
+    background:var(--card); border-radius:14px; box-shadow:var(--shadow); padding:12px 14px; margin-bottom:12px;
+  }
+  .moment-card .moment-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;}
+  .moment-card .moment-author{font-size:12.5px; font-weight:700; color:var(--emerald-deep);}
+  .moment-card .moment-time{font-size:10.5px; color:var(--ink-soft);}
+  .moment-card .moment-text{font-size:13.5px; line-height:1.7; white-space:pre-wrap; word-break:break-word;}
+  .moment-card .moment-photo{width:100%; border-radius:10px; margin-top:8px; display:block;}
+  .moment-card .moment-del{ float:inline-start; background:none; border:none; color:var(--danger); font-size:12px; margin-top:6px; padding:0; }
+  .moments-empty{ text-align:center; color:var(--ink-soft); font-size:13px; padding:40px 20px; }
+  .moments-compose{
+    flex-shrink:0; background:var(--card); border-top:1px solid var(--paper-deep); padding:10px 12px 12px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .moments-compose textarea{
+    width:100%; border:1.5px solid var(--line); border-radius:10px; padding:8px 10px; background:var(--paper);
+    font-family:var(--f-body); font-size:13.5px; resize:none;
+  }
+  .moments-compose-actions{display:flex; gap:8px; margin-top:8px; align-items:center;}
+  .moments-compose-actions #momentPhotoBtn{
+    background:var(--paper); border:1.5px solid var(--line); border-radius:9px; padding:9px 12px; font-size:12.5px; color:var(--ink-soft);
+  }
+  .moments-compose-actions .primary-btn{padding:9px 12px; font-size:13.5px;}
+  .moments-photo-preview{position:relative; margin-bottom:8px;}
+  .moments-photo-preview img{max-height:120px; border-radius:10px; display:block;}
+  .moments-photo-preview .remove-photo-x{
+    position:absolute; top:4px; inset-inline-end:4px; width:22px; height:22px; border-radius:50%;
+    background:rgba(43,33,24,.65); color:#fff; border:none; font-size:13px;
+  }
+  .moments-cta{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    background:rgba(246,239,221,.14); border:1px solid rgba(246,239,221,.3); border-radius:12px;
+    padding:10px; margin-top:12px; color:#F6EFDD; font-size:13px; font-weight:700; position:relative; z-index:1;
+  }
 </style>
 </head>
 <body>
@@ -196,6 +243,24 @@
     </div>
   </div>
 
+  <div id="momentsScreen">
+    <div class="moments-header">
+      <button class="icon-btn" id="momentsBack" title="رجوع">→</button>
+      <h2>📰 لحظات العائلة</h2>
+      <div style="width:36px;"></div>
+    </div>
+    <div class="moments-list" id="momentsList"></div>
+    <div class="moments-compose">
+      <div class="moments-photo-preview" id="momentPhotoPreview" style="display:none;"></div>
+      <textarea id="momentText" placeholder="شارك خبرًا أو لحظة مع العائلة…" rows="2"></textarea>
+      <div class="moments-compose-actions">
+        <button id="momentPhotoBtn" type="button">📷 صورة</button>
+        <input type="file" id="momentPhotoFile" accept="image/*" style="display:none;">
+        <button id="momentPostBtn" class="primary-btn" style="flex:1;">نشر</button>
+      </div>
+    </div>
+  </div>
+
   <div class="banner">
     <div class="banner-row">
       <div>
@@ -210,6 +275,7 @@
       </div>
     </div>
     <div class="stat-row" id="statRow"></div>
+    <button class="moments-cta" id="momentsOpenBtn" style="display:none; width:100%; cursor:pointer;">📰 لحظات العائلة — شارك واطّلع على آخر الأخبار</button>
   </div>
 
   <div class="storage-warn" id="storageWarn"></div>
@@ -415,6 +481,16 @@
     applyLang(); render();
   };
   window.__ftGetState = function(){ return state; };
+  window.__ftResizeImage = resizeImage;
+  window.__ftEscapeHtml = escapeHtml;
+  window.__ftTimeAgo = function(dateObj){
+    if(!dateObj) return '';
+    var diffSec = Math.round((Date.now() - dateObj.getTime())/1000);
+    if(diffSec < 60) return 'الآن';
+    var m = Math.round(diffSec/60); if(m < 60) return 'منذ ' + m + ' دقيقة';
+    var h = Math.round(m/60); if(h < 24) return 'منذ ' + h + ' ساعة';
+    var d = Math.round(h/24); return 'منذ ' + d + ' يوم';
+  };
 
   /* Edit permission (true = local-only or owner/editor; false = viewer / read-only).
      Set by the cloud module after it resolves the signed-in user's role. */
@@ -1115,7 +1191,7 @@
         window.__ftSetEditable(true);
         subscribeTree(currentTreeId);
         authGate.classList.add('hidden');
-        cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || '';
+        cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
         setLoading(false);
         manualAuthFlow = false;
       } else {
@@ -1130,7 +1206,7 @@
         window.__ftSetEditable(true);
         subscribeTree(currentTreeId);
         authGate.classList.add('hidden');
-        cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || '';
+        cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
         setLoading(false);
         manualAuthFlow = false;
       }
@@ -1147,6 +1223,9 @@
       currentUid = null; currentTreeId = null; currentRole = null;
       if(unsubTree){ unsubTree(); unsubTree = null; }
       cloudBtn.style.display = 'none';
+      document.getElementById('momentsOpenBtn').style.display = 'none';
+      document.getElementById('momentsScreen').classList.remove('open');
+      if(unsubMoments){ unsubMoments(); unsubMoments = null; }
       authGate.classList.remove('hidden');
       setLoading(false);
       return;
@@ -1166,7 +1245,7 @@
       window.__ftSetEditable(currentRole !== 'viewer');
       subscribeTree(currentTreeId);
       authGate.classList.add('hidden');
-      cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || '';
+      cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
       setLoading(false);
     }catch(err){
       setLoading(false);
@@ -1198,7 +1277,7 @@
       await addDoc(collection(db, 'trees', currentTreeId, 'activity'), {
         action: action, personName: personName || '', byEmail: email, byUid: currentUid, at: serverTimestamp()
       });
-    }catch(e){ /* non-critical; ignore failures (e.g. viewer somehow triggered this) */ }
+    }catch(e){ console.warn('logActivity failed (likely security rules not yet published):', e.message); }
   }
 
   function actionLabel(action){
@@ -1295,6 +1374,106 @@
       body.innerHTML = '<h3>👥 أفراد العائلة</h3><div class="context">تعذّر تحميل القائمة.</div>';
     }
   }
+
+  /* ---------- Family moments feed ---------- */
+  var unsubMoments = null;
+  var pendingMomentPhoto = null;
+
+  function renderMoments(docs){
+    var list = document.getElementById('momentsList');
+    if(!docs.length){
+      list.innerHTML = '<div class="moments-empty">لا توجد لحظات بعد — كن أول من يشارك خبرًا مع العائلة!</div>';
+      return;
+    }
+    var esc = window.__ftEscapeHtml || function(s){ return s; };
+    var timeAgoFn = window.__ftTimeAgo || function(){ return ''; };
+    var html = '';
+    docs.forEach(function(d){
+      var v = d.data();
+      var when = v.at && v.at.toDate ? timeAgoFn(v.at.toDate()) : 'الآن';
+      var canDelete = v.byUid === currentUid || currentRole === 'owner';
+      html += '<div class="moment-card">' +
+        '<div class="moment-head"><span class="moment-author">' + esc(v.byEmail || '؟') + '</span>' +
+        '<span class="moment-time">' + when + '</span></div>' +
+        (v.text ? '<div class="moment-text">' + esc(v.text) + '</div>' : '') +
+        (v.photo ? '<img class="moment-photo" src="' + v.photo + '">' : '') +
+        (canDelete ? '<button class="moment-del" data-id="' + d.id + '">🗑 حذف</button>' : '') +
+      '</div>';
+    });
+    list.innerHTML = html;
+    list.querySelectorAll('.moment-del').forEach(function(btn){
+      btn.onclick = async function(){
+        if(!confirm('حذف هذه اللحظة؟')) return;
+        try{ await deleteDoc(doc(db, 'trees', currentTreeId, 'moments', btn.dataset.id)); }
+        catch(e){ alert('تعذّر الحذف.'); }
+      };
+    });
+  }
+
+  function subscribeMoments(){
+    if(unsubMoments) unsubMoments();
+    var q = query(collection(db, 'trees', currentTreeId, 'moments'), orderBy('at', 'desc'), limit(50));
+    unsubMoments = onSnapshot(q, function(snap){
+      var docs = [];
+      snap.forEach(function(d){ docs.push(d); });
+      renderMoments(docs);
+    }, function(){
+      document.getElementById('momentsList').innerHTML = '<div class="moments-empty">تعذّر تحميل اللحظات.</div>';
+    });
+  }
+
+  function openMoments(){
+    document.getElementById('momentsScreen').classList.add('open');
+    document.getElementById('momentsList').innerHTML = '<div class="moments-empty">جارِ التحميل…</div>';
+    subscribeMoments();
+  }
+  function closeMoments(){
+    document.getElementById('momentsScreen').classList.remove('open');
+    if(unsubMoments){ unsubMoments(); unsubMoments = null; }
+  }
+  document.getElementById('momentsOpenBtn').addEventListener('click', openMoments);
+  document.getElementById('momentsBack').addEventListener('click', closeMoments);
+
+  document.getElementById('momentPhotoBtn').addEventListener('click', function(){
+    document.getElementById('momentPhotoFile').click();
+  });
+  document.getElementById('momentPhotoFile').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if(!file || !window.__ftResizeImage) return;
+    window.__ftResizeImage(file, 640, function(dataUrl){
+      if(!dataUrl) return;
+      pendingMomentPhoto = dataUrl;
+      var prev = document.getElementById('momentPhotoPreview');
+      prev.style.display = 'block';
+      prev.innerHTML = '<img src="'+dataUrl+'"><button type="button" class="remove-photo-x" id="momentRemovePhoto">✕</button>';
+      document.getElementById('momentRemovePhoto').onclick = function(){
+        pendingMomentPhoto = null; prev.style.display = 'none'; prev.innerHTML = '';
+      };
+    });
+  });
+
+  document.getElementById('momentPostBtn').addEventListener('click', async function(){
+    var textEl = document.getElementById('momentText');
+    var text = textEl.value.trim();
+    if(!text && !pendingMomentPhoto){ alert('اكتب شيئًا أو أضف صورة أولاً'); return; }
+    if(!currentTreeId || !currentUid){ alert('يجب تسجيل الدخول أولاً'); return; }
+    var btn = document.getElementById('momentPostBtn');
+    btn.disabled = true;
+    try{
+      await addDoc(collection(db, 'trees', currentTreeId, 'moments'), {
+        text: text, photo: pendingMomentPhoto || null,
+        byEmail: (auth.currentUser && auth.currentUser.email) || '', byUid: currentUid,
+        at: serverTimestamp()
+      });
+      textEl.value = '';
+      pendingMomentPhoto = null;
+      var prev = document.getElementById('momentPhotoPreview');
+      prev.style.display = 'none'; prev.innerHTML = '';
+    }catch(e){
+      alert('تعذّر النشر — تأكد من تحديث قواعد الأمان (Firestore Rules).');
+    }
+    btn.disabled = false;
+  });
 
   window.__ftCloud = {
     onLocalSave: function(state){

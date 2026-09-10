@@ -416,6 +416,11 @@
   };
   window.__ftGetState = function(){ return state; };
 
+  /* Edit permission (true = local-only or owner/editor; false = viewer / read-only).
+     Set by the cloud module after it resolves the signed-in user's role. */
+  var canEditCloud = true;
+  window.__ftSetEditable = function(val){ canEditCloud = !!val; render(); };
+
   function showStorageWarn(){ var w = document.getElementById('storageWarn'); w.textContent = t('storageWarn'); w.style.display = 'block'; }
   function hideStorageWarn(){ document.getElementById('storageWarn').style.display = 'none'; }
 
@@ -498,6 +503,11 @@
     reader.readAsDataURL(file);
   }
 
+  /* Notifies the cloud module (if active) so it can record who did what. */
+  function logActivity(action, personName){
+    if(window.__ftCloud && window.__ftCloud.logActivity) window.__ftCloud.logActivity(action, personName);
+  }
+
   /* ============== Mutations ============== */
   function createRoot(name, spouseName){
     var root = newPerson(name, 'm', null);
@@ -511,6 +521,7 @@
     }
     if(!state.familyName || state.familyName === t('appName')){ state.familyName = t('familyPrefix') + name.split(' ')[0] + t('familySuffix'); }
     scheduleSave(); render();
+    logActivity('add', name);
   }
 
   function addChild(parentId, name, gender){
@@ -518,6 +529,7 @@
     state.people[child.id] = child;
     getPerson(parentId).childrenIds.push(child.id);
     scheduleSave(); render();
+    logActivity('add', name);
   }
 
   function addSpouse(personId, name, gender){
@@ -526,6 +538,7 @@
     getPerson(personId).spouseIds.push(sp.id);
     sp.spouseIds.push(personId);
     scheduleSave(); render();
+    logActivity('add', name);
   }
 
   function updatePerson(id, data){
@@ -535,6 +548,7 @@
     p.residence = data.residence || '';
     if(data.photo !== undefined) p.photo = data.photo;
     scheduleSave(); render();
+    logActivity('edit', data.name);
   }
 
   function countDescendants(id){
@@ -546,6 +560,7 @@
   function deletePerson(id){
     var p = getPerson(id);
     if(!p) return;
+    var deletedName = p.name;
     (p.childrenIds || []).slice().forEach(deletePerson);
     (p.spouseIds || []).forEach(function(sid){
       var sp = getPerson(sid);
@@ -558,9 +573,14 @@
     delete state.people[id];
     if(state.rootId === id){ state.rootId = null; state.familyName = ""; }
     scheduleSave(); render();
+    logActivity('delete', deletedName);
   }
 
-  function toggleCollapse(id){ getPerson(id).collapsed = !getPerson(id).collapsed; scheduleSave(); render(); }
+  function toggleCollapse(id){
+    getPerson(id).collapsed = !getPerson(id).collapsed;
+    if(canEditCloud) scheduleSave(); // viewers can still collapse/expand locally for browsing; it just won't sync
+    render();
+  }
 
   function moveSibling(id, delta){
     var p = getPerson(id);
@@ -621,6 +641,7 @@
       '<div class="gen-badge">'+genLabel(depth)+'</div>' +
       (age !== null ? '<div class="meta-line">🎂 '+ageText(age)+'</div>' : '') +
       (p.residence ? '<div class="meta-line">📍 '+escapeHtml(p.residence)+'</div>' : '') +
+      (canEditCloud ? (
       '<div class="card-actions">' +
         '<button class="mini-btn" data-act="child" data-id="'+id+'" title="'+t('addChildTitle')+'">＋👶</button>' +
         (p.spouseIds.length < 4 ? '<button class="mini-btn" data-act="spouse" data-id="'+id+'" title="'+t('addSpouseTitle')+'">＋💍</button>' : '') +
@@ -628,7 +649,8 @@
         (siblingInfo && siblingInfo.idx > 0 ? '<button class="mini-btn" data-act="moveleft" data-id="'+id+'" title="'+t('moveRightTitle')+'">▶</button>' : '') +
         (siblingInfo && siblingInfo.idx < siblingInfo.count - 1 ? '<button class="mini-btn" data-act="moveright" data-id="'+id+'" title="'+t('moveLeftTitle')+'">◀</button>' : '') +
         '<button class="mini-btn danger" data-act="delete" data-id="'+id+'" title="delete">🗑</button>' +
-      '</div>';
+      '</div>') : '') +
+      '';
     if(childCount > 0){
       var tog = document.createElement('div');
       tog.className = 'toggle-branch';
@@ -664,6 +686,12 @@
     var emptyWrap = document.getElementById('emptyWrap');
     var canvas = document.getElementById('canvas');
     var toolbar = document.getElementById('toolbar');
+    var titleEl2 = document.getElementById('familyTitle');
+    titleEl2.setAttribute('contenteditable', canEditCloud ? 'true' : 'false');
+    document.getElementById('createRootBtn').style.display = canEditCloud ? '' : 'none';
+    document.getElementById('restoreBtnEmpty').style.display = canEditCloud ? '' : 'none';
+    document.getElementById('importBtn').style.display = canEditCloud ? '' : 'none';
+    document.getElementById('resetBtn').style.display = canEditCloud ? '' : 'none';
 
     if(!state.rootId || !getPerson(state.rootId)){
       emptyWrap.style.display = 'flex'; canvas.style.display = 'none'; toolbar.style.display = 'none';
@@ -912,12 +940,18 @@
       '<h3>'+t('menuTitle')+'</h3>'+
       '<div class="context">'+t('menuDesc')+'</div>'+
       '<button class="primary-btn" id="mn_export" style="margin-bottom:10px;">'+t('menuExport')+'</button>'+
-      '<button class="primary-btn" id="mn_import" style="margin-bottom:10px; background:var(--teal);">'+t('menuImport')+'</button>'+
-      '<button class="primary-btn" id="mn_reset" style="background:var(--danger);">'+t('menuReset')+'</button>'
+      (canEditCloud ? '<button class="primary-btn" id="mn_import" style="margin-bottom:10px; background:var(--teal);">'+t('menuImport')+'</button>' : '') +
+      (canEditCloud ? '<button class="primary-btn" id="mn_reset" style="background:var(--danger);">'+t('menuReset')+'</button>' : '') +
+      (window.__ftCloud ? '<button class="primary-btn" id="mn_activity" style="margin-top:10px; background:var(--plum);">📋 سجل النشاط</button>' : '')
     );
     document.getElementById('mn_export').onclick = function(){ closeSheet(); document.getElementById('exportBtn').click(); };
-    document.getElementById('mn_import').onclick = function(){ closeSheet(); document.getElementById('importBtn').click(); };
-    document.getElementById('mn_reset').onclick = function(){ closeSheet(); document.getElementById('resetBtn').click(); };
+    if(canEditCloud){
+      document.getElementById('mn_import').onclick = function(){ closeSheet(); document.getElementById('importBtn').click(); };
+      document.getElementById('mn_reset').onclick = function(){ closeSheet(); document.getElementById('resetBtn').click(); };
+    }
+    if(window.__ftCloud){
+      document.getElementById('mn_activity').onclick = function(){ closeSheet(); window.__ftCloud.showActivityLog(); };
+    }
   });
 
   function applyZoom(){
@@ -938,7 +972,8 @@
     createUserWithEmailAndPassword, signOut
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
   import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp
+    getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp,
+    collection, addDoc, getDocs, query, orderBy, limit, deleteDoc, updateDoc
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -956,6 +991,7 @@
 
   var currentUid = null;
   var currentTreeId = null;
+  var currentRole = null;
   var unsubTree = null;
   var applyingRemote = false;
   var pushTimer = null;
@@ -1039,9 +1075,11 @@
           showErr('رمز العائلة غير صحيح');
           return;
         }
-        await setDoc(doc(db, 'trees', code, 'members', cred.user.uid), { email: email, joinedAt: serverTimestamp() });
+        await setDoc(doc(db, 'trees', code, 'members', cred.user.uid), { email: email, role: 'editor', joinedAt: serverTimestamp() });
         await setDoc(doc(db, 'users', cred.user.uid), { email: email, treeId: code });
         currentUid = cred.user.uid; currentTreeId = code;
+        currentRole = 'editor';
+        window.__ftSetEditable(true);
         subscribeTree(currentTreeId);
         authGate.classList.add('hidden');
         cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || '';
@@ -1051,10 +1089,12 @@
         manualAuthFlow = true;
         var cred2 = await createUserWithEmailAndPassword(auth, email, pass);
         var newCode = genFamilyCode();
-        await setDoc(doc(db, 'trees', newCode, 'members', cred2.user.uid), { email: email, joinedAt: serverTimestamp() });
+        await setDoc(doc(db, 'trees', newCode, 'members', cred2.user.uid), { email: email, role: 'owner', joinedAt: serverTimestamp() });
         await setDoc(doc(db, 'trees', newCode), { familyName:'', lang:'ar', rootId:null, people:{}, updatedAt: serverTimestamp() });
         await setDoc(doc(db, 'users', cred2.user.uid), { email: email, treeId: newCode });
         currentUid = cred2.user.uid; currentTreeId = newCode;
+        currentRole = 'owner';
+        window.__ftSetEditable(true);
         subscribeTree(currentTreeId);
         authGate.classList.add('hidden');
         cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || '';
@@ -1071,7 +1111,7 @@
   onAuthStateChanged(auth, async function(user){
     if(manualAuthFlow) return; // the signup/join flow above is handling this itself
     if(!user){
-      currentUid = null; currentTreeId = null;
+      currentUid = null; currentTreeId = null; currentRole = null;
       if(unsubTree){ unsubTree(); unsubTree = null; }
       cloudBtn.style.display = 'none';
       authGate.classList.remove('hidden');
@@ -1088,6 +1128,9 @@
         return;
       }
       currentTreeId = userSnap.data().treeId;
+      var memberSnap = await getDoc(doc(db, 'trees', currentTreeId, 'members', user.uid));
+      currentRole = (memberSnap.exists() && memberSnap.data().role) || 'editor'; // legacy members with no role are grandfathered as editor
+      window.__ftSetEditable(currentRole !== 'viewer');
       subscribeTree(currentTreeId);
       authGate.classList.add('hidden');
       cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || '';
@@ -1115,17 +1158,124 @@
     });
   }
 
+  async function logActivity(action, personName){
+    if(!currentTreeId || !currentUid) return;
+    var email = (auth.currentUser && auth.currentUser.email) || '';
+    try{
+      await addDoc(collection(db, 'trees', currentTreeId, 'activity'), {
+        action: action, personName: personName || '', byEmail: email, byUid: currentUid, at: serverTimestamp()
+      });
+    }catch(e){ /* non-critical; ignore failures (e.g. viewer somehow triggered this) */ }
+  }
+
+  function actionLabel(action){
+    if(action === 'add') return 'أضاف';
+    if(action === 'edit') return 'عدّل';
+    if(action === 'delete') return 'حذف';
+    return action;
+  }
+  function timeAgo(dateObj){
+    if(!dateObj) return '';
+    var diffSec = Math.round((Date.now() - dateObj.getTime())/1000);
+    if(diffSec < 60) return 'الآن';
+    var m = Math.round(diffSec/60); if(m < 60) return 'منذ ' + m + ' دقيقة';
+    var h = Math.round(m/60); if(h < 24) return 'منذ ' + h + ' ساعة';
+    var d = Math.round(h/24); return 'منذ ' + d + ' يوم';
+  }
+
+  async function showActivityLog(){
+    var overlay = document.getElementById('overlay');
+    var sheet = document.getElementById('sheet');
+    var body = document.getElementById('sheetBody');
+    body.innerHTML = '<h3>📋 سجل النشاط</h3><div class="context">جارِ التحميل…</div>';
+    overlay.classList.add('open'); sheet.classList.add('open');
+    try{
+      var q = query(collection(db, 'trees', currentTreeId, 'activity'), orderBy('at', 'desc'), limit(30));
+      var snap = await getDocs(q);
+      if(snap.empty){
+        body.innerHTML = '<h3>📋 سجل النشاط</h3><div class="context">لا يوجد أي نشاط مسجَّل بعد.</div>';
+        return;
+      }
+      var rows = '';
+      snap.forEach(function(d){
+        var v = d.data();
+        var when = v.at && v.at.toDate ? timeAgo(v.at.toDate()) : '';
+        rows += '<div style="padding:9px 0; border-bottom:1px solid var(--paper-deep); font-size:13px;">' +
+          '<b>' + (v.byEmail || '؟') + '</b> ' + actionLabel(v.action) + ' «' + (v.personName || '') + '»' +
+          '<div style="color:var(--ink-soft); font-size:11px; margin-top:2px;">' + when + '</div>' +
+        '</div>';
+      });
+      body.innerHTML = '<h3>📋 سجل النشاط</h3><div class="context">آخر ' + snap.size + ' نشاط</div>' + rows;
+    }catch(e){
+      body.innerHTML = '<h3>📋 سجل النشاط</h3><div class="context">تعذّر تحميل السجل.</div>';
+    }
+  }
+
+  async function showMembers(){
+    var overlay = document.getElementById('overlay');
+    var sheet = document.getElementById('sheet');
+    var body = document.getElementById('sheetBody');
+    body.innerHTML = '<h3>👥 أفراد العائلة</h3><div class="context">جارِ التحميل…</div>';
+    overlay.classList.add('open'); sheet.classList.add('open');
+    try{
+      var snap = await getDocs(collection(db, 'trees', currentTreeId, 'members'));
+      var rows = '';
+      snap.forEach(function(d){
+        var v = d.data();
+        var uid = d.id;
+        var role = v.role || 'editor';
+        var roleLabel = role === 'owner' ? 'مالك' : (role === 'viewer' ? 'مشاهدة فقط' : 'محرِّر');
+        var isSelf = uid === currentUid;
+        rows += '<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 0; border-bottom:1px solid var(--paper-deep);">' +
+          '<div style="font-size:12.5px;"><b>' + (v.email || uid) + '</b>' + (isSelf ? ' (أنت)' : '') +
+          '<div style="color:var(--ink-soft); font-size:11px;">' + roleLabel + '</div></div>' +
+          (currentRole === 'owner' && !isSelf ? (
+            '<div style="display:flex; gap:5px;">' +
+              (role !== 'viewer' ? '<button class="mini-btn" data-uid="'+uid+'" data-newrole="viewer" data-mact="role" title="تخفيض لمشاهد">👁</button>' : '') +
+              (role !== 'editor' ? '<button class="mini-btn" data-uid="'+uid+'" data-newrole="editor" data-mact="role" title="ترقية لمحرِّر">✎</button>' : '') +
+              '<button class="mini-btn danger" data-uid="'+uid+'" data-mact="remove" title="إزالة من العائلة">🗑</button>' +
+            '</div>'
+          ) : '') +
+        '</div>';
+      });
+      body.innerHTML = '<h3>👥 أفراد العائلة (' + snap.size + ')</h3>' + rows;
+      body.querySelectorAll('[data-mact="role"]').forEach(function(btn){
+        btn.onclick = async function(){
+          var uid = btn.dataset.uid, newRole = btn.dataset.newrole;
+          try{
+            await updateDoc(doc(db, 'trees', currentTreeId, 'members', uid), { role: newRole });
+            showMembers();
+          }catch(e){ alert('تعذّر تغيير الصلاحية.'); }
+        };
+      });
+      body.querySelectorAll('[data-mact="remove"]').forEach(function(btn){
+        btn.onclick = async function(){
+          var uid = btn.dataset.uid;
+          if(!confirm('إزالة هذا الفرد من العائلة؟ لن يعود بإمكانه رؤية الشجرة.')) return;
+          try{
+            await deleteDoc(doc(db, 'trees', currentTreeId, 'members', uid));
+            showMembers();
+          }catch(e){ alert('تعذّر إزالة العضو.'); }
+        };
+      });
+    }catch(e){
+      body.innerHTML = '<h3>👥 أفراد العائلة</h3><div class="context">تعذّر تحميل القائمة.</div>';
+    }
+  }
+
   window.__ftCloud = {
     onLocalSave: function(state){
       if(!currentTreeId || applyingRemote) return;
       clearTimeout(pushTimer);
       cloudBtn.dataset.status = 'syncing';
       pushTimer = setTimeout(function(){ pushToCloud(state); }, 500);
-    }
+    },
+    logActivity: logActivity,
+    showActivityLog: showActivityLog
   };
 
   async function pushToCloud(state){
-    if(!currentTreeId) return;
+    if(!currentTreeId || currentRole === 'viewer') return;
     var payload = {
       familyName: state.familyName || '', lang: state.lang || 'ar',
       rootId: state.rootId || null, people: state.people || {},
@@ -1150,13 +1300,16 @@
     var sheet = document.getElementById('sheet');
     var body = document.getElementById('sheetBody');
     var currentEmail = (auth.currentUser && auth.currentUser.email) || '';
+    var roleLabel = currentRole === 'owner' ? 'مالك العائلة' : (currentRole === 'viewer' ? 'مشاهدة فقط' : 'محرِّر');
     body.innerHTML =
       '<h3>المزامنة السحابية</h3>' +
-      '<div class="context">مسجّل الدخول باسم: <strong>' + currentEmail + '</strong></div>' +
+      '<div class="context">مسجّل الدخول باسم: <strong>' + currentEmail + '</strong> (' + roleLabel + ')</div>' +
       '<div class="context">شارك هذا الرمز مع أفراد عائلتك للانضمام لنفس الشجرة</div>' +
       '<div class="code-display">' + currentTreeId + '</div>' +
       '<button class="primary-btn" id="cf_copyCode" style="margin-bottom:10px;">نسخ الرمز</button>' +
+      '<button class="primary-btn" id="cf_members" style="margin-bottom:10px; background:var(--teal);">👥 أفراد العائلة</button>' +
       '<button class="primary-btn" id="cf_signout" style="background:var(--danger);">تسجيل الخروج</button>';
+    document.getElementById('cf_members').onclick = function(){ showMembers(); };
     document.getElementById('cf_copyCode').onclick = function(){
       navigator.clipboard.writeText(currentTreeId).catch(function(){});
       this.textContent = 'تم النسخ ✓';

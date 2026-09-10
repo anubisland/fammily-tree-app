@@ -580,8 +580,8 @@
   }
 
   /* Notifies the cloud module (if active) so it can record who did what. */
-  function logActivity(action, personName){
-    if(window.__ftCloud && window.__ftCloud.logActivity) window.__ftCloud.logActivity(action, personName);
+  function logActivity(action, personName, detail){
+    if(window.__ftCloud && window.__ftCloud.logActivity) window.__ftCloud.logActivity(action, personName, detail);
   }
 
   /* ============== Mutations ============== */
@@ -619,12 +619,19 @@
 
   function updatePerson(id, data){
     var p = getPerson(id);
+    var changed = [];
+    if(p.name !== data.name) changed.push('الاسم');
+    if(p.gender !== data.gender) changed.push('النوع');
+    if((p.birthDate || null) !== (data.birthDate || null)) changed.push('تاريخ الميلاد');
+    if((p.residence || '') !== (data.residence || '')) changed.push('مكان الإقامة');
+    if(data.photo !== undefined && p.photo !== data.photo) changed.push('الصورة');
+
     p.name = data.name; p.gender = data.gender;
     p.birthDate = data.birthDate || null;
     p.residence = data.residence || '';
     if(data.photo !== undefined) p.photo = data.photo;
     scheduleSave(); render();
-    logActivity('edit', data.name);
+    if(changed.length){ logActivity('edit', data.name, changed.join('، ')); }
   }
 
   function countDescendants(id){
@@ -1194,6 +1201,7 @@
         cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
         setLoading(false);
         manualAuthFlow = false;
+        logActivity('join', '');
       } else {
         manualAuthFlow = true;
         var cred2 = await createUserWithEmailAndPassword(auth, email, pass);
@@ -1209,6 +1217,7 @@
         cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
         setLoading(false);
         manualAuthFlow = false;
+        logActivity('create_family', '');
       }
     }catch(err){
       manualAuthFlow = false;
@@ -1247,6 +1256,7 @@
       authGate.classList.add('hidden');
       cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
       setLoading(false);
+      logActivity('login', '');
     }catch(err){
       setLoading(false);
       showErr('تعذّر تحميل بيانات الحساب: ' + (err.message||err.code));
@@ -1270,12 +1280,12 @@
     });
   }
 
-  async function logActivity(action, personName){
+  async function logActivity(action, personName, detail){
     if(!currentTreeId || !currentUid) return;
     var email = (auth.currentUser && auth.currentUser.email) || '';
     try{
       await addDoc(collection(db, 'trees', currentTreeId, 'activity'), {
-        action: action, personName: personName || '', byEmail: email, byUid: currentUid, at: serverTimestamp()
+        action: action, personName: personName || '', detail: detail || '', byEmail: email, byUid: currentUid, at: serverTimestamp()
       });
     }catch(e){ console.warn('logActivity failed (likely security rules not yet published):', e.message); }
   }
@@ -1284,6 +1294,9 @@
     if(action === 'add') return 'أضاف';
     if(action === 'edit') return 'عدّل';
     if(action === 'delete') return 'حذف';
+    if(action === 'login') return 'سجّل الدخول';
+    if(action === 'join') return 'انضم للعائلة';
+    if(action === 'create_family') return 'أنشأ العائلة';
     return action;
   }
   function timeAgo(dateObj){
@@ -1312,8 +1325,11 @@
       snap.forEach(function(d){
         var v = d.data();
         var when = v.at && v.at.toDate ? timeAgo(v.at.toDate()) : '';
+        var isPersonAction = (v.action === 'add' || v.action === 'edit' || v.action === 'delete');
         rows += '<div style="padding:9px 0; border-bottom:1px solid var(--paper-deep); font-size:13px;">' +
-          '<b>' + (v.byEmail || '؟') + '</b> ' + actionLabel(v.action) + ' «' + (v.personName || '') + '»' +
+          '<b>' + (v.byEmail || '؟') + '</b> ' + actionLabel(v.action) +
+          (isPersonAction ? ' «' + (v.personName || '') + '»' : '') +
+          (v.detail ? ' <span style="color:var(--ink-soft);">(' + v.detail + ')</span>' : '') +
           '<div style="color:var(--ink-soft); font-size:11px; margin-top:2px;">' + when + '</div>' +
         '</div>';
       });

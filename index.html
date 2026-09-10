@@ -1016,7 +1016,7 @@
         currentUid = cred.user.uid; currentTreeId = code;
         subscribeTree(currentTreeId);
         authGate.classList.add('hidden');
-        cloudBtn.style.display = 'flex';
+        cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || '';
         setLoading(false);
         manualAuthFlow = false;
       } else {
@@ -1029,7 +1029,7 @@
         currentUid = cred2.user.uid; currentTreeId = newCode;
         subscribeTree(currentTreeId);
         authGate.classList.add('hidden');
-        cloudBtn.style.display = 'flex';
+        cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || '';
         setLoading(false);
         manualAuthFlow = false;
       }
@@ -1062,7 +1062,7 @@
       currentTreeId = userSnap.data().treeId;
       subscribeTree(currentTreeId);
       authGate.classList.add('hidden');
-      cloudBtn.style.display = 'flex';
+      cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || '';
       setLoading(false);
     }catch(err){
       setLoading(false);
@@ -1121,8 +1121,10 @@
     var overlay = document.getElementById('overlay');
     var sheet = document.getElementById('sheet');
     var body = document.getElementById('sheetBody');
+    var currentEmail = (auth.currentUser && auth.currentUser.email) || '';
     body.innerHTML =
       '<h3>المزامنة السحابية</h3>' +
+      '<div class="context">مسجّل الدخول باسم: <strong>' + currentEmail + '</strong></div>' +
       '<div class="context">شارك هذا الرمز مع أفراد عائلتك للانضمام لنفس الشجرة</div>' +
       '<div class="code-display">' + currentTreeId + '</div>' +
       '<button class="primary-btn" id="cf_copyCode" style="margin-bottom:10px;">نسخ الرمز</button>' +

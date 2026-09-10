@@ -1001,10 +1001,16 @@
       } else if(signupMode === 'join'){
         var code = document.getElementById('joinCode').value.trim().toUpperCase();
         if(!code){ setLoading(false); showErr('يرجى إدخال رمز العائلة'); return; }
-        var treeSnap = await getDoc(doc(db, 'trees', code));
-        if(!treeSnap.exists()){ setLoading(false); showErr('رمز العائلة غير صحيح'); return; }
         manualAuthFlow = true;
         var cred = await createUserWithEmailAndPassword(auth, email, pass);
+        var treeSnap = await getDoc(doc(db, 'trees', code));
+        if(!treeSnap.exists()){
+          await cred.user.delete().catch(function(){});
+          manualAuthFlow = false;
+          setLoading(false);
+          showErr('رمز العائلة غير صحيح');
+          return;
+        }
         await setDoc(doc(db, 'trees', code, 'members', cred.user.uid), { email: email, joinedAt: serverTimestamp() });
         await setDoc(doc(db, 'users', cred.user.uid), { email: email, treeId: code });
         currentUid = cred.user.uid; currentTreeId = code;

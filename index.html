@@ -296,6 +296,8 @@
     addChildTitle:{ar:'إضافة ابن / ابنة', en:'Add child'},
     addSpouseTitle:{ar:'إضافة زوج / زوجة', en:'Add spouse'},
     editTitle:{ar:'تعديل البيانات', en:'Edit details'},
+    moveLeftTitle:{ar:'نقل لليسار', en:'Move left'},
+    moveRightTitle:{ar:'نقل لليمين', en:'Move right'},
     contextChild:{ar:'سيُضاف كابن/ابنة لـ «{name}»', en:'Will be added as a child of "{name}"'},
     contextSpouse:{ar:'سيُضاف كزوج/زوجة لـ «{name}»', en:'Will be added as a spouse of "{name}"'},
     contextEdit:{ar:'تعديل بيانات «{name}»', en:'Editing "{name}"'},
@@ -560,6 +562,20 @@
 
   function toggleCollapse(id){ getPerson(id).collapsed = !getPerson(id).collapsed; scheduleSave(); render(); }
 
+  function moveSibling(id, delta){
+    var p = getPerson(id);
+    if(!p || !p.parentId) return;
+    var parent = getPerson(p.parentId);
+    if(!parent) return;
+    var idx = parent.childrenIds.indexOf(id);
+    var newIdx = idx + delta;
+    if(idx === -1 || newIdx < 0 || newIdx >= parent.childrenIds.length) return;
+    var tmp = parent.childrenIds[idx];
+    parent.childrenIds[idx] = parent.childrenIds[newIdx];
+    parent.childrenIds[newIdx] = tmp;
+    scheduleSave(); render();
+  }
+
   /* ============== Rendering ============== */
   function totalMembers(){ return Object.keys(state.people).length; }
   function maxGeneration(){
@@ -590,6 +606,14 @@
     var childCount = p.childrenIds.length;
     var age = calcAge(p.birthDate);
     var avatarInner = p.photo ? '<img src="'+p.photo+'" alt="">' : (p.gender==='f' ? '👩' : '👨');
+    var siblingInfo = null;
+    if(p.parentId){
+      var parentP = getPerson(p.parentId);
+      if(parentP){
+        var sIdx = parentP.childrenIds.indexOf(id);
+        siblingInfo = { idx: sIdx, count: parentP.childrenIds.length };
+      }
+    }
     el.innerHTML =
       (isRoot ? '<div class="root-badge">'+t('rootBadge')+'</div>' : '') +
       '<div class="avatar">'+avatarInner+'</div>' +
@@ -601,6 +625,8 @@
         '<button class="mini-btn" data-act="child" data-id="'+id+'" title="'+t('addChildTitle')+'">＋👶</button>' +
         (p.spouseIds.length < 4 ? '<button class="mini-btn" data-act="spouse" data-id="'+id+'" title="'+t('addSpouseTitle')+'">＋💍</button>' : '') +
         '<button class="mini-btn" data-act="edit" data-id="'+id+'" title="'+t('editTitle')+'">✎</button>' +
+        (siblingInfo && siblingInfo.idx > 0 ? '<button class="mini-btn" data-act="moveleft" data-id="'+id+'" title="'+t('moveRightTitle')+'">▶</button>' : '') +
+        (siblingInfo && siblingInfo.idx < siblingInfo.count - 1 ? '<button class="mini-btn" data-act="moveright" data-id="'+id+'" title="'+t('moveLeftTitle')+'">◀</button>' : '') +
         '<button class="mini-btn danger" data-act="delete" data-id="'+id+'" title="delete">🗑</button>' +
       '</div>';
     if(childCount > 0){
@@ -812,6 +838,8 @@
     else if(act === 'edit') openPersonForm('edit', id);
     else if(act === 'delete') openDeleteConfirm(id);
     else if(act === 'toggle') toggleCollapse(id);
+    else if(act === 'moveleft') moveSibling(id, -1);
+    else if(act === 'moveright') moveSibling(id, 1);
   });
 
   document.getElementById('createRootBtn').addEventListener('click', function(){

@@ -37,8 +37,12 @@
   /* ===== Tab panels / bottom nav ===== */
   .tab-panel{display:none;}
   .tab-panel.active{display:block;}
-  /* Scrolling panels clear the fixed bottom nav; the tree fills the screen. */
-  #tab-home.active, #tab-settings.active, #tab-moments.active{ padding-bottom:78px; }
+  /* Scrolling panels clear the fixed bottom nav; the tree fills the screen.
+     #tab-moments is excluded: #momentsScreen already reserves its own
+     bottom-nav clearance via height:calc(100vh - 70px), so stacking the same
+     78px on top of that pushed the compose bar 8px below the fold and forced
+     a scroll just to see it on open. */
+  #tab-home.active, #tab-settings.active{ padding-bottom:78px; }
   #tab-tree.active{ display:flex; flex-direction:column; height:100dvh; height:100vh; }
   #tab-tree .stage{ flex:1 1 auto; height:auto; min-height:0; padding-bottom:64px; }
   /* Immersive tree: chrome slides away while panning/scrolling the tree. */

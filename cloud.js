@@ -469,7 +469,9 @@
     },
     logActivity: logActivity,
     showActivityLog: showActivityLog,
-    createInvite: createInvite
+    createInvite: createInvite,
+    showMembers: showMembers,
+    signOut: function(){ signOut(auth); }
   };
 
   async function pushToCloud(state){

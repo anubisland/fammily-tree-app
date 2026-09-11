@@ -95,7 +95,24 @@
     completionHintMissingPhoto:{ar:'«{name}» بلا صورة', en:'"{name}" has no photo'},
     completionHintMissingBirth:{ar:'«{name}» بلا تاريخ ميلاد', en:'"{name}" has no birth date'},
     completionHintDone:{ar:'أحسنت! جميع البيانات مكتملة', en:'Great! All info is complete'},
-    comingSoon:{ar:'قريباً', en:'Coming soon'}
+    comingSoon:{ar:'قريباً', en:'Coming soon'},
+    settingsTitle:{ar:'الإعدادات', en:'Settings'},
+    setAppearance:{ar:'المظهر واللغة', en:'Appearance & language'},
+    setFamily:{ar:'العائلة', en:'Family'},
+    setLang:{ar:'اللغة', en:'Language'},
+    setDark:{ar:'الوضع الداكن', en:'Dark mode'},
+    setLight:{ar:'فاتح', en:'Light'},
+    setDarkOpt:{ar:'داكن', en:'Dark'},
+    setAuto:{ar:'تلقائي', en:'Auto'},
+    setFont:{ar:'حجم الخط', en:'Font size'},
+    fontSm:{ar:'صغير', en:'Small'},
+    fontMd:{ar:'متوسط', en:'Medium'},
+    fontLg:{ar:'كبير', en:'Large'},
+    setFamilyName:{ar:'اسم العائلة', en:'Family name'},
+    setInvite:{ar:'دعوة فرد للعائلة', en:'Invite a family member'},
+    setMembers:{ar:'أفراد العائلة', en:'Family members'},
+    setInstall:{ar:'تثبيت التطبيق', en:'Install app'},
+    setSignout:{ar:'تسجيل الخروج', en:'Sign out'}
   };
   var genLabelsMap = {
     ar:["الجيل الأول","الجيل الثاني","الجيل الثالث","الجيل الرابع","الجيل الخامس","الجيل السادس","الجيل السابع","الجيل الثامن"],
@@ -228,11 +245,6 @@
   function afterLoad(){
     applyLang(); render();
     applyTheme(ftReadTheme());
-    var themeBtn = document.getElementById('themeBtn');
-    if(themeBtn){ themeBtn.onclick = function(){
-      var cur = ftReadTheme();
-      applyTheme(cur === 'dark' ? 'light' : (cur === 'light' ? 'auto' : 'dark'));
-    }; }
   }
 
   /* ============== Language ============== */
@@ -283,12 +295,17 @@
     b.addEventListener('click', function(){ showTab(b.getAttribute('data-tab')); });
   });
 
-  document.getElementById('langBtn').addEventListener('click', function(){
-    state.lang = state.lang === 'ar' ? 'en' : 'ar';
+  function switchLang(newLang){
+    if(newLang !== 'ar' && newLang !== 'en') return;
+    if(state.lang === newLang) return;
+    state.lang = newLang;
     scheduleSave();
     applyLang();
     closeSheet();
     render();
+  }
+  document.getElementById('langBtn').addEventListener('click', function(){
+    switchLang(state.lang === 'ar' ? 'en' : 'ar');
   });
 
   /* ============== Helpers ============== */
@@ -657,6 +674,120 @@
     host.querySelector('[data-go="members"]').onclick = function(){ toast(t('comingSoon')); };
   }
   window.__ftRenderHome = renderHome;
+
+  /* ============== Settings tab ============== */
+  function ftReadFontScale(){ try { return localStorage.getItem('ft_fontscale') || 'md'; } catch(e){ return 'md'; } }
+  function ftSetFontScale(v){ try { localStorage.setItem('ft_fontscale', v); } catch(e){} }
+
+  function segHtml(id, options, active){
+    return '<span class="set-seg" id="'+id+'">' + options.map(function(o){
+      return '<button type="button" data-val="'+o.val+'" class="'+(o.val===active?'active':'')+'">'+o.label+'</button>';
+    }).join('') + '</span>';
+  }
+
+  function renderSettings(){
+    var host = document.getElementById('tab-settings');
+    if(!host) return;
+    var fam = (state.familyName && state.familyName.trim()) ? state.familyName : t('unnamedFamily');
+    var curTheme = ftReadTheme();
+    var curFont = ftReadFontScale();
+    var hasCloud = !!window.__ftCloud;
+
+    host.innerHTML =
+      '<div class="masthead">' +
+        '<div class="brand-row">' +
+          '<div class="crest">⚙︎</div>' +
+          '<div><div class="app-name">'+t('appName')+'</div><div class="family-name">'+t('settingsTitle')+'</div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="home-body">' +
+        '<div class="section-eyebrow"><span class="dia">◆</span><span>'+t('setAppearance')+'</span></div>' +
+        '<div class="set-group">' +
+          '<div class="set-row">' +
+            '<span>'+t('setLang')+'</span>' +
+            segHtml('setLangSeg', [{val:'ar', label:'عربي'}, {val:'en', label:'EN'}], state.lang) +
+          '</div>' +
+          '<div class="set-row">' +
+            '<span>'+t('setDark')+'</span>' +
+            segHtml('setThemeSeg', [
+              {val:'light', label:t('setLight')},
+              {val:'dark', label:t('setDarkOpt')},
+              {val:'auto', label:t('setAuto')}
+            ], curTheme) +
+          '</div>' +
+          '<div class="set-row">' +
+            '<span>'+t('setFont')+'</span>' +
+            segHtml('setFontSeg', [
+              {val:'sm', label:t('fontSm')},
+              {val:'md', label:t('fontMd')},
+              {val:'lg', label:t('fontLg')}
+            ], curFont) +
+          '</div>' +
+        '</div>' +
+        '<div class="section-eyebrow" style="margin-top:18px;"><span class="dia">◆</span><span>'+t('setFamily')+'</span></div>' +
+        '<div class="set-group">' +
+          '<div class="set-row'+(canEditCloud ? ' set-row-click' : '')+'" id="setFamilyNameRow">' +
+            '<span>🏷️ '+t('setFamilyName')+'</span>' +
+            '<span class="set-val">'+escapeHtml(fam)+(canEditCloud ? ' ›' : '')+'</span>' +
+          '</div>' +
+          (canEditCloud && hasCloud ? (
+          '<div class="set-row set-row-click" id="setInviteRow">' +
+            '<span>✉️ '+t('setInvite')+'</span>' +
+            '<span class="set-val set-val-accent">›</span>' +
+          '</div>') : '') +
+          (hasCloud ? (
+          '<div class="set-row set-row-click" id="setMembersRow">' +
+            '<span>👥 '+t('setMembers')+'</span>' +
+            '<span class="set-val">›</span>' +
+          '</div>') : '') +
+          '<div class="set-row set-row-click" id="setInstallRow">' +
+            '<span>📲 '+t('setInstall')+'</span>' +
+            '<span class="set-val">›</span>' +
+          '</div>' +
+          (hasCloud ? (
+          '<div class="set-row set-row-click set-row-danger" id="setSignoutRow">' +
+            '<span>⏻ '+t('setSignout')+'</span>' +
+          '</div>') : '') +
+        '</div>' +
+      '</div>';
+
+    host.querySelectorAll('#setLangSeg button').forEach(function(btn){
+      btn.onclick = function(){ switchLang(btn.dataset.val); renderSettings(); };
+    });
+    host.querySelectorAll('#setThemeSeg button').forEach(function(btn){
+      btn.onclick = function(){ applyTheme(btn.dataset.val); renderSettings(); };
+    });
+    host.querySelectorAll('#setFontSeg button').forEach(function(btn){
+      btn.onclick = function(){ ftSetFontScale(btn.dataset.val); renderSettings(); };
+    });
+    if(canEditCloud){
+      document.getElementById('setFamilyNameRow').onclick = function(){
+        showTab('tree');
+        setTimeout(function(){
+          var el = document.getElementById('familyTitle');
+          if(el){ el.focus(); document.execCommand && document.execCommand('selectAll', false, null); }
+        }, 0);
+      };
+    }
+    if(canEditCloud && hasCloud){
+      var invRow = document.getElementById('setInviteRow');
+      if(invRow) invRow.onclick = function(){ window.__ftCloud.createInvite('editor'); };
+    }
+    if(hasCloud){
+      var memRow = document.getElementById('setMembersRow');
+      if(memRow) memRow.onclick = function(){
+        if(window.__ftCloud.showMembers) window.__ftCloud.showMembers();
+      };
+    }
+    document.getElementById('setInstallRow').onclick = function(){ toast(t('comingSoon')); };
+    if(hasCloud){
+      var soRow = document.getElementById('setSignoutRow');
+      if(soRow) soRow.onclick = function(){
+        if(window.__ftCloud.signOut) window.__ftCloud.signOut();
+      };
+    }
+  }
+  window.__ftRenderSettings = renderSettings;
 
   /* ============== Sheets ============== */
   var overlay = document.getElementById('overlay');

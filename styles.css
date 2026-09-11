@@ -268,3 +268,36 @@
   #tab-home .bar i{display:block; height:100%; background:linear-gradient(90deg, var(--gold), var(--emerald)); border-radius:6px;}
   #tab-home .meter-hint{font-size:11px; color:var(--ink-soft); margin-top:9px; display:flex; align-items:center; gap:6px;}
   #tab-home .meter-hint .dot{color:var(--gold);}
+
+  /* ---------- Settings tab ---------- */
+  /* Same masthead/eyebrow look as the home tab, namespaced to #tab-settings for
+     the same reason (avoids colliding with the bare .stat-row / etc used by the
+     tree tab). */
+  #tab-settings .masthead{ background: linear-gradient(155deg, var(--emerald) 0%, var(--emerald-deep) 82%); color:#F6EFDD; padding:20px 20px 22px; position:relative; overflow:hidden;}
+  #tab-settings .masthead::after{ content:""; position:absolute; inset:0; background-image: radial-gradient(circle, rgba(246,239,221,.13) 1px, transparent 1.5px); background-size:15px 15px; opacity:.5; pointer-events:none;}
+  #tab-settings .brand-row{display:flex; align-items:center; gap:12px; position:relative; z-index:1;}
+  #tab-settings .crest{ width:46px; height:46px; border-radius:13px; background:rgba(246,239,221,.12); border:1px solid rgba(223,201,152,.5); display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0;}
+  #tab-settings .app-name{font-size:12.5px; color:#CFE3DC; letter-spacing:.3px;}
+  #tab-settings .family-name{font-family:var(--f-head); font-size:23px; font-weight:700; line-height:1.15;}
+  #tab-settings .home-body{padding:18px 16px 16px;}
+  #tab-settings .section-eyebrow{display:flex; align-items:center; gap:8px; margin:2px 2px 12px;}
+  #tab-settings .section-eyebrow .dia{color:var(--gold); font-size:9px;}
+  #tab-settings .section-eyebrow span{font-size:12px; font-weight:700; color:var(--ink-soft); letter-spacing:.2px;}
+
+  .set-group{ background:var(--card); border-radius:16px; padding:2px 14px; box-shadow:var(--shadow); border:1px solid var(--line);}
+  .set-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:13px 0; border-bottom:1px solid var(--line); font-size:14px; font-weight:600;}
+  .set-row:last-child{border-bottom:none;}
+  .set-row-click{cursor:pointer;}
+  .set-row-click:active{opacity:.75;}
+  .set-row-danger{color:var(--danger);}
+  .set-val{color:var(--ink-soft); font-size:12.5px; font-weight:600;}
+  .set-val-accent{color:var(--emerald); font-weight:700;}
+
+  .set-seg{display:flex; gap:6px;}
+  .set-seg button{ background:var(--paper-deep); color:var(--ink-soft); border:none; border-radius:9px; padding:6px 13px; font-size:12.5px; font-weight:600;}
+  .set-seg button.active{background:var(--emerald); color:#F6EFDD; font-weight:700;}
+
+  .set-toggle{ width:44px; height:26px; border-radius:20px; position:relative; border:none; background:var(--paper-deep); flex-shrink:0;}
+  .set-toggle::after{content:""; position:absolute; top:3px; inset-inline-start:3px; width:20px; height:20px; background:#F6EFDD; border-radius:50%; transition:inset-inline-start .15s ease;}
+  .set-toggle.on{background:var(--emerald);}
+  .set-toggle.on::after{inset-inline-start:21px;}

@@ -234,7 +234,7 @@
         </div>
         <div class="field" id="joinCodeField" style="display:none;">
           <label>رمز العائلة</label>
-          <input type="text" id="joinCode" placeholder="مثال: 7K9QXZ" style="text-transform:uppercase;">
+          <input type="text" id="joinCode" placeholder="الصق رابط الدعوة هنا">
         </div>
       </div>
 
@@ -389,7 +389,11 @@
     toastImportError:{ar:'تعذر قراءة الملف — تأكد أنه نسخة احتياطية صحيحة', en:'Could not read the file — make sure it\'s a valid backup'},
     rootBadge:{ar:'الجذر', en:'Root'},
     familyPrefix:{ar:'عائلة ', en:''},
-    familySuffix:{ar:'', en:' Family'}
+    familySuffix:{ar:'', en:' Family'},
+    errBadInvite:{ar:'رابط الدعوة غير صحيح أو انتهت صلاحيته', en:'The invite link is invalid or has expired'},
+    menuInvite:{ar:'➕ دعوة فرد للعائلة', en:'➕ Invite a family member'},
+    inviteCopied:{ar:'تم نسخ رابط الدعوة', en:'Invite link copied'},
+    joinCodePh:{ar:'الصق رابط الدعوة هنا', en:'Paste the invite link here'}
   };
   var genLabelsMap = {
     ar:["الجيل الأول","الجيل الثاني","الجيل الثالث","الجيل الرابع","الجيل الخامس","الجيل السادس","الجيل السابع","الجيل الثامن"],
@@ -521,6 +525,7 @@
     document.getElementById('rootSpouseName').placeholder = t('rootSpousePh');
     document.getElementById('createRootBtn').textContent = t('createBtn');
     document.getElementById('restoreBtnEmpty').textContent = t('restoreBackup');
+    document.getElementById('joinCode').placeholder = t('joinCodePh');
   }
 
   document.getElementById('langBtn').addEventListener('click', function(){
@@ -1025,12 +1030,17 @@
       '<button class="primary-btn" id="mn_export" style="margin-bottom:10px;">'+t('menuExport')+'</button>'+
       (canEditCloud ? '<button class="primary-btn" id="mn_import" style="margin-bottom:10px; background:var(--teal);">'+t('menuImport')+'</button>' : '') +
       (canEditCloud ? '<button class="primary-btn" id="mn_reset" style="background:var(--danger);">'+t('menuReset')+'</button>' : '') +
+      (canEditCloud && window.__ftCloud ? '<button class="primary-btn" id="mn_invite" style="margin-top:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '') +
       (window.__ftCloud ? '<button class="primary-btn" id="mn_activity" style="margin-top:10px; background:var(--plum);">📋 سجل النشاط</button>' : '')
     );
     document.getElementById('mn_export').onclick = function(){ closeSheet(); document.getElementById('exportBtn').click(); };
     if(canEditCloud){
       document.getElementById('mn_import').onclick = function(){ closeSheet(); document.getElementById('importBtn').click(); };
       document.getElementById('mn_reset').onclick = function(){ closeSheet(); document.getElementById('resetBtn').click(); };
+    }
+    if(canEditCloud && window.__ftCloud && window.__ftCloud.createInvite){
+      var invBtn = document.getElementById('mn_invite');
+      if(invBtn) invBtn.onclick = function(){ closeSheet(); window.__ftCloud.createInvite('editor'); };
     }
     if(window.__ftCloud){
       document.getElementById('mn_activity').onclick = function(){ closeSheet(); window.__ftCloud.showActivityLog(); };
@@ -1159,6 +1169,18 @@
   modeJoin.onclick = function(){ signupMode='join'; modeJoin.classList.add('active'); modeCreate.classList.remove('active'); refreshAuthUI(); };
   refreshAuthUI();
 
+  (function handleInviteHash(){
+    var h = location.hash || '';
+    if(h.indexOf('#join=') === 0){
+      var payload = decodeURIComponent(h.slice('#join='.length));
+      var jc = document.getElementById('joinCode');
+      if(jc){ jc.value = payload; }
+      mode = 'signup'; signupMode = 'join';
+      modeJoin.classList.add('active'); modeCreate.classList.remove('active');
+      refreshAuthUI();
+    }
+  })();
+
   var manualAuthFlow = false;
 
   authSubmitBtn.onclick = async function(){
@@ -1172,23 +1194,30 @@
         await signInWithEmailAndPassword(auth, email, pass);
         // onAuthStateChanged handles the rest for a normal login.
       } else if(signupMode === 'join'){
-        var code = document.getElementById('joinCode').value.trim().toUpperCase();
-        if(!code){ setLoading(false); showErr('يرجى إدخال رمز العائلة'); return; }
+        // The join link carries "<treeId>.<token>" in #join=; the invite-hash
+        // handler below (on load) parses it into this field. No tree read
+        // before join -- the invite doc is the only thing read, by token id.
+        var joinRaw = document.getElementById('joinCode').value.trim();
+        var dot = joinRaw.indexOf('.');
+        if(dot < 1){ setLoading(false); showErr(t('errBadInvite')); return; }
+        var joinTreeId = joinRaw.slice(0, dot);
+        var joinToken  = joinRaw.slice(dot + 1);
         manualAuthFlow = true;
         var cred = await createUserWithEmailAndPassword(auth, email, pass);
-        var treeSnap = await getDoc(doc(db, 'trees', code));
-        if(!treeSnap.exists()){
+        // Read the invite by token (rules: get allowed for any signed-in user).
+        var invSnap = await getDoc(doc(db, 'trees', joinTreeId, 'invites', joinToken));
+        if(!invSnap.exists()){
           await cred.user.delete().catch(function(){});
-          manualAuthFlow = false;
-          setLoading(false);
-          showErr('رمز العائلة غير صحيح');
-          return;
+          manualAuthFlow = false; setLoading(false); showErr(t('errBadInvite')); return;
         }
-        await setDoc(doc(db, 'trees', code, 'members', cred.user.uid), { email: email, role: 'editor', joinedAt: serverTimestamp() });
-        await setDoc(doc(db, 'users', cred.user.uid), { email: email, treeId: code });
-        currentUid = cred.user.uid; currentTreeId = code;
-        currentRole = 'editor';
-        window.__ftSetEditable(true);
+        var invRole = invSnap.data().role; // 'editor' | 'viewer'
+        // Membership create is authorised by the invite path in the rules.
+        await setDoc(doc(db, 'trees', joinTreeId, 'members', cred.user.uid),
+          { email: email, role: invRole, viaInvite: joinToken, joinedAt: serverTimestamp() });
+        await setDoc(doc(db, 'users', cred.user.uid), { email: email, treeId: joinTreeId });
+        currentUid = cred.user.uid; currentTreeId = joinTreeId;
+        currentRole = invRole;
+        window.__ftSetEditable(invRole !== 'viewer');
         subscribeTree(currentTreeId);
         authGate.classList.add('hidden');
         cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
@@ -1489,6 +1518,18 @@
     btn.disabled = false;
   });
 
+  async function createInvite(role){
+    if(!currentTreeId || currentRole === 'viewer') return;
+    var token = (doc(collection(db, 'trees', currentTreeId, 'invites'))).id;
+    await setDoc(doc(db, 'trees', currentTreeId, 'invites', token), {
+      role: (role === 'viewer' ? 'viewer' : 'editor'), createdBy: currentUid, createdAt: serverTimestamp()
+    });
+    var base = location.origin + location.pathname;
+    var link = base + '#join=' + currentTreeId + '.' + token;
+    try { await navigator.clipboard.writeText(link); toast(t('inviteCopied')); }
+    catch(e){ prompt(t('inviteCopied'), link); }
+  }
+
   window.__ftCloud = {
     onLocalSave: function(state){
       if(!currentTreeId || applyingRemote) return;
@@ -1497,7 +1538,8 @@
       pushTimer = setTimeout(function(){ pushToCloud(state); }, 500);
     },
     logActivity: logActivity,
-    showActivityLog: showActivityLog
+    showActivityLog: showActivityLog,
+    createInvite: createInvite
   };
 
   async function pushToCloud(state){

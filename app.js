@@ -296,6 +296,7 @@
     stage.addEventListener('scroll', function(){ setTreeImmersive(true); clearTimeout(hideT); hideT=setTimeout(function(){ setTreeImmersive(false); }, 1400); }, {passive:true});
   }
 
+  var currentTabName = null;
   function showTab(name){
     var tabs = ['home', 'tree', 'moments', 'settings'];
     if(tabs.indexOf(name) < 0) name = 'tree';
@@ -310,6 +311,21 @@
     try{ localStorage.setItem('ft_tab', name); }catch(e){}
     if(name === 'home' && window.__ftRenderHome) window.__ftRenderHome();
     if(name === 'settings' && window.__ftRenderSettings) window.__ftRenderSettings();
+    /* Moments used to be a slide-over only reachable via the CTA button, which
+       is what subscribed to the live feed. Now it's also a regular tab (bottom
+       nav + the home card), so the subscription has to follow the tab switch
+       itself, not just that one button — otherwise the feed silently never
+       loads when reached those other ways. Unsubscribe on the way out so a
+       background listener doesn't linger. */
+    if(name === 'moments' && window.__ftOpenMomentsTab) window.__ftOpenMomentsTab();
+    if(currentTabName === 'moments' && name !== 'moments' && window.__ftCloseMomentsTab) window.__ftCloseMomentsTab();
+    currentTabName = name;
+    /* The tree's connector lines are positioned from getBoundingClientRect,
+       which returns all-zero rects while #tab-tree is display:none. If the
+       tree was (re)rendered while another tab was showing — e.g. cloud data
+       arrives while the user is on Home — the lines never got real
+       coordinates. Redraw them now that the tab is actually visible. */
+    if(name === 'tree' && typeof drawLinks === 'function') requestAnimationFrame(drawLinks);
   }
   window.__ftShowTab = showTab;
   document.querySelectorAll('.bottom-nav .nav-item').forEach(function(b){

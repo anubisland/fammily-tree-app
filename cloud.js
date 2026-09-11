@@ -406,6 +406,12 @@
   }
   document.getElementById('momentsOpenBtn').addEventListener('click', openMoments);
   document.getElementById('momentsBack').addEventListener('click', closeMoments);
+  /* Moments is now a regular tab (bottom nav + home card), not just a
+     slide-over reached via momentsOpenBtn. app.js's tab router calls these
+     on every switch into/out of the moments tab so the live feed subscribes
+     and unsubscribes regardless of how the user got there. */
+  window.__ftOpenMomentsTab = openMoments;
+  window.__ftCloseMomentsTab = closeMoments;
 
   document.getElementById('momentPhotoBtn').addEventListener('click', function(){
     document.getElementById('momentPhotoFile').click();

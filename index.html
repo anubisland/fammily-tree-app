@@ -1159,13 +1159,6 @@
   modeJoin.onclick = function(){ signupMode='join'; modeJoin.classList.add('active'); modeCreate.classList.remove('active'); refreshAuthUI(); };
   refreshAuthUI();
 
-  function genFamilyCode(){
-    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    var s = '';
-    for(var i=0;i<6;i++) s += chars[Math.floor(Math.random()*chars.length)];
-    return s;
-  }
-
   var manualAuthFlow = false;
 
   authSubmitBtn.onclick = async function(){
@@ -1205,9 +1198,14 @@
       } else {
         manualAuthFlow = true;
         var cred2 = await createUserWithEmailAndPassword(auth, email, pass);
-        var newCode = genFamilyCode();
+        // Auto-id tree: id is decoupled from any human-shareable secret, so
+        // there is no code to collide (removes finding 3.3). createdBy lets
+        // the rules authorise the bootstrap owner-membership below.
+        var treeRef = doc(collection(db, 'trees'));
+        var newCode = treeRef.id;
+        // Tree doc FIRST: the members bootstrap rule reads trees/{id}.createdBy.
+        await setDoc(treeRef, { familyName:'', lang:'ar', rootId:null, people:{}, createdBy: cred2.user.uid, updatedAt: serverTimestamp() });
         await setDoc(doc(db, 'trees', newCode, 'members', cred2.user.uid), { email: email, role: 'owner', joinedAt: serverTimestamp() });
-        await setDoc(doc(db, 'trees', newCode), { familyName:'', lang:'ar', rootId:null, people:{}, updatedAt: serverTimestamp() });
         await setDoc(doc(db, 'users', cred2.user.uid), { email: email, treeId: newCode });
         currentUid = cred2.user.uid; currentTreeId = newCode;
         currentRole = 'owner';

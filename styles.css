@@ -2,9 +2,10 @@
     --paper:#F2E9D8; --paper-deep:#E9DCC0; --ink:#2B2118; --ink-soft:#5C4C3B;
     --emerald:#0F5B4B; --emerald-deep:#0A4038; --gold:#B8862D; --gold-soft:#DFC998;
     --teal:#1D6E77; --plum:#7A4869; --card:#FFFCF5; --line:#C9B98F; --danger:#9C3B2E;
+    --blue:#2C6FB5; --ic-chip:#FFFDF7;
     --shadow: 0 1px 2px rgba(43,33,24,.06), 0 6px 18px rgba(43,33,24,.10);
     --f-head:'Amiri', serif; --f-body:'Cairo', sans-serif;
-    --t-tree:#CFE8DC; --t-feed:#F7E3B6; --t-search:#C7E5E9; --t-members:#ECD3E1;
+    --t-tree:#CFE8DC; --t-feed:#F7E3B6; --t-search:#D2E0F4; --t-members:#ECD3E1;
     color-scheme: light;
   }
   html.lang-en{ --f-head:'Lora', serif; --f-body:'Inter','Cairo', sans-serif; }
@@ -13,9 +14,10 @@
     --paper:#17120B; --paper-deep:#211A10; --ink:#EDE3CE; --ink-soft:#B8A98C;
     --emerald:#2E8B72; --emerald-deep:#256F5C; --gold:#D6A94A; --gold-soft:#5A4A24;
     --teal:#3E9AA4; --plum:#B07C9C; --card:#221A10; --line:#3E3320; --danger:#C56A5A;
+    --blue:#5B9BD8; --ic-chip:#F3ECDD;
     --shadow: 0 1px 2px rgba(0,0,0,.30), 0 8px 22px rgba(0,0,0,.35);
     --t-tree:rgba(46,139,114,.22); --t-feed:rgba(214,169,74,.20);
-    --t-search:rgba(62,154,164,.22); --t-members:rgba(176,124,156,.24);
+    --t-search:rgba(91,155,216,.24); --t-members:rgba(176,124,156,.24);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
   html,body{margin:0; padding:0; background:var(--paper); color:var(--ink); font-family:var(--f-body);}
@@ -263,13 +265,13 @@
   #tab-home .leaf{ background:var(--card); border-radius:16px; padding:16px 14px 17px; box-shadow:var(--shadow); position:relative; overflow:hidden; border:1px solid var(--line); border-top-width:5px; text-align:start; cursor:pointer; transition:transform .12s ease;}
   #tab-home .leaf:active{ transform:scale(.97); }
   #tab-home .leaf .corner{position:absolute; top:11px; inset-inline-end:12px; font-size:12px; opacity:.55;}
-  #tab-home .leaf .ic{ width:48px; height:48px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:24px; margin-bottom:12px; box-shadow:var(--shadow);}
+  #tab-home .leaf .ic{ width:50px; height:50px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:26px; margin-bottom:12px; background:var(--ic-chip); border:2px solid var(--line); box-shadow:var(--shadow);}
   #tab-home .leaf h3{font-family:var(--f-head); font-size:18px; font-weight:700; margin-bottom:3px; color:var(--ink);}
   #tab-home .leaf p{font-size:11.5px; color:var(--ink-soft); line-height:1.5;}
-  #tab-home .leaf.tree{background:var(--t-tree); border-top-color:var(--emerald);}     #tab-home .leaf.tree .ic{background:var(--emerald); color:#F6EFDD;}     #tab-home .leaf.tree .corner{color:var(--emerald);}
-  #tab-home .leaf.feed{background:var(--t-feed); border-top-color:var(--gold);}     #tab-home .leaf.feed .ic{background:var(--gold); color:#3a2a08;}         #tab-home .leaf.feed .corner{color:var(--gold);}
-  #tab-home .leaf.search{background:var(--t-search); border-top-color:var(--teal);} #tab-home .leaf.search .ic{background:var(--teal); color:#F6EFDD;}      #tab-home .leaf.search .corner{color:var(--teal);}
-  #tab-home .leaf.members{background:var(--t-members); border-top-color:var(--plum);} #tab-home .leaf.members .ic{background:var(--plum); color:#F6EFDD;}  #tab-home .leaf.members .corner{color:var(--plum);}
+  #tab-home .leaf.tree{background:var(--t-tree); border-top-color:var(--emerald);}     #tab-home .leaf.tree .ic{border-color:var(--emerald);}     #tab-home .leaf.tree .corner{color:var(--emerald);}
+  #tab-home .leaf.feed{background:var(--t-feed); border-top-color:var(--gold);}     #tab-home .leaf.feed .ic{border-color:var(--gold);}         #tab-home .leaf.feed .corner{color:var(--gold);}
+  #tab-home .leaf.search{background:var(--t-search); border-top-color:var(--blue);} #tab-home .leaf.search .ic{border-color:var(--blue);}      #tab-home .leaf.search .corner{color:var(--blue);}
+  #tab-home .leaf.members{background:var(--t-members); border-top-color:var(--plum);} #tab-home .leaf.members .ic{border-color:var(--plum);}  #tab-home .leaf.members .corner{color:var(--plum);}
 
   #tab-home .meter-card{ margin-top:12px; background:var(--card); border-radius:16px; padding:15px 16px; box-shadow:var(--shadow); border:1px solid var(--line);}
   #tab-home .meter-top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:9px;}

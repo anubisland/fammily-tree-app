@@ -1,6 +1,10 @@
 (function(){
   "use strict";
 
+  /* Set html.dark before first paint (per persisted choice or OS setting) to avoid a flash. */
+  try { document.documentElement.classList.toggle('dark',
+    (function(m){ return m === 'dark' || (m === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); })(localStorage.getItem('ft_theme') || 'auto')); } catch(e){}
+
   /* ============== i18n ============== */
   var I18N = {
     appName:{ar:'شجرة العائلة', en:'Family Tree'},
@@ -69,7 +73,9 @@
     inviteCopied:{ar:'تم نسخ رابط الدعوة', en:'Invite link copied'},
     joinCodePh:{ar:'الصق رابط الدعوة هنا', en:'Paste the invite link here'},
     inviteShareHint:{ar:'لدعوة أحد أفراد العائلة، أنشئ رابط دعوة وأرسله له', en:'To add a family member, generate an invite link and send it to them'},
-    errNoMembership:{ar:'حسابك ليس عضوًا في هذه العائلة. اطلب رابط دعوة من مالك الشجرة.', en:'Your account is not a member of this family. Ask the tree owner for an invite link.'}
+    errNoMembership:{ar:'حسابك ليس عضوًا في هذه العائلة. اطلب رابط دعوة من مالك الشجرة.', en:'Your account is not a member of this family. Ask the tree owner for an invite link.'},
+    themeDark:{ar:'الوضع الداكن', en:'Dark mode'},
+    themeLight:{ar:'الوضع الفاتح', en:'Light mode'}
   };
   var genLabelsMap = {
     ar:["الجيل الأول","الجيل الثاني","الجيل الثالث","الجيل الرابع","الجيل الخامس","الجيل السادس","الجيل السابع","الجيل الثامن"],
@@ -100,6 +106,25 @@
       return n + ' سنة';
     }
     return n + (n === 1 ? ' year' : ' years');
+  }
+
+  /* ============== Theme ============== */
+  function ftReadTheme(){ try { return localStorage.getItem('ft_theme') || 'auto'; } catch(e){ return 'auto'; } }
+  function ftPrefersDark(){ return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; }
+  function ftResolveDark(mode){ return mode === 'dark' || (mode === 'auto' && ftPrefersDark()); }
+  function applyTheme(mode){
+    var m = (mode === 'light' || mode === 'dark') ? mode : 'auto';
+    document.documentElement.classList.toggle('dark', ftResolveDark(m));
+    try { localStorage.setItem('ft_theme', m); } catch(e){}
+    var btn = document.getElementById('themeBtn');
+    if(btn){ btn.textContent = ftResolveDark(m) ? '☀' : '☾'; btn.title = t(ftResolveDark(m) ? 'themeLight' : 'themeDark'); }
+  }
+  window.__ftApplyTheme = applyTheme;
+  // Re-resolve on OS change while in 'auto'
+  if(window.matchMedia){
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(){
+      if(ftReadTheme() === 'auto') applyTheme('auto');
+    });
   }
 
   /* ============== State ============== */
@@ -180,14 +205,24 @@
   function showStorageWarn(){ var w = document.getElementById('storageWarn'); w.textContent = t('storageWarn'); w.style.display = 'block'; }
   function hideStorageWarn(){ document.getElementById('storageWarn').style.display = 'none'; }
 
-  function afterLoad(){ applyLang(); render(); }
+  function afterLoad(){
+    applyLang(); render();
+    applyTheme(ftReadTheme());
+    var themeBtn = document.getElementById('themeBtn');
+    if(themeBtn){ themeBtn.onclick = function(){
+      var cur = ftReadTheme();
+      applyTheme(cur === 'dark' ? 'light' : (cur === 'light' ? 'auto' : 'dark'));
+    }; }
+  }
 
   /* ============== Language ============== */
   function applyLang(){
     var html = document.getElementById('htmlRoot');
     html.setAttribute('lang', state.lang);
     html.setAttribute('dir', state.lang === 'ar' ? 'rtl' : 'ltr');
+    var wasDark = html.classList.contains('dark');
     html.className = state.lang === 'en' ? 'lang-en' : '';
+    if(wasDark) html.classList.add('dark');
     document.getElementById('langBtn').textContent = state.lang === 'ar' ? 'EN' : 'AR';
     document.getElementById('editHint').textContent = t('editHint');
     document.getElementById('exportBtn').textContent = t('tbBackup');

@@ -9,6 +9,12 @@
     color-scheme: light;
   }
   html.lang-en{ --f-head:'Lora', serif; --f-body:'Inter','Cairo', sans-serif; }
+  /* Font-size preference (Settings › حجم الخط). Every size in this file is a
+     fixed px value, so a root font-size change would do nothing — scale the
+     whole page instead via `zoom` (supported in the Chromium-based targets
+     this app ships to: Chrome/Edge/Android WebView). */
+  html.fontscale-sm{ zoom:0.9; }
+  html.fontscale-lg{ zoom:1.15; }
   html.dark{
     color-scheme: dark;
     --paper:#17120B; --paper-deep:#211A10; --ink:#EDE3CE; --ink-soft:#B8A98C;

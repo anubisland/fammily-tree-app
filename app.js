@@ -4,6 +4,11 @@
   /* Set html.dark before first paint (per persisted choice or OS setting) to avoid a flash. */
   try { document.documentElement.classList.toggle('dark',
     (function(m){ return m === 'dark' || (m === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); })(localStorage.getItem('ft_theme') || 'auto')); } catch(e){}
+  /* Same for the font-size preference, so it doesn't visibly jump after load. */
+  try {
+    var __fs = localStorage.getItem('ft_fontscale');
+    if(__fs === 'sm' || __fs === 'lg') document.documentElement.classList.add('fontscale-' + __fs);
+  } catch(e){}
 
   /* ============== i18n ============== */
   var I18N = {
@@ -245,6 +250,7 @@
   function afterLoad(){
     applyLang(); render();
     applyTheme(ftReadTheme());
+    applyFontScale(ftReadFontScale());
   }
 
   /* ============== Language ============== */
@@ -693,7 +699,14 @@
 
   /* ============== Settings tab ============== */
   function ftReadFontScale(){ try { return localStorage.getItem('ft_fontscale') || 'md'; } catch(e){ return 'md'; } }
-  function ftSetFontScale(v){ try { localStorage.setItem('ft_fontscale', v); } catch(e){} }
+  function ftSetFontScale(v){ try { localStorage.setItem('ft_fontscale', v); } catch(e){} applyFontScale(v); }
+  function applyFontScale(mode){
+    var m = (mode === 'sm' || mode === 'lg') ? mode : 'md';
+    var html = document.getElementById('htmlRoot');
+    html.classList.remove('fontscale-sm', 'fontscale-lg');
+    if(m !== 'md') html.classList.add('fontscale-' + m);
+  }
+  window.__ftApplyFontScale = applyFontScale;
 
   function segHtml(id, options, active){
     return '<span class="set-seg" id="'+id+'">' + options.map(function(o){

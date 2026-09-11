@@ -21,8 +21,12 @@ import { readFileSync } from 'node:fs';
 const OWNER = 'uid-owner';
 const OUTSIDER = 'uid-outsider';
 const JOINER = 'uid-joiner';
+const EDITOR = 'uid-editor';
+const VIEWER = 'uid-viewer';
+const THROWAWAY = 'uid-throwaway';
 const TREE = 'tree-1';
 const INVITE_EDITOR = 'invite-editor-token';
+const INVITE_VIEWER = 'invite-viewer-token';
 
 let passed = 0, failed = 0;
 
@@ -36,10 +40,16 @@ async function seed(ctx) {
     rootId: null, people: {}, lang: 'ar',
   });
   await setDoc(doc(db, 'trees', TREE, 'members', OWNER), { role: 'owner', email: 'o@x.com' });
+  // An editor and a viewer member, so role-specific clauses (canEdit != 'viewer',
+  // members update: isOwner, createdBy immutability) can be exercised directly.
+  await setDoc(doc(db, 'trees', TREE, 'members', EDITOR), { role: 'editor', email: 'e@x.com' });
+  await setDoc(doc(db, 'trees', TREE, 'members', VIEWER), { role: 'viewer', email: 'v@x.com' });
   await setDoc(doc(db, 'trees', TREE, 'invites', INVITE_EDITOR), { role: 'editor', createdBy: OWNER });
+  await setDoc(doc(db, 'trees', TREE, 'invites', INVITE_VIEWER), { role: 'viewer', createdBy: OWNER });
   await setDoc(doc(db, 'users', OWNER), { email: 'o@x.com', treeId: TREE });
   await setDoc(doc(db, 'users', OUTSIDER), { email: 'out@x.com', treeId: '' });
   await setDoc(doc(db, 'trees', TREE, 'moments', 'm1'), { byUid: OWNER, text: 'hi' });
+  await setDoc(doc(db, 'trees', TREE, 'activity', 'a1'), { byUid: OWNER, kind: 'created' });
 }
 
 const testEnv = await initializeTestEnvironment({
@@ -55,6 +65,9 @@ const testEnv = await initializeTestEnvironment({
 const ownerDb = testEnv.authenticatedContext(OWNER).firestore();
 const outsiderDb = testEnv.authenticatedContext(OUTSIDER).firestore();
 const joinerDb = testEnv.authenticatedContext(JOINER).firestore();
+const editorDb = testEnv.authenticatedContext(EDITOR).firestore();
+const viewerDb = testEnv.authenticatedContext(VIEWER).firestore();
+const throwawayDb = testEnv.authenticatedContext(THROWAWAY).firestore();
 
 // Reset to the known-good baseline before every single check, so one
 // check's side effects (e.g. a successful self-grant) can never leak into
@@ -118,7 +131,10 @@ await check('3.0 outsider cannot read family moments', () =>
 await check('outsider cannot enumerate invites to steal one', () =>
   assertFails(getDocs(collection(outsiderDb, 'trees', TREE, 'invites'))));
 
-await check('join via invite cannot escalate role beyond the invite', () =>
+// This tests ONLY the invite path's `role != 'owner'` clause: an editor invite
+// cannot be used to self-grant owner. Role-vs-invite binding and invite-existence
+// are covered by the dedicated invite role-binding checks below (finding 1).
+await check('join via invite cannot claim owner role (role != owner clause)', () =>
   assertFails(setDoc(doc(joinerDb, 'trees', TREE, 'members', JOINER),
     { role: 'owner', viaInvite: INVITE_EDITOR })));
 
@@ -156,6 +172,89 @@ await check('a brand-new user can bootstrap their own new tree', () =>
     });
     await setDoc(doc(outsiderDb, 'trees', 'tree-new', 'members', OUTSIDER), { role: 'owner' });
   })()));
+
+// ── C1 regression: createdBy is immutable (tree update guard) ────────────
+// An editor rewriting trees/{tree}.createdBy is the root of the editor→owner
+// takeover. Guards: allow update ... && request.resource.data.createdBy ==
+// resource.data.createdBy.
+await check('C1: editor cannot rewrite tree.createdBy', () =>
+  assertFails(updateDoc(doc(editorDb, 'trees', TREE), { createdBy: EDITOR })));
+
+// Full chain: the createdBy rewrite is denied, so createdBy stays OWNER and a
+// throwaway account still cannot satisfy the bootstrap owner path.
+await check('C1 chain: denied createdBy rewrite blocks throwaway owner bootstrap', async () => {
+  await assertFails(updateDoc(doc(editorDb, 'trees', TREE), { createdBy: THROWAWAY }));
+  await assertFails(setDoc(doc(throwawayDb, 'trees', TREE, 'members', THROWAWAY),
+    { role: 'owner', createdBy: THROWAWAY }));
+});
+
+// ── Invite role-binding (finding 1) ─────────────────────────────────────
+// (a) presenting a viewer invite but claiming editor: guards the invite path's
+//     `invite.role == request.resource.data.role` clause.
+await check('invite role-binding: viewer invite cannot be claimed as editor', () =>
+  assertFails(setDoc(doc(joinerDb, 'trees', TREE, 'members', JOINER),
+    { role: 'editor', viaInvite: INVITE_VIEWER })));
+
+// (b) claiming editor with a token that does not exist: guards the invite path's
+//     `exists(inviteDoc(...))` clause.
+await check('invite role-binding: non-existent invite token is rejected', () =>
+  assertFails(setDoc(doc(joinerDb, 'trees', TREE, 'members', JOINER),
+    { role: 'editor', viaInvite: 'bogus' })));
+
+// ── Viewer role (finding 2): guards canEdit's `!= 'viewer'` ──────────────
+await check('viewer can read the tree', () =>
+  assertSucceeds(getDoc(doc(viewerDb, 'trees', TREE))));
+
+await check('viewer can read moments', () =>
+  assertSucceeds(getDoc(doc(viewerDb, 'trees', TREE, 'moments', 'm1'))));
+
+await check('viewer cannot edit the tree', () =>
+  assertFails(updateDoc(doc(viewerDb, 'trees', TREE), { rootId: 'v' })));
+
+await check('viewer cannot create an invite', () =>
+  assertFails(setDoc(doc(viewerDb, 'trees', TREE, 'invites', 'vinv'), { role: 'viewer', createdBy: VIEWER })));
+
+// NOTE: the finding-2 brief also listed "viewer cannot create a moment", but the
+// approved spec gates moments `create` on isMember (a shared family feed any
+// member contributes to), NOT canEdit — identical to `activity`. A viewer CAN
+// post a moment by design, so no assertFails is placed here; that clause is not
+// part of canEdit's `!= 'viewer'` guard. canEdit's viewer-exclusion is covered
+// by the "viewer cannot edit the tree" and "viewer cannot create an invite"
+// checks above (both go through canEdit). Reported to the controller.
+
+// ── Member self-escalation via update (finding 3): guards members update: isOwner
+await check('editor member cannot self-escalate role to owner via update', () =>
+  assertFails(updateDoc(doc(editorDb, 'trees', TREE, 'members', EDITOR), { role: 'owner' })));
+
+// ── Activity subcollection (finding 4) ──────────────────────────────────
+await check('outsider cannot read activity', () =>
+  assertFails(getDoc(doc(outsiderDb, 'trees', TREE, 'activity', 'a1'))));
+
+await check('outsider cannot create activity', () =>
+  assertFails(setDoc(doc(outsiderDb, 'trees', TREE, 'activity', 'a2'), { byUid: OUTSIDER, kind: 'x' })));
+
+await check('member can read activity', () =>
+  assertSucceeds(getDoc(doc(editorDb, 'trees', TREE, 'activity', 'a1'))));
+
+await check('member can create activity', () =>
+  assertSucceeds(setDoc(doc(editorDb, 'trees', TREE, 'activity', 'a3'), { byUid: EDITOR, kind: 'edit' })));
+
+await check('activity log cannot be updated', () =>
+  assertFails(updateDoc(doc(editorDb, 'trees', TREE, 'activity', 'a1'), { kind: 'tampered' })));
+
+await check('activity log cannot be deleted', () =>
+  assertFails(deleteDoc(doc(editorDb, 'trees', TREE, 'activity', 'a1'))));
+
+// ── Member-roster read (finding 5): outsider cannot harvest member emails ─
+await check('outsider cannot read the member roster', () =>
+  assertFails(getDocs(collection(outsiderDb, 'trees', TREE, 'members'))));
+
+// ── Moments integrity (finding 6): byUid must equal the author ───────────
+await check('member can create a moment with their own byUid', () =>
+  assertSucceeds(setDoc(doc(editorDb, 'trees', TREE, 'moments', 'm2'), { byUid: EDITOR, text: 'mine' })));
+
+await check('member cannot create a moment with a foreign byUid', () =>
+  assertFails(setDoc(doc(editorDb, 'trees', TREE, 'moments', 'm3'), { byUid: OWNER, text: 'forged' })));
 
 await testEnv.cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);

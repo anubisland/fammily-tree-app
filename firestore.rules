@@ -37,7 +37,10 @@ service cloud.firestore {
     match /trees/{treeId} {
       allow read:   if isMember(treeId);
       allow create: if signedIn() && request.resource.data.createdBy == uid();
-      allow update: if canEdit(treeId);
+      // createdBy is immutable on update: an editor could otherwise rewrite it
+      // to a throwaway uid that then satisfies the bootstrap owner path (C1).
+      allow update: if canEdit(treeId)
+                    && request.resource.data.createdBy == resource.data.createdBy;
       allow delete: if false;
 
       match /members/{memberUid} {
@@ -58,8 +61,10 @@ service cloud.firestore {
             && get(inviteDoc(treeId, request.resource.data.viaInvite)).data.role
                  == request.resource.data.role )
           ||
-          // (3) an owner adds someone directly
-          ( isOwner(treeId) )
+          // (3) an owner adds someone directly — but never a SECOND owner
+          //     (one-owner-per-tree invariant; transfer is out of Phase 0 scope)
+          ( isOwner(treeId)
+            && request.resource.data.role in ['editor', 'viewer'] )
         );
 
         allow update: if isOwner(treeId);

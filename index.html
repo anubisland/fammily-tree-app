@@ -42,79 +42,94 @@
     </div>
   </div>
 
-  <div id="momentsScreen">
-    <div class="moments-header">
-      <button class="icon-btn" id="momentsBack" title="رجوع">→</button>
-      <h2>📰 لحظات العائلة</h2>
-      <div style="width:36px;"></div>
-    </div>
-    <div class="moments-list" id="momentsList"></div>
-    <div class="moments-compose">
-      <div class="moments-photo-preview" id="momentPhotoPreview" style="display:none;"></div>
-      <textarea id="momentText" placeholder="شارك خبرًا أو لحظة مع العائلة…" rows="2"></textarea>
-      <div class="moments-compose-actions">
-        <button id="momentPhotoBtn" type="button">📷 صورة</button>
-        <input type="file" id="momentPhotoFile" accept="image/*" style="display:none;">
-        <button id="momentPostBtn" class="primary-btn" style="flex:1;">نشر</button>
-      </div>
-    </div>
-  </div>
+  <section id="tab-home" class="tab-panel"></section>
 
-  <div class="banner">
-    <div class="banner-row">
-      <div>
-        <h1 class="family-title" id="familyTitle" contenteditable="true" spellcheck="false">شجرة العائلة</h1>
-        <div class="family-sub" id="editHint">اضغط على الاسم لتعديله</div>
-      </div>
-      <div class="banner-actions">
-        <button class="icon-btn" id="themeBtn" title="الوضع الداكن">☾</button>
-        <button class="icon-btn" id="cloudBtn" title="Cloud sync" style="display:none;">☁</button>
-        <button class="icon-btn" id="langBtn" title="Language">EN</button>
-        <button class="icon-btn" id="printBtn" title="Print">🖨</button>
-        <button class="icon-btn" id="menuBtn" title="Menu">⋮</button>
-      </div>
-    </div>
-    <div class="stat-row" id="statRow"></div>
-    <button class="moments-cta" id="momentsOpenBtn" style="display:none; width:100%; cursor:pointer;">📰 لحظات العائلة — شارك واطّلع على آخر الأخبار</button>
-  </div>
-
-  <div class="storage-warn" id="storageWarn"></div>
-
-  <div class="toolbar" id="toolbar" style="display:none;">
-    <div class="zoom-group">
-      <button id="zoomOut">−</button>
-      <span id="zoomLabel">100%</span>
-      <button id="zoomIn">+</button>
-    </div>
-    <button id="exportBtn"></button>
-    <button id="importBtn"></button>
-    <input type="file" id="importFile" accept=".json,application/json,text/plain" style="display:none;">
-    <button id="resetBtn"></button>
-  </div>
-
-  <div class="stage" id="stage">
-    <svg class="links" id="linksSvg"></svg>
-    <div class="empty-wrap" id="emptyWrap">
-      <div class="empty-card">
-        <div class="glyph">🌳</div>
-        <h2 id="emptyTitle"></h2>
-        <p id="emptyDesc"></p>
-        <div class="field">
-          <label id="rootNameLabel"></label>
-          <input type="text" id="rootName">
+  <section id="tab-tree" class="tab-panel">
+    <div class="banner">
+      <div class="banner-row">
+        <div>
+          <h1 class="family-title" id="familyTitle" contenteditable="true" spellcheck="false">شجرة العائلة</h1>
+          <div class="family-sub" id="editHint">اضغط على الاسم لتعديله</div>
         </div>
-        <div class="field">
-          <label id="rootSpouseLabel"></label>
-          <input type="text" id="rootSpouseName">
+        <div class="banner-actions">
+          <button class="icon-btn" id="themeBtn" title="الوضع الداكن">☾</button>
+          <button class="icon-btn" id="cloudBtn" title="Cloud sync" style="display:none;">☁</button>
+          <button class="icon-btn" id="langBtn" title="Language">EN</button>
+          <button class="icon-btn" id="printBtn" title="Print">🖨</button>
+          <button class="icon-btn" id="menuBtn" title="Menu">⋮</button>
         </div>
-        <button class="primary-btn" id="createRootBtn"></button>
-        <button class="primary-btn" id="restoreBtnEmpty" style="background:var(--teal); margin-top:10px;"></button>
+      </div>
+      <div class="stat-row" id="statRow"></div>
+      <button class="moments-cta" id="momentsOpenBtn" style="display:none; width:100%; cursor:pointer;">📰 لحظات العائلة — شارك واطّلع على آخر الأخبار</button>
+    </div>
+
+    <div class="storage-warn" id="storageWarn"></div>
+
+    <div class="toolbar" id="toolbar" style="display:none;">
+      <div class="zoom-group">
+        <button id="zoomOut">−</button>
+        <span id="zoomLabel">100%</span>
+        <button id="zoomIn">+</button>
+      </div>
+      <button id="exportBtn"></button>
+      <button id="importBtn"></button>
+      <input type="file" id="importFile" accept=".json,application/json,text/plain" style="display:none;">
+      <button id="resetBtn"></button>
+    </div>
+
+    <div class="stage" id="stage">
+      <svg class="links" id="linksSvg"></svg>
+      <div class="empty-wrap" id="emptyWrap">
+        <div class="empty-card">
+          <div class="glyph">🌳</div>
+          <h2 id="emptyTitle"></h2>
+          <p id="emptyDesc"></p>
+          <div class="field">
+            <label id="rootNameLabel"></label>
+            <input type="text" id="rootName">
+          </div>
+          <div class="field">
+            <label id="rootSpouseLabel"></label>
+            <input type="text" id="rootSpouseName">
+          </div>
+          <button class="primary-btn" id="createRootBtn"></button>
+          <button class="primary-btn" id="restoreBtnEmpty" style="background:var(--teal); margin-top:10px;"></button>
+        </div>
+      </div>
+      <div class="canvas" id="canvas" style="display:none;">
+        <div id="treeRoot"></div>
       </div>
     </div>
-    <div class="canvas" id="canvas" style="display:none;">
-      <div id="treeRoot"></div>
+  </section>
+
+  <section id="tab-moments" class="tab-panel">
+    <div id="momentsScreen">
+      <div class="moments-header">
+        <button class="icon-btn" id="momentsBack" title="رجوع">→</button>
+        <h2>📰 لحظات العائلة</h2>
+        <div style="width:36px;"></div>
+      </div>
+      <div class="moments-list" id="momentsList"></div>
+      <div class="moments-compose">
+        <div class="moments-photo-preview" id="momentPhotoPreview" style="display:none;"></div>
+        <textarea id="momentText" placeholder="شارك خبرًا أو لحظة مع العائلة…" rows="2"></textarea>
+        <div class="moments-compose-actions">
+          <button id="momentPhotoBtn" type="button">📷 صورة</button>
+          <input type="file" id="momentPhotoFile" accept="image/*" style="display:none;">
+          <button id="momentPostBtn" class="primary-btn" style="flex:1;">نشر</button>
+        </div>
+      </div>
     </div>
-  </div>
+  </section>
+
+  <section id="tab-settings" class="tab-panel"></section>
+
+  <nav class="bottom-nav" id="bottomNav" style="display:none;">
+    <button class="nav-item" data-tab="home"><span class="ni">⌂</span><span id="nav_home"></span></button>
+    <button class="nav-item" data-tab="tree"><span class="ni">🌳</span><span id="nav_tree"></span></button>
+    <button class="nav-item" data-tab="moments"><span class="ni">📰</span><span id="nav_moments"></span></button>
+    <button class="nav-item" data-tab="settings"><span class="ni">⚙</span><span id="nav_settings"></span></button>
+  </nav>
 
   <div class="overlay" id="overlay"></div>
   <div class="sheet" id="sheet">

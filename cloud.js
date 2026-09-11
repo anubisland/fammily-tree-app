@@ -39,6 +39,18 @@
   function clearErr(){ authErr.classList.remove('show'); authErr.textContent=''; }
   function setLoading(on){ authLoading.classList.toggle('show', on); authSubmitBtn.disabled = on; }
 
+  /* Reveal the tab shell once auth succeeds (join flow, create flow, or an
+     already-signed-in reload); hide it again when auth is lost. */
+  function showAppShell(){
+    var nav = document.getElementById('bottomNav');
+    if(nav) nav.style.display = 'flex';
+    if(window.__ftShowTab) window.__ftShowTab(localStorage.getItem('ft_tab') || 'tree');
+  }
+  function hideAppShell(){
+    var nav = document.getElementById('bottomNav');
+    if(nav) nav.style.display = 'none';
+  }
+
   function friendlyAuthError(code){
     var map = {
       'auth/invalid-email':'صيغة البريد الإلكتروني غير صحيحة',
@@ -127,6 +139,7 @@
         subscribeTree(currentTreeId);
         authGate.classList.add('hidden');
         cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
+        showAppShell();
         setLoading(false);
         manualAuthFlow = false;
         logActivity('join', '');
@@ -148,6 +161,7 @@
         subscribeTree(currentTreeId);
         authGate.classList.add('hidden');
         cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
+        showAppShell();
         setLoading(false);
         manualAuthFlow = false;
         logActivity('create_family', '');
@@ -169,6 +183,7 @@
       document.getElementById('momentsScreen').classList.remove('open');
       if(unsubMoments){ unsubMoments(); unsubMoments = null; }
       authGate.classList.remove('hidden');
+      hideAppShell();
       setLoading(false);
       return;
     }
@@ -196,6 +211,7 @@
       subscribeTree(currentTreeId);
       authGate.classList.add('hidden');
       cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
+      showAppShell();
       setLoading(false);
       logActivity('login', '');
     }catch(err){

@@ -75,7 +75,11 @@
     inviteShareHint:{ar:'لدعوة أحد أفراد العائلة، أنشئ رابط دعوة وأرسله له', en:'To add a family member, generate an invite link and send it to them'},
     errNoMembership:{ar:'حسابك ليس عضوًا في هذه العائلة. اطلب رابط دعوة من مالك الشجرة.', en:'Your account is not a member of this family. Ask the tree owner for an invite link.'},
     themeDark:{ar:'الوضع الداكن', en:'Dark mode'},
-    themeLight:{ar:'الوضع الفاتح', en:'Light mode'}
+    themeLight:{ar:'الوضع الفاتح', en:'Light mode'},
+    navHome:{ar:'الرئيسية', en:'Home'},
+    navTree:{ar:'الشجرة', en:'Tree'},
+    navMoments:{ar:'اللحظات', en:'Moments'},
+    navSettings:{ar:'إعدادات', en:'Settings'}
   };
   var genLabelsMap = {
     ar:["الجيل الأول","الجيل الثاني","الجيل الثالث","الجيل الرابع","الجيل الخامس","الجيل السادس","الجيل السابع","الجيل الثامن"],
@@ -237,7 +241,31 @@
     document.getElementById('createRootBtn').textContent = t('createBtn');
     document.getElementById('restoreBtnEmpty').textContent = t('restoreBackup');
     document.getElementById('joinCode').placeholder = t('joinCodePh');
+    document.getElementById('nav_home').textContent = t('navHome');
+    document.getElementById('nav_tree').textContent = t('navTree');
+    document.getElementById('nav_moments').textContent = t('navMoments');
+    document.getElementById('nav_settings').textContent = t('navSettings');
   }
+
+  /* ============== Tab router ============== */
+  function showTab(name){
+    var tabs = ['home', 'tree', 'moments', 'settings'];
+    if(tabs.indexOf(name) < 0) name = 'tree';
+    tabs.forEach(function(t){
+      var p = document.getElementById('tab-' + t);
+      if(p) p.classList.toggle('active', t === name);
+    });
+    document.querySelectorAll('.bottom-nav .nav-item').forEach(function(b){
+      b.classList.toggle('active', b.getAttribute('data-tab') === name);
+    });
+    try{ localStorage.setItem('ft_tab', name); }catch(e){}
+    if(name === 'home' && window.__ftRenderHome) window.__ftRenderHome();
+    if(name === 'settings' && window.__ftRenderSettings) window.__ftRenderSettings();
+  }
+  window.__ftShowTab = showTab;
+  document.querySelectorAll('.bottom-nav .nav-item').forEach(function(b){
+    b.addEventListener('click', function(){ showTab(b.getAttribute('data-tab')); });
+  });
 
   document.getElementById('langBtn').addEventListener('click', function(){
     state.lang = state.lang === 'ar' ? 'en' : 'ar';

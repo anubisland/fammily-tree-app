@@ -394,7 +394,8 @@
     menuInvite:{ar:'➕ دعوة فرد للعائلة', en:'➕ Invite a family member'},
     inviteCopied:{ar:'تم نسخ رابط الدعوة', en:'Invite link copied'},
     joinCodePh:{ar:'الصق رابط الدعوة هنا', en:'Paste the invite link here'},
-    inviteShareHint:{ar:'لدعوة أحد أفراد العائلة، أنشئ رابط دعوة وأرسله له', en:'To add a family member, generate an invite link and send it to them'}
+    inviteShareHint:{ar:'لدعوة أحد أفراد العائلة، أنشئ رابط دعوة وأرسله له', en:'To add a family member, generate an invite link and send it to them'},
+    errNoMembership:{ar:'حسابك ليس عضوًا في هذه العائلة. اطلب رابط دعوة من مالك الشجرة.', en:'Your account is not a member of this family. Ask the tree owner for an invite link.'}
   };
   var genLabelsMap = {
     ar:["الجيل الأول","الجيل الثاني","الجيل الثالث","الجيل الرابع","الجيل الخامس","الجيل السادس","الجيل السابع","الجيل الثامن"],
@@ -1278,7 +1279,15 @@
       }
       currentTreeId = userSnap.data().treeId;
       var memberSnap = await getDoc(doc(db, 'trees', currentTreeId, 'members', user.uid));
-      currentRole = (memberSnap.exists() && memberSnap.data().role) || 'editor'; // legacy members with no role are grandfathered as editor
+      if(!memberSnap.exists()){
+        // No membership => no access. Never fall through to a default role;
+        // that was finding 3.1 (an absent member doc granted 'editor').
+        setLoading(false);
+        showErr(t('errNoMembership'));
+        await signOut(auth).catch(function(){});
+        return;
+      }
+      currentRole = memberSnap.data().role || 'viewer'; // missing role => least privilege
       window.__ftSetEditable(currentRole !== 'viewer');
       subscribeTree(currentTreeId);
       authGate.classList.add('hidden');

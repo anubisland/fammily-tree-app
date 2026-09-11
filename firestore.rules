@@ -1,44 +1,93 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+    // ===================================================================
+    // Identity vs. permission
+    //
+    // Authority for "is this user a member / what role?" is the member
+    // document at trees/{treeId}/members/{uid} -- a document the user can
+    // NEVER freely create for themselves in an existing tree.
+    //
+    // It is deliberately NOT users/{uid}: that doc IS self-writable, so
+    // basing permission on it lets a user grant themselves any role.
+    // ===================================================================
+
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function memberDoc(treeId) {
+      return /databases/$(database)/documents/trees/$(treeId)/members/$(uid());
     }
+    function isMember(treeId) { return signedIn() && exists(memberDoc(treeId)); }
+    function myRole(treeId) { return get(memberDoc(treeId)).data.role; }
+    function isOwner(treeId) { return isMember(treeId) && myRole(treeId) == 'owner'; }
+    function canEdit(treeId) { return isMember(treeId) && myRole(treeId) != 'viewer'; }
+    function treeCreatedBy(treeId) {
+      return get(/databases/$(database)/documents/trees/$(treeId)).data.createdBy;
+    }
+    function inviteDoc(treeId, token) {
+      return /databases/$(database)/documents/trees/$(treeId)/invites/$(token);
+    }
+
+    // users/{uid}: self only. Never a source of permission.
+    match /users/{userId} {
+      allow read, write: if signedIn() && uid() == userId;
+    }
+
     match /trees/{treeId} {
-      allow read: if request.auth != null;
-      allow update: if request.auth != null &&
-        exists(/databases/$(database)/documents/trees/$(treeId)/members/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/trees/$(treeId)/members/$(request.auth.uid)).data.role != 'viewer';
-      allow create: if request.auth != null;
+      allow read:   if isMember(treeId);
+      allow create: if signedIn() && request.resource.data.createdBy == uid();
+      allow update: if canEdit(treeId);
       allow delete: if false;
-    }
-    match /trees/{treeId}/members/{uid} {
-      allow read: if request.auth != null &&
-        exists(/databases/$(database)/documents/trees/$(treeId)/members/$(request.auth.uid));
-      allow create: if request.auth != null && request.auth.uid == uid;
-      allow update: if request.auth != null &&
-        get(/databases/$(database)/documents/trees/$(treeId)/members/$(request.auth.uid)).data.role == 'owner';
-      allow delete: if request.auth != null &&
-        get(/databases/$(database)/documents/trees/$(treeId)/members/$(request.auth.uid)).data.role == 'owner' &&
-        uid != request.auth.uid;
-    }
-    match /trees/{treeId}/activity/{logId} {
-      allow read: if request.auth != null &&
-        exists(/databases/$(database)/documents/trees/$(treeId)/members/$(request.auth.uid));
-      allow create: if request.auth != null &&
-        exists(/databases/$(database)/documents/trees/$(treeId)/members/$(request.auth.uid));
-      allow update, delete: if false;
-    }
-    match /trees/{treeId}/moments/{momentId} {
-      allow read: if request.auth != null &&
-        exists(/databases/$(database)/documents/trees/$(treeId)/members/$(request.auth.uid));
-      allow create: if request.auth != null &&
-        exists(/databases/$(database)/documents/trees/$(treeId)/members/$(request.auth.uid)) &&
-        request.resource.data.byUid == request.auth.uid;
-      allow delete: if request.auth != null &&
-        (resource.data.byUid == request.auth.uid ||
-         get(/databases/$(database)/documents/trees/$(treeId)/members/$(request.auth.uid)).data.role == 'owner');
-      allow update: if false;
+
+      match /members/{memberUid} {
+        allow read: if isMember(treeId);
+
+        // create — three legitimate paths, never free self-grant:
+        allow create: if signedIn() && (
+          // (1) bootstrap: the tree's creator becomes its first owner
+          ( memberUid == uid()
+            && request.resource.data.role == 'owner'
+            && treeCreatedBy(treeId) == uid()
+            && !exists(memberDoc(treeId)) )
+          ||
+          // (2) invited join: a valid invite exists; role must match it and never be owner
+          ( memberUid == uid()
+            && request.resource.data.role != 'owner'
+            && exists(inviteDoc(treeId, request.resource.data.viaInvite))
+            && get(inviteDoc(treeId, request.resource.data.viaInvite)).data.role
+                 == request.resource.data.role )
+          ||
+          // (3) an owner adds someone directly
+          ( isOwner(treeId) )
+        );
+
+        allow update: if isOwner(treeId);
+        allow delete: if isOwner(treeId) && memberUid != uid();
+      }
+
+      match /invites/{token} {
+        allow get:    if signedIn();          // a joiner reads the token they were handed
+        allow list:   if isMember(treeId);    // only members may enumerate invites
+        allow create: if canEdit(treeId)
+                      && request.resource.data.role in ['editor', 'viewer'];
+        allow delete: if canEdit(treeId);
+        allow update: if false;
+      }
+
+      match /activity/{logId} {
+        allow read:   if isMember(treeId);
+        allow create: if isMember(treeId);
+        allow update, delete: if false;
+      }
+
+      match /moments/{momentId} {
+        allow read:   if isMember(treeId);
+        allow create: if isMember(treeId) && request.resource.data.byUid == uid();
+        allow delete: if signedIn() &&
+                      (resource.data.byUid == uid() || isOwner(treeId));
+        allow update: if false;
+      }
     }
   }
 }

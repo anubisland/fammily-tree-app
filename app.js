@@ -740,10 +740,6 @@
             '<span>👥 '+t('setMembers')+'</span>' +
             '<span class="set-val">›</span>' +
           '</div>') : '') +
-          '<div class="set-row set-row-click" id="setInstallRow">' +
-            '<span>📲 '+t('setInstall')+'</span>' +
-            '<span class="set-val">›</span>' +
-          '</div>' +
           (hasCloud ? (
           '<div class="set-row set-row-click set-row-danger" id="setSignoutRow">' +
             '<span>⏻ '+t('setSignout')+'</span>' +
@@ -779,7 +775,6 @@
         if(window.__ftCloud.showMembers) window.__ftCloud.showMembers();
       };
     }
-    document.getElementById('setInstallRow').onclick = function(){ toast(t('comingSoon')); };
     if(hasCloud){
       var soRow = document.getElementById('setSignoutRow');
       if(soRow) soRow.onclick = function(){

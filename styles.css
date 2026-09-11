@@ -23,12 +23,16 @@
     background-image:
       radial-gradient(circle at 15% 8%, rgba(184,134,45,.10), transparent 40%),
       radial-gradient(circle at 85% 92%, rgba(15,91,75,.08), transparent 45%);
-    min-height:100vh; overflow-x:hidden; padding-bottom:70px;
+    min-height:100vh; overflow-x:hidden;
   }
 
   /* ===== Tab panels / bottom nav ===== */
   .tab-panel{display:none;}
   .tab-panel.active{display:block;}
+  /* Scrolling panels clear the fixed bottom nav; the tree fills the screen. */
+  #tab-home.active, #tab-settings.active, #tab-moments.active{ padding-bottom:78px; }
+  #tab-tree.active{ display:flex; flex-direction:column; height:100dvh; height:100vh; }
+  #tab-tree .stage{ flex:1 1 auto; height:auto; min-height:0; padding-bottom:64px; }
   .bottom-nav{ position:fixed; inset-inline:0; bottom:0; z-index:30; display:flex; background:var(--card); border-top:1px solid var(--line); padding:9px 6px 12px; box-shadow:0 -4px 16px rgba(43,33,24,.06);}
   .nav-item{ flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10.5px; color:var(--ink-soft); background:none; border:none; padding:3px 0; position:relative; font-family:var(--f-body);}
   .nav-item .ni{font-size:21px;}

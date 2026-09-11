@@ -4,8 +4,16 @@
     --teal:#1D6E77; --plum:#7A4869; --card:#FFFCF5; --line:#C9B98F; --danger:#9C3B2E;
     --shadow: 0 1px 2px rgba(43,33,24,.06), 0 6px 18px rgba(43,33,24,.10);
     --f-head:'Amiri', serif; --f-body:'Cairo', sans-serif;
+    color-scheme: light;
   }
   html.lang-en{ --f-head:'Lora', serif; --f-body:'Inter','Cairo', sans-serif; }
+  html.dark{
+    color-scheme: dark;
+    --paper:#17120B; --paper-deep:#211A10; --ink:#EDE3CE; --ink-soft:#B8A98C;
+    --emerald:#2E8B72; --emerald-deep:#256F5C; --gold:#D6A94A; --gold-soft:#5A4A24;
+    --teal:#3E9AA4; --plum:#B07C9C; --card:#221A10; --line:#3E3320; --danger:#C56A5A;
+    --shadow: 0 1px 2px rgba(0,0,0,.30), 0 8px 22px rgba(0,0,0,.35);
+  }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
   html,body{margin:0; padding:0; background:var(--paper); color:var(--ink); font-family:var(--f-body);}
   body{

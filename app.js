@@ -276,9 +276,24 @@
   }
 
   /* ============== Tab router ============== */
+  /* Immersive tree: banner + bottom nav slide away while the user pans or
+     scrolls the tree, and return when they lift/stop — so the tree gets the
+     whole screen during viewing (agreed in the design). */
+  function setTreeImmersive(on){ document.body.classList.toggle('tree-immersive', !!on); }
+  function initImmersiveTree(){
+    var stage = document.getElementById('stage');
+    if(!stage || stage._immInit) return; stage._immInit = true;
+    var down=false, moved=false, sx=0, sy=0, hideT=null;
+    stage.addEventListener('pointerdown', function(e){ down=true; moved=false; sx=e.clientX; sy=e.clientY; });
+    stage.addEventListener('pointermove', function(e){ if(down && (Math.abs(e.clientX-sx)>6 || Math.abs(e.clientY-sy)>6)){ moved=true; setTreeImmersive(true); } });
+    window.addEventListener('pointerup', function(){ if(down){ down=false; if(moved) setTreeImmersive(false); } });
+    stage.addEventListener('scroll', function(){ setTreeImmersive(true); clearTimeout(hideT); hideT=setTimeout(function(){ setTreeImmersive(false); }, 1400); }, {passive:true});
+  }
+
   function showTab(name){
     var tabs = ['home', 'tree', 'moments', 'settings'];
     if(tabs.indexOf(name) < 0) name = 'tree';
+    setTreeImmersive(false); // always restore chrome when switching tabs
     tabs.forEach(function(t){
       var p = document.getElementById('tab-' + t);
       if(p) p.classList.toggle('active', t === name);
@@ -294,6 +309,7 @@
   document.querySelectorAll('.bottom-nav .nav-item').forEach(function(b){
     b.addEventListener('click', function(){ showTab(b.getAttribute('data-tab')); });
   });
+  initImmersiveTree();
 
   function switchLang(newLang){
     if(newLang !== 'ar' && newLang !== 'en') return;

@@ -935,7 +935,22 @@
   });
   titleEl.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); titleEl.blur(); } });
 
-  document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
+  document.getElementById('printBtn').addEventListener('click', function(){ showTab('tree'); window.print(); });
+  /* Print: reset zoom to 1 and redraw the connector lines against the print
+     layout (chrome hidden, stage expanded) so lines and cards line up on paper.
+     The lines are absolutely-positioned from getBoundingClientRect, so they must
+     be recomputed for the exact printed layout, not the on-screen zoomed one. */
+  window.addEventListener('beforeprint', function(){
+    window.__ftPrevZoom = zoom; zoom = 1; applyZoom();
+    document.body.classList.remove('tree-immersive');
+    document.body.classList.add('printing');
+    drawLinks();
+  });
+  window.addEventListener('afterprint', function(){
+    document.body.classList.remove('printing');
+    zoom = window.__ftPrevZoom || 1; applyZoom();
+    requestAnimationFrame(drawLinks);
+  });
 
   document.getElementById('exportBtn').addEventListener('click', function(){
     var blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});

@@ -144,11 +144,26 @@
   .toast{ position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:var(--paper); font-size:12.5px; padding:9px 16px; border-radius:20px; opacity:0; transition:all .25s ease; z-index:60; pointer-events:none; max-width:88%; text-align:center;}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 
+  @page{ size: landscape; margin: 8mm; }
+  /* Printing: applied to the live DOM (via body.printing in beforeprint) so the
+     connector lines are measured against the exact layout that prints, and
+     mirrored in @media print as a fallback. Only the tree prints; all chrome
+     (nav, banner, toolbar, per-card action buttons) is hidden. */
+  body.printing .bottom-nav, body.printing .banner, body.printing .toolbar,
+  body.printing .storage-warn, body.printing .card-actions, body.printing .toggle-branch,
+  body.printing .section-eyebrow, body.printing #tab-home,
+  body.printing #tab-settings, body.printing #tab-moments{ display:none !important; }
+  body.printing #tab-tree.active{ display:block !important; height:auto !important; }
+  body.printing .stage{ height:auto !important; overflow:visible !important; padding-bottom:0 !important; }
+  body.printing .canvas{ transform:scale(1) !important; padding:10px; }
+  body.printing{ background:#fff !important; }
   @media print{
-    .toolbar, .storage-warn, .banner-actions, .card-actions, .toggle-branch{display:none !important;}
-    .stage{height:auto; overflow:visible;}
-    .canvas{transform:scale(1) !important; padding:10px;}
-    body{background:#fff;}
+    .bottom-nav, .banner, .toolbar, .storage-warn, .card-actions, .toggle-branch,
+    .section-eyebrow, #tab-home, #tab-settings, #tab-moments{ display:none !important; }
+    #tab-tree.active{ display:block !important; height:auto !important; }
+    .stage{ height:auto !important; overflow:visible !important; padding-bottom:0 !important; }
+    .canvas{ transform:scale(1) !important; padding:10px; }
+    body{ background:#fff !important; }
   }
 
   /* ---------- Auth gate ---------- */

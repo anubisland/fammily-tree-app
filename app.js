@@ -79,7 +79,23 @@
     navHome:{ar:'الرئيسية', en:'Home'},
     navTree:{ar:'الشجرة', en:'Tree'},
     navMoments:{ar:'اللحظات', en:'Moments'},
-    navSettings:{ar:'إعدادات', en:'Settings'}
+    navSettings:{ar:'إعدادات', en:'Settings'},
+    unnamedFamily:{ar:'عائلتي', en:'My family'},
+    homeSectionsEyebrow:{ar:'أقسام العائلة', en:'Sections'},
+    cardTree:{ar:'الشجرة', en:'Tree'},
+    cardTreeSub:{ar:'استعرض النسب كاملاً', en:'Browse the full lineage'},
+    cardFeed:{ar:'اللحظات', en:'Moments'},
+    cardFeedSub:{ar:'أخبار العائلة وأحداثها', en:'Family news and events'},
+    cardSearch:{ar:'البحث', en:'Search'},
+    cardSearchSub:{ar:'ابحث بالاسم عربي/EN', en:'Search by name, AR/EN'},
+    cardMembers:{ar:'الأعضاء', en:'Members'},
+    cardMembersSub:{ar:'إدارة صلاحيات الأفراد', en:'Manage member permissions'},
+    statPhotos:{ar:'صورة', en:'Photos'},
+    completionTitle:{ar:'اكتمال الشجرة', en:'Tree completeness'},
+    completionHintMissingPhoto:{ar:'«{name}» بلا صورة', en:'"{name}" has no photo'},
+    completionHintMissingBirth:{ar:'«{name}» بلا تاريخ ميلاد', en:'"{name}" has no birth date'},
+    completionHintDone:{ar:'أحسنت! جميع البيانات مكتملة', en:'Great! All info is complete'},
+    comingSoon:{ar:'قريباً', en:'Coming soon'}
   };
   var genLabelsMap = {
     ar:["الجيل الأول","الجيل الثاني","الجيل الثالث","الجيل الرابع","الجيل الخامس","الجيل السادس","الجيل السابع","الجيل الثامن"],
@@ -576,6 +592,71 @@
     });
   }
   window.addEventListener('resize', function(){ requestAnimationFrame(drawLinks); });
+
+  /* ============== Home tab ============== */
+  var arDigits = {'0':'٠','1':'١','2':'٢','3':'٣','4':'٤','5':'٥','6':'٦','7':'٧','8':'٨','9':'٩'};
+  function localeDigits(n){
+    var s = String(n);
+    if(state.lang !== 'ar') return s;
+    return s.replace(/[0-9]/g, function(d){ return arDigits[d]; });
+  }
+
+  function homeCompletionHint(ppl, ids){
+    for(var i=0;i<ids.length;i++){
+      var p = ppl[ids[i]];
+      if(!p.photo) return tf('completionHintMissingPhoto', {name: escapeHtml(p.name)});
+      if(!p.birthDate) return tf('completionHintMissingBirth', {name: escapeHtml(p.name)});
+    }
+    return t('completionHintDone');
+  }
+
+  function renderHome(){
+    var host = document.getElementById('tab-home');
+    if(!host) return;
+    var ppl = state.people || {};
+    var ids = Object.keys(ppl);
+    var count = ids.length;
+    var gens = count ? maxGeneration() : 0;
+    var photos = ids.filter(function(id){ return ppl[id].photo; }).length;
+    var complete = ids.filter(function(id){ return ppl[id].photo && ppl[id].birthDate; }).length;
+    var pct = count ? Math.round((complete / count) * 100) : 0;
+    var fam = (state.familyName && state.familyName.trim()) ? state.familyName : t('unnamedFamily');
+    var hint = homeCompletionHint(ppl, ids);
+
+    host.innerHTML =
+      '<div class="masthead">' +
+        '<div class="brand-row">' +
+          '<div class="crest">🌳</div>' +
+          '<div><div class="app-name">'+t('appName')+'</div><div class="family-name">'+escapeHtml(fam)+'</div></div>' +
+        '</div>' +
+        '<div class="tadhib"><span class="dia">◆</span><span class="rule"></span><span class="dia">◆</span></div>' +
+        '<div class="home-stat-row">' +
+          '<div class="home-stat"><b>'+localeDigits(count)+'</b><span>'+t('statMembers')+'</span></div>' +
+          '<div class="home-stat"><b>'+localeDigits(gens)+'</b><span>'+t('statGenerations')+'</span></div>' +
+          '<div class="home-stat"><b>'+localeDigits(photos)+'</b><span>'+t('statPhotos')+'</span></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="home-body">' +
+        '<div class="section-eyebrow"><span class="dia">◆</span><span>'+t('homeSectionsEyebrow')+'</span></div>' +
+        '<div class="grid">' +
+          '<div class="leaf tree" data-go="tree"><span class="corner">۞</span><div class="ic">🌳</div><h3>'+t('cardTree')+'</h3><p>'+t('cardTreeSub')+'</p></div>' +
+          '<div class="leaf feed" data-go="moments"><span class="corner">۞</span><div class="ic">📰</div><h3>'+t('cardFeed')+'</h3><p>'+t('cardFeedSub')+'</p></div>' +
+          '<div class="leaf search" data-go="search"><span class="corner">۞</span><div class="ic">🔍</div><h3>'+t('cardSearch')+'</h3><p>'+t('cardSearchSub')+'</p></div>' +
+          '<div class="leaf members" data-go="members"><span class="corner">۞</span><div class="ic">👥</div><h3>'+t('cardMembers')+'</h3><p>'+t('cardMembersSub')+'</p></div>' +
+        '</div>' +
+        '<div class="meter-card">' +
+          '<div class="meter-top"><h3>'+t('completionTitle')+'</h3><b>'+localeDigits(pct)+'%</b></div>' +
+          '<div class="bar"><i style="width:'+pct+'%"></i></div>' +
+          '<div class="meter-hint"><span class="dot">◆</span><span>'+hint+'</span></div>' +
+        '</div>' +
+      '</div>';
+
+    host.querySelector('[data-go="tree"]').onclick = function(){ showTab('tree'); };
+    host.querySelector('[data-go="moments"]').onclick = function(){ showTab('moments'); };
+    host.querySelector('[data-go="search"]').onclick = function(){ toast(t('comingSoon')); };
+    host.querySelector('[data-go="members"]').onclick = function(){ toast(t('comingSoon')); };
+  }
+  window.__ftRenderHome = renderHome;
 
   /* ============== Sheets ============== */
   var overlay = document.getElementById('overlay');

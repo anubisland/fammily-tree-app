@@ -226,3 +226,45 @@
     background:rgba(246,239,221,.14); border:1px solid rgba(246,239,221,.3); border-radius:12px;
     padding:10px; margin-top:12px; color:#F6EFDD; font-size:13px; font-weight:700; position:relative; z-index:1;
   }
+
+  /* ---------- Home tab ---------- */
+  /* Namespaced under #tab-home: the tree tab already owns a bare .stat-row
+     (with .stat-pill children), so the home stats use .home-stat-row/.home-stat
+     instead of colliding with it. */
+  #tab-home .masthead{ background: linear-gradient(155deg, var(--emerald) 0%, var(--emerald-deep) 82%); color:#F6EFDD; padding:20px 20px 22px; position:relative; overflow:hidden;}
+  #tab-home .masthead::after{ content:""; position:absolute; inset:0; background-image: radial-gradient(circle, rgba(246,239,221,.13) 1px, transparent 1.5px); background-size:15px 15px; opacity:.5; pointer-events:none;}
+  #tab-home .brand-row{display:flex; align-items:center; gap:12px; position:relative; z-index:1;}
+  #tab-home .crest{ width:46px; height:46px; border-radius:13px; background:rgba(246,239,221,.12); border:1px solid rgba(223,201,152,.5); display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0;}
+  #tab-home .app-name{font-size:12.5px; color:#CFE3DC; letter-spacing:.3px;}
+  #tab-home .family-name{font-family:var(--f-head); font-size:26px; font-weight:700; line-height:1.15;}
+  #tab-home .tadhib{display:flex; align-items:center; gap:7px; margin-top:7px; position:relative; z-index:1;}
+  #tab-home .tadhib .rule{height:1.5px; background:linear-gradient(90deg, transparent, var(--gold-soft) 30%, var(--gold-soft) 70%, transparent); flex:1;}
+  #tab-home .tadhib .dia{color:var(--gold-soft); font-size:11px;}
+  #tab-home .home-stat-row{display:flex; gap:9px; margin-top:16px; position:relative; z-index:1;}
+  #tab-home .home-stat{flex:1; background:rgba(246,239,221,.12); border:1px solid rgba(246,239,221,.22); border-radius:13px; padding:9px 6px; text-align:center;}
+  #tab-home .home-stat b{display:block; font-family:var(--f-head); font-size:22px; font-weight:700;}
+  #tab-home .home-stat span{font-size:10.5px; color:#CFE3DC;}
+
+  #tab-home .home-body{padding:18px 16px 16px;}
+  #tab-home .section-eyebrow{display:flex; align-items:center; gap:8px; margin:2px 2px 12px;}
+  #tab-home .section-eyebrow .dia{color:var(--gold); font-size:9px;}
+  #tab-home .section-eyebrow span{font-size:12px; font-weight:700; color:var(--ink-soft); letter-spacing:.2px;}
+  #tab-home .grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  #tab-home .leaf{ background:var(--card); border-radius:16px; padding:15px 14px 16px; box-shadow:var(--shadow); position:relative; overflow:hidden; border:1px solid var(--line); text-align:start; cursor:pointer;}
+  #tab-home .leaf .corner{position:absolute; top:9px; inset-inline-end:11px; font-size:11px; opacity:.5;}
+  #tab-home .leaf .ic{ width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:21px; margin-bottom:11px;}
+  #tab-home .leaf h3{font-family:var(--f-head); font-size:17px; font-weight:700; margin-bottom:3px; color:var(--ink);}
+  #tab-home .leaf p{font-size:11.5px; color:var(--ink-soft); line-height:1.5;}
+  #tab-home .leaf.tree{background:var(--t-tree);}     #tab-home .leaf.tree .ic{background:var(--emerald); color:#F6EFDD;}     #tab-home .leaf.tree .corner{color:var(--emerald);}
+  #tab-home .leaf.feed{background:var(--t-feed);}     #tab-home .leaf.feed .ic{background:var(--gold); color:#3a2a08;}         #tab-home .leaf.feed .corner{color:var(--gold);}
+  #tab-home .leaf.search{background:var(--t-search);} #tab-home .leaf.search .ic{background:var(--teal); color:#F6EFDD;}      #tab-home .leaf.search .corner{color:var(--teal);}
+  #tab-home .leaf.members{background:var(--t-members);} #tab-home .leaf.members .ic{background:var(--plum); color:#F6EFDD;}  #tab-home .leaf.members .corner{color:var(--plum);}
+
+  #tab-home .meter-card{ margin-top:12px; background:var(--card); border-radius:16px; padding:15px 16px; box-shadow:var(--shadow); border:1px solid var(--line);}
+  #tab-home .meter-top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:9px;}
+  #tab-home .meter-top h3{font-family:var(--f-head); font-size:16px; color:var(--ink);}
+  #tab-home .meter-top b{font-family:var(--f-head); font-size:20px; color:var(--emerald);}
+  #tab-home .bar{height:9px; border-radius:6px; background:var(--paper-deep); overflow:hidden;}
+  #tab-home .bar i{display:block; height:100%; background:linear-gradient(90deg, var(--gold), var(--emerald)); border-radius:6px;}
+  #tab-home .meter-hint{font-size:11px; color:var(--ink-soft); margin-top:9px; display:flex; align-items:center; gap:6px;}
+  #tab-home .meter-hint .dot{color:var(--gold);}

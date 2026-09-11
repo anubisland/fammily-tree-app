@@ -1,0 +1,5 @@
+{
+  "_comment": "Emulator-only config for `npm run test:rules`.",
+  "firestore": { "rules": "firestore.rules" },
+  "emulators": { "firestore": { "port": 8080 }, "ui": { "enabled": false } }
+}

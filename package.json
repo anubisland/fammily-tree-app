@@ -1,0 +1,13 @@
+{
+  "name": "family-tree-rules",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:rules": "firebase emulators:exec --only firestore --config firebase.emulator.json --project family-tree-rules-test \"node scripts/verify-rules.mjs\""
+  },
+  "devDependencies": {
+    "firebase": "^10.13.2",
+    "@firebase/rules-unit-testing": "^5.0.1"
+  }
+}

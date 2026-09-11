@@ -201,6 +201,21 @@ await check('invite role-binding: non-existent invite token is rejected', () =>
   assertFails(setDoc(doc(joinerDb, 'trees', TREE, 'members', JOINER),
     { role: 'editor', viaInvite: 'bogus' })));
 
+// ── Owner-adds-member directly (members create path 3) ──────────────────
+// Guards the `isOwner(treeId) && request.resource.data.role in ['editor',
+// 'viewer']` clause: the owner's direct-add path must accept editor/viewer
+// and must still reject a second owner (one-owner-per-tree invariant).
+const ADDED = 'uid-added';
+const ADDED2 = 'uid-added-2';
+
+await check('owner can directly add an editor member (path 3)', () =>
+  assertSucceeds(setDoc(doc(ownerDb, 'trees', TREE, 'members', ADDED),
+    { role: 'editor', email: 'added@x.com' })));
+
+await check('owner cannot add a second owner (path 3 role constraint)', () =>
+  assertFails(setDoc(doc(ownerDb, 'trees', TREE, 'members', ADDED2),
+    { role: 'owner', email: 'boss2@x.com' })));
+
 // ── Viewer role (finding 2): guards canEdit's `!= 'viewer'` ──────────────
 await check('viewer can read the tree', () =>
   assertSucceeds(getDoc(doc(viewerDb, 'trees', TREE))));

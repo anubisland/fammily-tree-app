@@ -25,6 +25,7 @@ const EDITOR = 'uid-editor';
 const VIEWER = 'uid-viewer';
 const THROWAWAY = 'uid-throwaway';
 const TREE = 'tree-1';
+const TREE_LEGACY = 'tree-legacy';
 const INVITE_EDITOR = 'invite-editor-token';
 const INVITE_VIEWER = 'invite-viewer-token';
 
@@ -50,6 +51,15 @@ async function seed(ctx) {
   await setDoc(doc(db, 'users', OUTSIDER), { email: 'out@x.com', treeId: '' });
   await setDoc(doc(db, 'trees', TREE, 'moments', 'm1'), { byUid: OWNER, text: 'hi' });
   await setDoc(doc(db, 'trees', TREE, 'activity', 'a1'), { byUid: OWNER, kind: 'created' });
+
+  // A legacy tree from the pre-createdBy era: no `createdBy` field at all.
+  // Reuses OWNER/EDITOR as its members so the existing authenticated
+  // contexts can exercise it directly (see C-legacy checks below).
+  await setDoc(doc(db, 'trees', TREE_LEGACY), {
+    familyName: { ar: 'قديمة', en: 'Legacy' }, rootId: null, people: {}, lang: 'ar',
+  });
+  await setDoc(doc(db, 'trees', TREE_LEGACY, 'members', OWNER), { role: 'owner', email: 'o@x.com' });
+  await setDoc(doc(db, 'trees', TREE_LEGACY, 'members', EDITOR), { role: 'editor', email: 'e@x.com' });
 }
 
 const testEnv = await initializeTestEnvironment({
@@ -187,6 +197,16 @@ await check('C1 chain: denied createdBy rewrite blocks throwaway owner bootstrap
   await assertFails(setDoc(doc(throwawayDb, 'trees', TREE, 'members', THROWAWAY),
     { role: 'owner', createdBy: THROWAWAY }));
 });
+
+// ── Legacy tree (no createdBy field): absence-safe guard ─────────────────
+// The production tree created by the old flow has no `createdBy` at all.
+// request.resource.data.get('createdBy', '') / resource.data.get('createdBy', '')
+// must treat both sides as '' rather than erroring the whole condition to deny.
+await check('legacy tree (no createdBy): owner can still edit', () =>
+  assertSucceeds(updateDoc(doc(ownerDb, 'trees', TREE_LEGACY), { rootId: 'x' })));
+
+await check('legacy tree: editor cannot add createdBy (C1 stays closed)', () =>
+  assertFails(updateDoc(doc(editorDb, 'trees', TREE_LEGACY), { createdBy: EDITOR })));
 
 // ── Invite role-binding (finding 1) ─────────────────────────────────────
 // (a) presenting a viewer invite but claiming editor: guards the invite path's

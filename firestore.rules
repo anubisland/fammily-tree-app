@@ -40,7 +40,7 @@ service cloud.firestore {
       // createdBy is immutable on update: an editor could otherwise rewrite it
       // to a throwaway uid that then satisfies the bootstrap owner path (C1).
       allow update: if canEdit(treeId)
-                    && request.resource.data.createdBy == resource.data.createdBy;
+                    && request.resource.data.get('createdBy', '') == resource.data.get('createdBy', '');
       allow delete: if false;
 
       match /members/{memberUid} {

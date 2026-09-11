@@ -1,0 +1,5 @@
+# Local agent/session scratch
+.remember/
+.claude/
+node_modules/
+firestore-debug.log

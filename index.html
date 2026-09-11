@@ -233,8 +233,8 @@
           <button type="button" id="modeJoin">الانضمام لعائلة</button>
         </div>
         <div class="field" id="joinCodeField" style="display:none;">
-          <label>رمز العائلة</label>
-          <input type="text" id="joinCode" placeholder="مثال: 7K9QXZ" style="text-transform:uppercase;">
+          <label>رابط الدعوة</label>
+          <input type="text" id="joinCode" placeholder="الصق رابط الدعوة هنا">
         </div>
       </div>
 
@@ -389,7 +389,13 @@
     toastImportError:{ar:'تعذر قراءة الملف — تأكد أنه نسخة احتياطية صحيحة', en:'Could not read the file — make sure it\'s a valid backup'},
     rootBadge:{ar:'الجذر', en:'Root'},
     familyPrefix:{ar:'عائلة ', en:''},
-    familySuffix:{ar:'', en:' Family'}
+    familySuffix:{ar:'', en:' Family'},
+    errBadInvite:{ar:'رابط الدعوة غير صحيح أو انتهت صلاحيته', en:'The invite link is invalid or has expired'},
+    menuInvite:{ar:'➕ دعوة فرد للعائلة', en:'➕ Invite a family member'},
+    inviteCopied:{ar:'تم نسخ رابط الدعوة', en:'Invite link copied'},
+    joinCodePh:{ar:'الصق رابط الدعوة هنا', en:'Paste the invite link here'},
+    inviteShareHint:{ar:'لدعوة أحد أفراد العائلة، أنشئ رابط دعوة وأرسله له', en:'To add a family member, generate an invite link and send it to them'},
+    errNoMembership:{ar:'حسابك ليس عضوًا في هذه العائلة. اطلب رابط دعوة من مالك الشجرة.', en:'Your account is not a member of this family. Ask the tree owner for an invite link.'}
   };
   var genLabelsMap = {
     ar:["الجيل الأول","الجيل الثاني","الجيل الثالث","الجيل الرابع","الجيل الخامس","الجيل السادس","الجيل السابع","الجيل الثامن"],
@@ -521,6 +527,7 @@
     document.getElementById('rootSpouseName').placeholder = t('rootSpousePh');
     document.getElementById('createRootBtn').textContent = t('createBtn');
     document.getElementById('restoreBtnEmpty').textContent = t('restoreBackup');
+    document.getElementById('joinCode').placeholder = t('joinCodePh');
   }
 
   document.getElementById('langBtn').addEventListener('click', function(){
@@ -1025,12 +1032,17 @@
       '<button class="primary-btn" id="mn_export" style="margin-bottom:10px;">'+t('menuExport')+'</button>'+
       (canEditCloud ? '<button class="primary-btn" id="mn_import" style="margin-bottom:10px; background:var(--teal);">'+t('menuImport')+'</button>' : '') +
       (canEditCloud ? '<button class="primary-btn" id="mn_reset" style="background:var(--danger);">'+t('menuReset')+'</button>' : '') +
+      (canEditCloud && window.__ftCloud ? '<button class="primary-btn" id="mn_invite" style="margin-top:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '') +
       (window.__ftCloud ? '<button class="primary-btn" id="mn_activity" style="margin-top:10px; background:var(--plum);">📋 سجل النشاط</button>' : '')
     );
     document.getElementById('mn_export').onclick = function(){ closeSheet(); document.getElementById('exportBtn').click(); };
     if(canEditCloud){
       document.getElementById('mn_import').onclick = function(){ closeSheet(); document.getElementById('importBtn').click(); };
       document.getElementById('mn_reset').onclick = function(){ closeSheet(); document.getElementById('resetBtn').click(); };
+    }
+    if(canEditCloud && window.__ftCloud && window.__ftCloud.createInvite){
+      var invBtn = document.getElementById('mn_invite');
+      if(invBtn) invBtn.onclick = function(){ closeSheet(); window.__ftCloud.createInvite('editor'); };
     }
     if(window.__ftCloud){
       document.getElementById('mn_activity').onclick = function(){ closeSheet(); window.__ftCloud.showActivityLog(); };
@@ -1159,12 +1171,17 @@
   modeJoin.onclick = function(){ signupMode='join'; modeJoin.classList.add('active'); modeCreate.classList.remove('active'); refreshAuthUI(); };
   refreshAuthUI();
 
-  function genFamilyCode(){
-    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    var s = '';
-    for(var i=0;i<6;i++) s += chars[Math.floor(Math.random()*chars.length)];
-    return s;
-  }
+  (function handleInviteHash(){
+    var h = location.hash || '';
+    if(h.indexOf('#join=') === 0){
+      var payload = decodeURIComponent(h.slice('#join='.length));
+      var jc = document.getElementById('joinCode');
+      if(jc){ jc.value = payload; }
+      mode = 'signup'; signupMode = 'join';
+      modeJoin.classList.add('active'); modeCreate.classList.remove('active');
+      refreshAuthUI();
+    }
+  })();
 
   var manualAuthFlow = false;
 
@@ -1179,23 +1196,30 @@
         await signInWithEmailAndPassword(auth, email, pass);
         // onAuthStateChanged handles the rest for a normal login.
       } else if(signupMode === 'join'){
-        var code = document.getElementById('joinCode').value.trim().toUpperCase();
-        if(!code){ setLoading(false); showErr('يرجى إدخال رمز العائلة'); return; }
+        // The join link carries "<treeId>.<token>" in #join=; the invite-hash
+        // handler below (on load) parses it into this field. No tree read
+        // before join -- the invite doc is the only thing read, by token id.
+        var joinRaw = document.getElementById('joinCode').value.trim();
+        var dot = joinRaw.indexOf('.');
+        if(dot < 1){ setLoading(false); showErr(t('errBadInvite')); return; }
+        var joinTreeId = joinRaw.slice(0, dot);
+        var joinToken  = joinRaw.slice(dot + 1);
         manualAuthFlow = true;
         var cred = await createUserWithEmailAndPassword(auth, email, pass);
-        var treeSnap = await getDoc(doc(db, 'trees', code));
-        if(!treeSnap.exists()){
+        // Read the invite by token (rules: get allowed for any signed-in user).
+        var invSnap = await getDoc(doc(db, 'trees', joinTreeId, 'invites', joinToken));
+        if(!invSnap.exists()){
           await cred.user.delete().catch(function(){});
-          manualAuthFlow = false;
-          setLoading(false);
-          showErr('رمز العائلة غير صحيح');
-          return;
+          manualAuthFlow = false; setLoading(false); showErr(t('errBadInvite')); return;
         }
-        await setDoc(doc(db, 'trees', code, 'members', cred.user.uid), { email: email, role: 'editor', joinedAt: serverTimestamp() });
-        await setDoc(doc(db, 'users', cred.user.uid), { email: email, treeId: code });
-        currentUid = cred.user.uid; currentTreeId = code;
-        currentRole = 'editor';
-        window.__ftSetEditable(true);
+        var invRole = invSnap.data().role; // 'editor' | 'viewer'
+        // Membership create is authorised by the invite path in the rules.
+        await setDoc(doc(db, 'trees', joinTreeId, 'members', cred.user.uid),
+          { email: email, role: invRole, viaInvite: joinToken, joinedAt: serverTimestamp() });
+        await setDoc(doc(db, 'users', cred.user.uid), { email: email, treeId: joinTreeId });
+        currentUid = cred.user.uid; currentTreeId = joinTreeId;
+        currentRole = invRole;
+        window.__ftSetEditable(invRole !== 'viewer');
         subscribeTree(currentTreeId);
         authGate.classList.add('hidden');
         cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
@@ -1205,9 +1229,14 @@
       } else {
         manualAuthFlow = true;
         var cred2 = await createUserWithEmailAndPassword(auth, email, pass);
-        var newCode = genFamilyCode();
+        // Auto-id tree: id is decoupled from any human-shareable secret, so
+        // there is no code to collide (removes finding 3.3). createdBy lets
+        // the rules authorise the bootstrap owner-membership below.
+        var treeRef = doc(collection(db, 'trees'));
+        var newCode = treeRef.id;
+        // Tree doc FIRST: the members bootstrap rule reads trees/{id}.createdBy.
+        await setDoc(treeRef, { familyName:'', lang:'ar', rootId:null, people:{}, createdBy: cred2.user.uid, updatedAt: serverTimestamp() });
         await setDoc(doc(db, 'trees', newCode, 'members', cred2.user.uid), { email: email, role: 'owner', joinedAt: serverTimestamp() });
-        await setDoc(doc(db, 'trees', newCode), { familyName:'', lang:'ar', rootId:null, people:{}, updatedAt: serverTimestamp() });
         await setDoc(doc(db, 'users', cred2.user.uid), { email: email, treeId: newCode });
         currentUid = cred2.user.uid; currentTreeId = newCode;
         currentRole = 'owner';
@@ -1250,7 +1279,15 @@
       }
       currentTreeId = userSnap.data().treeId;
       var memberSnap = await getDoc(doc(db, 'trees', currentTreeId, 'members', user.uid));
-      currentRole = (memberSnap.exists() && memberSnap.data().role) || 'editor'; // legacy members with no role are grandfathered as editor
+      if(!memberSnap.exists()){
+        // No membership => no access. Never fall through to a default role;
+        // that was finding 3.1 (an absent member doc granted 'editor').
+        setLoading(false);
+        showErr(t('errNoMembership'));
+        await signOut(auth).catch(function(){});
+        return;
+      }
+      currentRole = memberSnap.data().role || 'viewer'; // missing role => least privilege
       window.__ftSetEditable(currentRole !== 'viewer');
       subscribeTree(currentTreeId);
       authGate.classList.add('hidden');
@@ -1491,6 +1528,18 @@
     btn.disabled = false;
   });
 
+  async function createInvite(role){
+    if(!currentTreeId || currentRole === 'viewer') return;
+    var token = (doc(collection(db, 'trees', currentTreeId, 'invites'))).id;
+    await setDoc(doc(db, 'trees', currentTreeId, 'invites', token), {
+      role: (role === 'viewer' ? 'viewer' : 'editor'), createdBy: currentUid, createdAt: serverTimestamp()
+    });
+    var base = location.origin + location.pathname;
+    var link = base + '#join=' + currentTreeId + '.' + token;
+    try { await navigator.clipboard.writeText(link); toast(t('inviteCopied')); }
+    catch(e){ prompt(t('inviteCopied'), link); }
+  }
+
   window.__ftCloud = {
     onLocalSave: function(state){
       if(!currentTreeId || applyingRemote) return;
@@ -1499,7 +1548,8 @@
       pushTimer = setTimeout(function(){ pushToCloud(state); }, 500);
     },
     logActivity: logActivity,
-    showActivityLog: showActivityLog
+    showActivityLog: showActivityLog,
+    createInvite: createInvite
   };
 
   async function pushToCloud(state){
@@ -1532,16 +1582,17 @@
     body.innerHTML =
       '<h3>المزامنة السحابية</h3>' +
       '<div class="context">مسجّل الدخول باسم: <strong>' + currentEmail + '</strong> (' + roleLabel + ')</div>' +
-      '<div class="context">شارك هذا الرمز مع أفراد عائلتك للانضمام لنفس الشجرة</div>' +
-      '<div class="code-display">' + currentTreeId + '</div>' +
-      '<button class="primary-btn" id="cf_copyCode" style="margin-bottom:10px;">نسخ الرمز</button>' +
+      (canEditCloud ? (
+        '<div class="context">' + t('inviteShareHint') + '</div>' +
+        (window.__ftCloud && window.__ftCloud.createInvite ? '<button class="primary-btn" id="cf_invite" style="margin-bottom:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '')
+      ) : '') +
       '<button class="primary-btn" id="cf_members" style="margin-bottom:10px; background:var(--teal);">👥 أفراد العائلة</button>' +
       '<button class="primary-btn" id="cf_signout" style="background:var(--danger);">تسجيل الخروج</button>';
     document.getElementById('cf_members').onclick = function(){ showMembers(); };
-    document.getElementById('cf_copyCode').onclick = function(){
-      navigator.clipboard.writeText(currentTreeId).catch(function(){});
-      this.textContent = 'تم النسخ ✓';
-    };
+    if(canEditCloud && window.__ftCloud && window.__ftCloud.createInvite){
+      var invBtn = document.getElementById('cf_invite');
+      if(invBtn) invBtn.onclick = function(){ closeSheet(); window.__ftCloud.createInvite('editor'); };
+    }
     document.getElementById('cf_signout').onclick = function(){
       signOut(auth);
       overlay.classList.remove('open'); sheet.classList.remove('open');

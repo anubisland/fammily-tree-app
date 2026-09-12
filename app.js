@@ -527,7 +527,7 @@
     el.dataset.id = id;
     var childCount = p.childrenIds.length;
     var age = calcAge(p.birthDate);
-    var avatarInner = p.photo ? '<img src="'+p.photo+'" alt="">' : (p.gender==='f' ? '👩' : '👨');
+    var avatarInner = p.photo ? '<img src="'+escapeHtml(p.photo)+'" alt="">' : (p.gender==='f' ? '👩' : '👨');
     var siblingInfo = null;
     if(p.parentId){
       var parentP = getPerson(p.parentId);

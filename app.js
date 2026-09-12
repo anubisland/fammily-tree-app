@@ -871,7 +871,7 @@
   function photoRowHtml(existingPhoto){
     return '<div class="field"><label>'+t('photoLabel')+'</label>'+
       '<div class="photo-row">'+
-        '<div class="photo-preview" id="pf_photoPreview">'+(existingPhoto ? '<img src="'+existingPhoto+'">' : '👤')+'</div>'+
+        '<div class="photo-preview" id="pf_photoPreview">'+(existingPhoto ? '<img src="'+escapeHtml(existingPhoto)+'">' : '👤')+'</div>'+
         '<div class="photo-btns">'+
           '<button type="button" id="pf_choosePhoto">'+t('photoChoose')+'</button>'+
           '<button type="button" id="pf_removePhoto" style="'+(existingPhoto?'':'display:none;')+'">'+t('photoRemove')+'</button>'+
@@ -919,7 +919,7 @@
         '</div>'+
       '</div>'+
       (isEdit ? photoRowHtml(target.photo) : '') +
-      (isEdit ? '<div class="field"><label>'+t('birthLabel')+'</label><input type="date" id="pf_birth" value="'+(target.birthDate||'')+'"></div>' : '') +
+      (isEdit ? '<div class="field"><label>'+t('birthLabel')+'</label><input type="date" id="pf_birth" value="'+escapeHtml(target.birthDate||'')+'"></div>' : '') +
       (isEdit ? '<div class="field"><label>'+t('residenceLabel')+'</label><input type="text" id="pf_residence" placeholder="'+t('residencePh')+'" value="'+escapeHtml(target.residence||'')+'"></div>' : '') +
       (mode === 'child' ? '<div class="keep-open-row"><input type="checkbox" id="pf_keep" checked><label for="pf_keep">'+t('keepAdding')+'</label></div>' : '') +
       '<button class="primary-btn" id="pf_save">'+t('saveBtn')+'</button>'

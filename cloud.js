@@ -302,7 +302,7 @@
         var when = at ? timeAgo(at) : '';
         var isPersonAction = (v.action === 'add' || v.action === 'edit' || v.action === 'delete');
         rows += '<div style="padding:9px 0; border-bottom:1px solid var(--paper-deep); font-size:13px;">' +
-          '<b>' + esc(v.byEmail || '؟') + '</b> ' + actionLabel(v.action) +
+          '<b>' + esc(v.byEmail || '؟') + '</b> ' + esc(actionLabel(v.action)) +
           (isPersonAction ? ' «' + esc(v.personName || '') + '»' : '') +
           (v.detail ? ' <span style="color:var(--ink-soft);">(' + esc(v.detail) + ')</span>' : '') +
           '<div style="color:var(--ink-soft); font-size:11px; margin-top:2px;">' + when + '</div>' +

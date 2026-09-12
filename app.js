@@ -545,12 +545,12 @@
       (p.residence ? '<div class="meta-line">📍 '+escapeHtml(p.residence)+'</div>' : '') +
       (canEditCloud ? (
       '<div class="card-actions">' +
-        '<button class="mini-btn" data-act="child" data-id="'+id+'" title="'+t('addChildTitle')+'">＋👶</button>' +
-        (p.spouseIds.length < 4 ? '<button class="mini-btn" data-act="spouse" data-id="'+id+'" title="'+t('addSpouseTitle')+'">＋💍</button>' : '') +
-        '<button class="mini-btn" data-act="edit" data-id="'+id+'" title="'+t('editTitle')+'">✎</button>' +
-        (siblingInfo && siblingInfo.idx > 0 ? '<button class="mini-btn" data-act="moveleft" data-id="'+id+'" title="'+t('moveRightTitle')+'">▶</button>' : '') +
-        (siblingInfo && siblingInfo.idx < siblingInfo.count - 1 ? '<button class="mini-btn" data-act="moveright" data-id="'+id+'" title="'+t('moveLeftTitle')+'">◀</button>' : '') +
-        '<button class="mini-btn danger" data-act="delete" data-id="'+id+'" title="delete">🗑</button>' +
+        '<button class="mini-btn" data-act="child" data-id="'+escapeHtml(id)+'" title="'+t('addChildTitle')+'">＋👶</button>' +
+        (p.spouseIds.length < 4 ? '<button class="mini-btn" data-act="spouse" data-id="'+escapeHtml(id)+'" title="'+t('addSpouseTitle')+'">＋💍</button>' : '') +
+        '<button class="mini-btn" data-act="edit" data-id="'+escapeHtml(id)+'" title="'+t('editTitle')+'">✎</button>' +
+        (siblingInfo && siblingInfo.idx > 0 ? '<button class="mini-btn" data-act="moveleft" data-id="'+escapeHtml(id)+'" title="'+t('moveRightTitle')+'">▶</button>' : '') +
+        (siblingInfo && siblingInfo.idx < siblingInfo.count - 1 ? '<button class="mini-btn" data-act="moveright" data-id="'+escapeHtml(id)+'" title="'+t('moveLeftTitle')+'">◀</button>' : '') +
+        '<button class="mini-btn danger" data-act="delete" data-id="'+escapeHtml(id)+'" title="delete">🗑</button>' +
       '</div>') : '') +
       '';
     if(childCount > 0){
@@ -639,7 +639,7 @@
     document.querySelectorAll('.children-row').forEach(function(row){
       if(row.classList.contains('collapsed')) return;
       var parentId = row.dataset.parentUnit;
-      var coupleEl = document.querySelector('.couple[data-couple-for="'+parentId+'"]');
+      var coupleEl = document.querySelector('.couple[data-couple-for="'+(window.CSS && CSS.escape ? CSS.escape(parentId) : parentId)+'"]');
       if(!coupleEl) return;
       var coupleRect = coupleEl.getBoundingClientRect();
       var startX = (coupleRect.left + coupleRect.right)/2 - canvasRect.left;

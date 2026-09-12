@@ -102,6 +102,7 @@
     completionHintMissingPhoto:{ar:'«{name}» بلا صورة', en:'"{name}" has no photo'},
     completionHintMissingBirth:{ar:'«{name}» بلا تاريخ ميلاد', en:'"{name}" has no birth date'},
     completionHintDone:{ar:'أحسنت! جميع البيانات مكتملة', en:'Great! All info is complete'},
+    completionHintEmpty:{ar:'أضف أول فرد لتبدأ رحلة اكتمال الشجرة', en:'Add your first person to start tracking completeness'},
     comingSoon:{ar:'قريباً', en:'Coming soon'},
     settingsTitle:{ar:'الإعدادات', en:'Settings'},
     setAppearance:{ar:'المظهر واللغة', en:'Appearance & language'},
@@ -328,7 +329,7 @@
        tree was (re)rendered while another tab was showing — e.g. cloud data
        arrives while the user is on Home — the lines never got real
        coordinates. Redraw them now that the tab is actually visible. */
-    if(name === 'tree' && typeof drawLinks === 'function') requestAnimationFrame(drawLinks);
+    if(name === 'tree' && typeof drawLinks === 'function') requestAnimationFrame(function(){ drawLinks(); centerStage(); });
   }
   window.__ftShowTab = showTab;
   document.querySelectorAll('.bottom-nav .nav-item').forEach(function(b){
@@ -599,6 +600,10 @@
       var svgEmpty = document.getElementById('linksSvg');
       svgEmpty.innerHTML = '';
       svgEmpty.style.width = '0px'; svgEmpty.style.height = '0px';
+      /* Otherwise the banner keeps showing whatever family name was there before
+         the tree was cleared (e.g. after "start a new tree") — a brand-new,
+         empty tree should read as empty, not as a leftover of the old one. */
+      titleEl2.textContent = state.familyName || t('appName');
       return;
     }
     emptyWrap.style.display = 'none'; canvas.style.display = 'block'; toolbar.style.display = 'flex';
@@ -655,6 +660,23 @@
   }
   window.addEventListener('resize', function(){ requestAnimationFrame(drawLinks); });
 
+  /* When the tree is wider than the stage (any real family, on any viewport),
+     the stage opens scrolled to its start edge — the visitor lands on a stray
+     spouse card or blank canvas instead of the root couple. Center the stage's
+     scroll on the canvas so the root is what you see first. Uses rendered
+     rects (not scrollWidth math) so it's correct under RTL's scroll-direction
+     quirks without needing a direction check. */
+  function centerStage(){
+    var stage = document.getElementById('stage');
+    var canvas = document.getElementById('canvas');
+    if(!stage || !canvas) return;
+    var stageRect = stage.getBoundingClientRect();
+    var canvasRect = canvas.getBoundingClientRect();
+    if(!canvasRect.width || !stageRect.width) return;
+    var delta = (canvasRect.left + canvasRect.right)/2 - (stageRect.left + stageRect.right)/2;
+    stage.scrollLeft += delta;
+  }
+
   /* ============== Home tab ============== */
   var arDigits = {'0':'٠','1':'١','2':'٢','3':'٣','4':'٤','5':'٥','6':'٦','7':'٧','8':'٨','9':'٩'};
   function localeDigits(n){
@@ -664,6 +686,7 @@
   }
 
   function homeCompletionHint(ppl, ids){
+    if(!ids.length) return t('completionHintEmpty');
     for(var i=0;i<ids.length;i++){
       var p = ppl[ids[i]];
       if(!p.photo) return tf('completionHintMissingPhoto', {name: escapeHtml(p.name)});

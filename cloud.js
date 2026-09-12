@@ -213,7 +213,17 @@
       cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
       showAppShell();
       setLoading(false);
-      logActivity('login', '');
+      /* Log a login at most once per member per day — onAuthStateChanged also
+         fires on hourly token refresh, which would otherwise spam the log. */
+      (function(){
+        var today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (local enough for a daily gate)
+        var key = 'ft_loginLogged_' + currentTreeId + '_' + currentUid;
+        var last = null; try { last = localStorage.getItem(key); } catch(e){}
+        if(last !== today){
+          try { localStorage.setItem(key, today); } catch(e){}
+          logActivity('login', '');
+        }
+      })();
     }catch(err){
       setLoading(false);
       showErr('تعذّر تحميل بيانات الحساب: ' + (err.message||err.code));
@@ -279,9 +289,16 @@
         return;
       }
       var rows = '';
+      var seenLogin = {};   // collapse repeated logins: one per member per day
       snap.forEach(function(d){
         var v = d.data();
-        var when = v.at && v.at.toDate ? timeAgo(v.at.toDate()) : '';
+        var at = v.at && v.at.toDate ? v.at.toDate() : null;
+        if(v.action === 'login'){
+          var dayKey = (v.byUid || v.byEmail || '?') + '|' + (at ? at.toISOString().slice(0,10) : '?');
+          if(seenLogin[dayKey]) return;   // skip duplicate login for the same member/day
+          seenLogin[dayKey] = true;
+        }
+        var when = at ? timeAgo(at) : '';
         var isPersonAction = (v.action === 'add' || v.action === 'edit' || v.action === 'delete');
         rows += '<div style="padding:9px 0; border-bottom:1px solid var(--paper-deep); font-size:13px;">' +
           '<b>' + (v.byEmail || '؟') + '</b> ' + actionLabel(v.action) +

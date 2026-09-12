@@ -969,17 +969,42 @@
      layout (chrome hidden, stage expanded) so lines and cards line up on paper.
      The lines are absolutely-positioned from getBoundingClientRect, so they must
      be recomputed for the exact printed layout, not the on-screen zoomed one. */
-  window.addEventListener('beforeprint', function(){
-    window.__ftPrevZoom = zoom; zoom = 1; applyZoom();
+  /* Smart print: measure the whole tree, pick the orientation that suits its
+     shape, and scale it down (CSS zoom, which shrinks the layout box too so it
+     paginates correctly) until the ENTIRE tree fits one page — never printing
+     just a slice. Lines are redrawn against the scaled layout so they align. */
+  function ftInjectPrintPage(orient){
+    var st = document.getElementById('ftPrintPage');
+    if(!st){ st = document.createElement('style'); st.id = 'ftPrintPage'; document.head.appendChild(st); }
+    st.textContent = '@page{ size: ' + orient + '; margin: 8mm; }';
+  }
+  function ftPreparePrint(){
+    window.__ftPrevZoom = zoom;
     document.body.classList.remove('tree-immersive');
     document.body.classList.add('printing');
-    drawLinks();
-  });
-  window.addEventListener('afterprint', function(){
+    zoom = 1; applyZoom();
+    var canvas = document.getElementById('canvas');
+    canvas.style.zoom = '';                       // measure natural size
+    var natW = canvas.scrollWidth  || canvas.getBoundingClientRect().width;
+    var natH = canvas.scrollHeight || canvas.getBoundingClientRect().height;
+    if(!natW || !natH) return;
+    var landscape = natW >= natH;                 // wide tree -> landscape, tall -> portrait
+    /* A4 printable px @96dpi minus ~8mm margins each side (~60px). */
+    var pageW = (landscape ? 1123 : 794) - 60;
+    var pageH = (landscape ? 794 : 1123) - 60;
+    var scale = Math.min(pageW / natW, pageH / natH, 1) * 0.97; // 0.97 safety
+    ftInjectPrintPage(landscape ? 'landscape' : 'portrait');
+    canvas.style.zoom = scale;                     // scales visual AND layout box
+    drawLinks();                                   // realign lines at the scaled layout
+  }
+  function ftRestoreAfterPrint(){
     document.body.classList.remove('printing');
+    document.getElementById('canvas').style.zoom = '';
     zoom = window.__ftPrevZoom || 1; applyZoom();
     requestAnimationFrame(drawLinks);
-  });
+  }
+  window.addEventListener('beforeprint', ftPreparePrint);
+  window.addEventListener('afterprint', ftRestoreAfterPrint);
 
   document.getElementById('exportBtn').addEventListener('click', function(){
     var blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});

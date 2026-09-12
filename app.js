@@ -988,10 +988,14 @@
     var natW = canvas.scrollWidth  || canvas.getBoundingClientRect().width;
     var natH = canvas.scrollHeight || canvas.getBoundingClientRect().height;
     if(!natW || !natH) return;
+    /* Print title at the top ("شجرة عائلة <name>"), shown only on paper. */
+    var fam = (state.familyName && state.familyName.trim()) ? state.familyName.trim() : t('unnamedFamily');
+    var pt = document.getElementById('printTitle');
+    if(pt) pt.textContent = (state.lang === 'en') ? (fam + ' — Family Tree') : ('شجرة عائلة ' + fam);
     var landscape = natW >= natH;                 // wide tree -> landscape, tall -> portrait
-    /* A4 printable px @96dpi minus ~8mm margins each side (~60px). */
+    /* A4 printable px @96dpi minus ~8mm margins each side (~60px), minus ~52px for the title. */
     var pageW = (landscape ? 1123 : 794) - 60;
-    var pageH = (landscape ? 794 : 1123) - 60;
+    var pageH = (landscape ? 794 : 1123) - 60 - 52;
     var scale = Math.min(pageW / natW, pageH / natH, 1) * 0.97; // 0.97 safety
     ftInjectPrintPage(landscape ? 'landscape' : 'portrait');
     canvas.style.zoom = scale;                     // scales visual AND layout box

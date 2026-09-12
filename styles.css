@@ -163,6 +163,8 @@
   body.printing .storage-warn, body.printing .card-actions, body.printing .toggle-branch,
   body.printing .section-eyebrow, body.printing #tab-home,
   body.printing #tab-settings, body.printing #tab-moments{ display:none !important; }
+  .print-title{ display:none; }
+  body.printing .print-title{ display:block; text-align:center; font-family:var(--f-head); font-size:24px; font-weight:700; color:#2B2118; padding:4px 0 16px; }
   body.printing #tab-tree.active{ display:block !important; height:auto !important; }
   body.printing .stage{ height:auto !important; overflow:visible !important; padding-bottom:0 !important; }
   body.printing .canvas{ transform:scale(1) !important; padding:10px; }
@@ -171,6 +173,7 @@
     .bottom-nav, .banner, .toolbar, .storage-warn, .card-actions, .toggle-branch,
     .section-eyebrow, #tab-home, #tab-settings, #tab-moments{ display:none !important; }
     #tab-tree.active{ display:block !important; height:auto !important; }
+    .print-title{ display:block !important; text-align:center; font-family:var(--f-head); font-size:24px; font-weight:700; color:#2B2118; padding:4px 0 16px; }
     .stage{ height:auto !important; overflow:visible !important; padding-bottom:0 !important; }
     .canvas{ transform:scale(1) !important; padding:10px; }
     body{ background:#fff !important; }

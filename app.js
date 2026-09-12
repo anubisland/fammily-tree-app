@@ -604,6 +604,10 @@
     treeRoot.innerHTML = '';
     treeRoot.appendChild(renderUnit(state.rootId));
     document.getElementById('familyTitle').textContent = state.familyName || t('appName');
+    /* Title centered above the root couple, inside the canvas — so it scales and
+       stays above the grandparents as the tree is zoomed. */
+    var treeTitle = document.getElementById('treeTitle');
+    if(treeTitle) treeTitle.textContent = (state.familyName && state.familyName.trim()) ? state.familyName.trim() : '';
 
     requestAnimationFrame(drawLinks);
   }
@@ -980,22 +984,20 @@
   }
   function ftPreparePrint(){
     window.__ftPrevZoom = zoom;
+    window.__ftWasDark = document.documentElement.classList.contains('dark');
+    document.documentElement.classList.remove('dark'); // print on the light manuscript palette
     document.body.classList.remove('tree-immersive');
     document.body.classList.add('printing');
     zoom = 1; applyZoom();
     var canvas = document.getElementById('canvas');
-    canvas.style.zoom = '';                       // measure natural size
+    canvas.style.zoom = '';                       // measure natural size (title is inside, so it's included)
     var natW = canvas.scrollWidth  || canvas.getBoundingClientRect().width;
     var natH = canvas.scrollHeight || canvas.getBoundingClientRect().height;
     if(!natW || !natH) return;
-    /* Print title at the top ("شجرة عائلة <name>"), shown only on paper. */
-    var fam = (state.familyName && state.familyName.trim()) ? state.familyName.trim() : t('unnamedFamily');
-    var pt = document.getElementById('printTitle');
-    if(pt) pt.textContent = (state.lang === 'en') ? (fam + ' — Family Tree') : ('شجرة عائلة ' + fam);
     var landscape = natW >= natH;                 // wide tree -> landscape, tall -> portrait
-    /* A4 printable px @96dpi minus ~8mm margins each side (~60px), minus ~52px for the title. */
+    /* A4 printable px @96dpi minus ~8mm margins each side (~60px). */
     var pageW = (landscape ? 1123 : 794) - 60;
-    var pageH = (landscape ? 794 : 1123) - 60 - 52;
+    var pageH = (landscape ? 794 : 1123) - 60;
     var scale = Math.min(pageW / natW, pageH / natH, 1) * 0.97; // 0.97 safety
     ftInjectPrintPage(landscape ? 'landscape' : 'portrait');
     canvas.style.zoom = scale;                     // scales visual AND layout box
@@ -1003,6 +1005,7 @@
   }
   function ftRestoreAfterPrint(){
     document.body.classList.remove('printing');
+    if(window.__ftWasDark) document.documentElement.classList.add('dark');
     document.getElementById('canvas').style.zoom = '';
     zoom = window.__ftPrevZoom || 1; applyZoom();
     requestAnimationFrame(drawLinks);

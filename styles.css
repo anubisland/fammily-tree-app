@@ -42,9 +42,9 @@
      bottom-nav clearance via height:calc(100vh - 70px), so stacking the same
      78px on top of that pushed the compose bar 8px below the fold and forced
      a scroll just to see it on open. */
-  #tab-home.active, #tab-settings.active{ padding-bottom:78px; }
+  #tab-home.active, #tab-settings.active{ padding-bottom:64px; }
   #tab-tree.active{ display:flex; flex-direction:column; height:100dvh; height:100vh; }
-  #tab-tree .stage{ flex:1 1 auto; height:auto; min-height:0; padding-bottom:64px; }
+  #tab-tree .stage{ flex:1 1 auto; height:auto; min-height:0; padding-bottom:56px; }
   /* Immersive tree: chrome slides away while panning/scrolling the tree. */
   #tab-tree .banner, #tab-tree .toolbar{ transition: max-height .28s ease, opacity .18s ease, padding .28s ease, margin .28s ease, border-width .28s ease; max-height:420px; }
   .bottom-nav{ transition: transform .28s ease; }
@@ -54,17 +54,26 @@
   /* Tree tab shows only what the tree needs: a slim header (family title +
      print/menu/language), no stat pills or moments CTA — those live on Home
      and the Moments tab. */
-  #tab-tree .banner{ padding:12px 16px; }
+  #tab-tree .banner{ padding:9px 16px; }
   #tab-tree .stat-row{ display:none; }
   #tab-tree .moments-cta{ display:none; }
+  #tab-tree .family-sub{ display:none; }        /* edit hint drops a line — not needed here */
+  #tab-tree .family-title{ font-size:20px; line-height:1.25; }
   /* Full-screen toggle: a deliberate button (works with mouse and touch). */
-  .immersive-btn{ position:fixed; bottom:80px; inset-inline-start:14px; z-index:36; width:46px; height:46px; border-radius:50%; border:1px solid var(--line); background:var(--card); color:var(--emerald); font-size:20px; box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:bottom .28s ease; }
+  .immersive-btn{ position:fixed; bottom:66px; inset-inline-start:14px; z-index:36; width:46px; height:46px; border-radius:50%; border:1px solid var(--line); background:var(--card); color:var(--emerald); font-size:20px; box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:bottom .28s ease; }
   body.tree-immersive .immersive-btn{ bottom:16px; }
-  .bottom-nav{ position:fixed; inset-inline:0; bottom:0; z-index:30; display:flex; background:var(--card); border-top:1px solid var(--line); padding:9px 6px 12px; box-shadow:0 -4px 16px rgba(43,33,24,.06);}
-  .nav-item{ flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10.5px; color:var(--ink-soft); background:none; border:none; padding:3px 0; position:relative; font-family:var(--f-body);}
-  .nav-item .ni{font-size:21px;}
+  .bottom-nav{ position:fixed; inset-inline:0; bottom:0; z-index:30; display:flex; background:var(--card); border-top:1px solid var(--line); padding:5px 6px; padding-bottom:max(6px, env(safe-area-inset-bottom)); box-shadow:0 -4px 16px rgba(43,33,24,.06);}
+  .nav-item{ flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; font-size:10px; color:var(--ink-soft); background:none; border:none; padding:4px 0; position:relative; font-family:var(--f-body);}
+  .nav-item .ni{font-size:18px; line-height:1;}
   .nav-item.active{color:var(--emerald); font-weight:700;}
-  .nav-item.active::before{content:""; position:absolute; top:-9px; width:22px; height:3px; border-radius:3px; background:var(--gold);}
+  .nav-item.active::before{content:""; position:absolute; top:-5px; width:20px; height:3px; border-radius:3px; background:var(--gold);}
+  /* Desktop: don't stretch the 4 items edge-to-edge across a wide screen —
+     group them centered and keep the bar slim. */
+  @media (min-width:820px){
+    .bottom-nav{ justify-content:center; gap:8px; }
+    .nav-item{ flex:0 0 auto; min-width:110px; padding:3px 0; }
+    .nav-item .ni{font-size:17px;}
+  }
   h1,h2,h3{font-family:var(--f-head); margin:0;}
   button{font-family:var(--f-body); cursor:pointer;}
   input, select{font-family:var(--f-body);}

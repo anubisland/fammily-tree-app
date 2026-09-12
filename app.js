@@ -977,10 +977,10 @@
      shape, and scale it down (CSS zoom, which shrinks the layout box too so it
      paginates correctly) until the ENTIRE tree fits one page — never printing
      just a slice. Lines are redrawn against the scaled layout so they align. */
-  function ftInjectPrintPage(orient){
+  function ftInjectPrintPage(sizeDims, marginMm){
     var st = document.getElementById('ftPrintPage');
     if(!st){ st = document.createElement('style'); st.id = 'ftPrintPage'; document.head.appendChild(st); }
-    st.textContent = '@page{ size: ' + orient + '; margin: 8mm; }';
+    st.textContent = '@page{ size: ' + sizeDims + '; margin: ' + marginMm + 'mm; }';
   }
   function ftPreparePrint(){
     window.__ftPrevZoom = zoom;
@@ -994,19 +994,24 @@
     var natW = canvas.scrollWidth  || canvas.getBoundingClientRect().width;
     var natH = canvas.scrollHeight || canvas.getBoundingClientRect().height;
     if(!natW || !natH) return;
+    /* Fit the whole tree onto one A4 page, measured in real mm (not guessed px),
+       with a generous margin so nothing clips, and centered on the page. */
     var landscape = natW >= natH;                 // wide tree -> landscape, tall -> portrait
-    /* A4 printable px @96dpi minus ~8mm margins each side (~60px). */
-    var pageW = (landscape ? 1123 : 794) - 60;
-    var pageH = (landscape ? 794 : 1123) - 60;
-    var scale = Math.min(pageW / natW, pageH / natH, 1) * 0.97; // 0.97 safety
-    ftInjectPrintPage(landscape ? 'landscape' : 'portrait');
+    var PXMM = 96 / 25.4;                          // ~3.7795 px per mm @96dpi
+    var marginMm = 10;
+    var pageWmm = (landscape ? 297 : 210) - marginMm * 2;
+    var pageHmm = (landscape ? 210 : 297) - marginMm * 2;
+    var pageW = pageWmm * PXMM, pageH = pageHmm * PXMM;
+    var scale = Math.min(pageW / natW, pageH / natH, 1) * 0.92; // 0.92 safety so edges never clip
+    ftInjectPrintPage(landscape ? '297mm 210mm' : '210mm 297mm', marginMm);
     canvas.style.zoom = scale;                     // scales visual AND layout box
+    canvas.style.margin = '0 auto';                // center the tree horizontally on the page
     drawLinks();                                   // realign lines at the scaled layout
   }
   function ftRestoreAfterPrint(){
     document.body.classList.remove('printing');
     if(window.__ftWasDark) document.documentElement.classList.add('dark');
-    document.getElementById('canvas').style.zoom = '';
+    var c = document.getElementById('canvas'); c.style.zoom = ''; c.style.margin = '';
     zoom = window.__ftPrevZoom || 1; applyZoom();
     requestAnimationFrame(drawLinks);
   }

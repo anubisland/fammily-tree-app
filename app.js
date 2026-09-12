@@ -85,6 +85,8 @@
     navTree:{ar:'الشجرة', en:'Tree'},
     navMoments:{ar:'اللحظات', en:'Moments'},
     navSettings:{ar:'إعدادات', en:'Settings'},
+    immersiveOn:{ar:'ملء الشاشة', en:'Full screen'},
+    immersiveOff:{ar:'إنهاء ملء الشاشة', en:'Exit full screen'},
     unnamedFamily:{ar:'عائلتي', en:'My family'},
     homeSectionsEyebrow:{ar:'أقسام العائلة', en:'Sections'},
     cardTree:{ar:'الشجرة', en:'Tree'},
@@ -282,18 +284,19 @@
   }
 
   /* ============== Tab router ============== */
-  /* Immersive tree: banner + bottom nav slide away while the user pans or
-     scrolls the tree, and return when they lift/stop — so the tree gets the
-     whole screen during viewing (agreed in the design). */
-  function setTreeImmersive(on){ document.body.classList.toggle('tree-immersive', !!on); }
+  /* Immersive tree: a deliberate full-screen TOGGLE (works identically with a
+     mouse or touch — no flicker, no timers). The button enters full screen
+     (banner + bottom nav slide away); a floating exit button brings them back. */
+  function setTreeImmersive(on){
+    document.body.classList.toggle('tree-immersive', !!on);
+    var b = document.getElementById('immersiveBtn');
+    if(b){ b.textContent = on ? '⤡' : '⤢'; b.title = t(on ? 'immersiveOff' : 'immersiveOn'); }
+    requestAnimationFrame(drawLinks); // re-fit the connector lines to the new height
+  }
   function initImmersiveTree(){
-    var stage = document.getElementById('stage');
-    if(!stage || stage._immInit) return; stage._immInit = true;
-    var down=false, moved=false, sx=0, sy=0, hideT=null;
-    stage.addEventListener('pointerdown', function(e){ down=true; moved=false; sx=e.clientX; sy=e.clientY; });
-    stage.addEventListener('pointermove', function(e){ if(down && (Math.abs(e.clientX-sx)>6 || Math.abs(e.clientY-sy)>6)){ moved=true; setTreeImmersive(true); } });
-    window.addEventListener('pointerup', function(){ if(down){ down=false; if(moved) setTreeImmersive(false); } });
-    stage.addEventListener('scroll', function(){ setTreeImmersive(true); clearTimeout(hideT); hideT=setTimeout(function(){ setTreeImmersive(false); }, 1400); }, {passive:true});
+    var b = document.getElementById('immersiveBtn');
+    if(!b || b._immInit) return; b._immInit = true;
+    b.onclick = function(){ setTreeImmersive(!document.body.classList.contains('tree-immersive')); };
   }
 
   var currentTabName = null;

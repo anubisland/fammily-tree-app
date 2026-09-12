@@ -51,6 +51,15 @@
   body.tree-immersive #tab-tree .banner, body.tree-immersive #tab-tree .toolbar{ max-height:0; opacity:0; padding-top:0; padding-bottom:0; margin:0; border-width:0; overflow:hidden; }
   body.tree-immersive .bottom-nav{ transform: translateY(140%); }
   body.tree-immersive #tab-tree .stage{ padding-bottom:16px; }
+  /* Tree tab shows only what the tree needs: a slim header (family title +
+     print/menu/language), no stat pills or moments CTA — those live on Home
+     and the Moments tab. */
+  #tab-tree .banner{ padding:12px 16px; }
+  #tab-tree .stat-row{ display:none; }
+  #tab-tree .moments-cta{ display:none; }
+  /* Full-screen toggle: a deliberate button (works with mouse and touch). */
+  .immersive-btn{ position:fixed; bottom:80px; inset-inline-start:14px; z-index:36; width:46px; height:46px; border-radius:50%; border:1px solid var(--line); background:var(--card); color:var(--emerald); font-size:20px; box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:bottom .28s ease; }
+  body.tree-immersive .immersive-btn{ bottom:16px; }
   .bottom-nav{ position:fixed; inset-inline:0; bottom:0; z-index:30; display:flex; background:var(--card); border-top:1px solid var(--line); padding:9px 6px 12px; box-shadow:0 -4px 16px rgba(43,33,24,.06);}
   .nav-item{ flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10.5px; color:var(--ink-soft); background:none; border:none; padding:3px 0; position:relative; font-family:var(--f-body);}
   .nav-item .ni{font-size:21px;}
@@ -163,7 +172,7 @@
      (nav, banner, toolbar, per-card action buttons) is hidden. */
   body.printing .bottom-nav, body.printing .banner, body.printing .toolbar,
   body.printing .storage-warn, body.printing .card-actions, body.printing .toggle-branch,
-  body.printing .section-eyebrow, body.printing #tab-home,
+  body.printing .section-eyebrow, body.printing .immersive-btn, body.printing #tab-home,
   body.printing #tab-settings, body.printing #tab-moments{ display:none !important; }
   body.printing #tab-tree.active{ display:block !important; height:auto !important; }
   body.printing .stage{ height:auto !important; overflow:visible !important; padding-bottom:0 !important; }
@@ -171,7 +180,7 @@
   body.printing{ background:#fff !important; }
   @media print{
     .bottom-nav, .banner, .toolbar, .storage-warn, .card-actions, .toggle-branch,
-    .section-eyebrow, #tab-home, #tab-settings, #tab-moments{ display:none !important; }
+    .section-eyebrow, .immersive-btn, #tab-home, #tab-settings, #tab-moments{ display:none !important; }
     #tab-tree.active{ display:block !important; height:auto !important; }
     .stage{ height:auto !important; overflow:visible !important; padding-bottom:0 !important; }
     .canvas{ transform:scale(1) !important; padding:10px; }

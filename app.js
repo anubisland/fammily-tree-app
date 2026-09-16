@@ -87,6 +87,17 @@
     navSettings:{ar:'إعدادات', en:'Settings'},
     immersiveOn:{ar:'ملء الشاشة', en:'Full screen'},
     immersiveOff:{ar:'إنهاء ملء الشاشة', en:'Exit full screen'},
+    firstNameLabel:{ar:'الاسم الأول *', en:'First name *'},
+    firstNamePh:{ar:'مثال: خالد', en:'e.g. Khaled'},
+    fullNamePreview:{ar:'الاسم الكامل:', en:'Full name:'},
+    kinshipMenu:{ar:'🔗 حاسبة القرابة', en:'🔗 Relationship finder'},
+    kinshipPick1:{ar:'اختر الشخص الأول من الشجرة', en:'Tap the first person on the tree'},
+    kinshipPick2:{ar:'اختر الشخص الثاني', en:'Tap the second person'},
+    kinshipCancel:{ar:'إلغاء', en:'Cancel'},
+    kinshipTitle:{ar:'القرابة', en:'Relationship'},
+    kinshipConnector:{ar:'قرابة', en:'relationship'},
+    kinshipTo:{ar:'إلى', en:'to'},
+    kinshipClose:{ar:'إغلاق', en:'Close'},
     unnamedFamily:{ar:'عائلتي', en:'My family'},
     homeSectionsEyebrow:{ar:'أقسام العائلة', en:'Sections'},
     cardTree:{ar:'الشجرة', en:'Tree'},
@@ -900,6 +911,20 @@
     };
   }
 
+  /* Nasab auto-fill: a child's full name is the entered first name followed by
+     the father's full name (which already carries the chain to the surname),
+     e.g. parent "محمد الوزير" + "خالد" -> "خالد محمد الوزير". If the user typed
+     the full chain already, don't duplicate it. */
+  function buildFullName(first, parentName){
+    first = (first || '').trim().replace(/\s+/g, ' ');
+    parentName = (parentName || '').trim();
+    if(!first) return '';
+    if(!parentName) return first;
+    if(first === parentName) return first;
+    if(first.length >= parentName.length && first.slice(-parentName.length) === parentName) return first;
+    return first + ' ' + parentName;
+  }
+
   function openPersonForm(mode, targetId){
     var isEdit = mode === 'edit';
     var target = getPerson(targetId);
@@ -911,7 +936,8 @@
     openSheet(
       '<h3>'+titleTxt+'</h3>'+
       '<div class="context">'+contextTxt+'</div>'+
-      '<div class="field"><label>'+t('nameLabel')+'</label><input type="text" id="pf_name" placeholder="'+t('namePh')+'" value="'+(isEdit ? escapeHtml(target.name) : '')+'"></div>'+
+      '<div class="field"><label>'+(mode==='child' ? t('firstNameLabel') : t('nameLabel'))+'</label><input type="text" id="pf_name" placeholder="'+(mode==='child' ? t('firstNamePh') : t('namePh'))+'" value="'+(isEdit ? escapeHtml(target.name) : '')+'"></div>'+
+      (mode==='child' ? '<div class="name-preview" id="pf_fullPreview"></div>' : '')+
       '<div class="field"><label>'+t('genderLabel')+'</label>'+
         '<div class="gender-toggle">'+
           '<button type="button" id="pf_male" class="'+(!isEdit || target.gender==='m' ? 'active-m':'')+'">'+t('male')+'</button>'+
@@ -929,12 +955,23 @@
     document.getElementById('pf_male').onclick = function(){ gender='m'; this.className='active-m'; document.getElementById('pf_female').className=''; };
     document.getElementById('pf_female').onclick = function(){ gender='f'; this.className='active-f'; document.getElementById('pf_male').className=''; };
     if(isEdit) wirePhotoRow(target.photo);
+    // Live full-name preview for a new child.
+    if(mode === 'child'){
+      var nameInput = document.getElementById('pf_name');
+      var preview = document.getElementById('pf_fullPreview');
+      var updatePreview = function(){
+        var full = buildFullName(nameInput.value, target.name);
+        preview.textContent = full ? (t('fullNamePreview') + ' ' + full) : '';
+      };
+      nameInput.addEventListener('input', updatePreview);
+      updatePreview();
+    }
     document.getElementById('pf_name').focus();
 
     document.getElementById('pf_save').onclick = function(){
       var name = document.getElementById('pf_name').value.trim();
       if(!name){ toast(t('toastNameRequired')); return; }
-      if(mode === 'child') addChild(targetId, name, gender);
+      if(mode === 'child') addChild(targetId, buildFullName(name, target.name), gender);
       else if(mode === 'spouse') addSpouse(targetId, name, gender);
       else {
         updatePerson(targetId, {
@@ -966,7 +1003,69 @@
     document.getElementById('cf_ok').onclick = function(){ deletePerson(id); closeSheet(); toast(t('toastDeleted')); };
   }
 
+  /* ============== Kinship finder ============== */
+  var kinshipMode = false;   // false | 'pick1' | 'pick2'
+  var kinshipA = null;
+
+  function startKinship(){
+    if(!state.rootId){ toast(t('emptyTitle')); return; }
+    kinshipMode = 'pick1'; kinshipA = null;
+    document.body.classList.add('kinship-mode');
+    showTab('tree');
+    updateKinshipBanner();
+  }
+  function endKinship(){
+    kinshipMode = false; kinshipA = null;
+    document.body.classList.remove('kinship-mode');
+    var el = document.getElementById('kinshipBanner'); if(el) el.remove();
+    document.querySelectorAll('.card.kin-selected').forEach(function(c){ c.classList.remove('kin-selected'); });
+  }
+  function updateKinshipBanner(){
+    var el = document.getElementById('kinshipBanner');
+    if(!el){
+      el = document.createElement('div'); el.id = 'kinshipBanner'; el.className = 'kinship-banner';
+      document.body.appendChild(el);
+    }
+    var msg = kinshipMode === 'pick1' ? t('kinshipPick1') : t('kinshipPick2');
+    el.innerHTML = '<span>'+escapeHtml(msg)+'</span><button type="button" id="kinCancel">'+t('kinshipCancel')+'</button>';
+    document.getElementById('kinCancel').onclick = endKinship;
+  }
+  function pickKinship(id){
+    if(!getPerson(id)) return;
+    if(kinshipMode === 'pick1'){
+      kinshipA = id; kinshipMode = 'pick2';
+      var card = document.querySelector('.card[data-id="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]');
+      if(card) card.classList.add('kin-selected');
+      updateKinshipBanner();
+    } else if(kinshipMode === 'pick2'){
+      if(id === kinshipA){ return; }
+      showKinshipResult(kinshipA, id);
+      endKinship();
+    }
+  }
+  function showKinshipResult(aId, bId){
+    var A = getPerson(aId), B = getPerson(bId);
+    var rel = (window.ftKinship ? window.ftKinship(state.people, aId, bId) : '');
+    var verb = B.gender === 'f' ? 'هي' : 'هو';   // «B» هي/هو [rel] لـ «A»
+    openSheet(
+      '<h3>🔗 '+t('kinshipTitle')+'</h3>'+
+      '<div class="kin-result">'+
+        '<div class="kin-people"><b>'+escapeHtml(B.name)+'</b> '+verb+'</div>'+
+        '<div class="kin-term">'+escapeHtml(rel)+'</div>'+
+        '<div class="kin-people">'+t('kinshipTo')+' <b>'+escapeHtml(A.name)+'</b></div>'+
+      '</div>'+
+      '<button class="primary-btn" id="kin_close">'+t('kinshipClose')+'</button>'
+    );
+    document.getElementById('kin_close').onclick = closeSheet;
+  }
+  window.__ftStartKinship = startKinship;
+
   document.getElementById('treeRoot').addEventListener('click', function(e){
+    if(kinshipMode){
+      var picked = e.target.closest('.card');
+      if(picked && picked.dataset.id){ e.stopPropagation(); pickKinship(picked.dataset.id); }
+      return;
+    }
     var btn = e.target.closest('[data-act]');
     if(!btn) return;
     var act = btn.dataset.act, id = btn.dataset.id;
@@ -1096,12 +1195,14 @@
     openSheet(
       '<h3>'+t('menuTitle')+'</h3>'+
       '<div class="context">'+t('menuDesc')+'</div>'+
+      '<button class="primary-btn" id="mn_kinship" style="margin-bottom:10px; background:var(--plum);">'+t('kinshipMenu')+'</button>'+
       '<button class="primary-btn" id="mn_export" style="margin-bottom:10px;">'+t('menuExport')+'</button>'+
       (canEditCloud ? '<button class="primary-btn" id="mn_import" style="margin-bottom:10px; background:var(--teal);">'+t('menuImport')+'</button>' : '') +
       (canEditCloud ? '<button class="primary-btn" id="mn_reset" style="background:var(--danger);">'+t('menuReset')+'</button>' : '') +
       (canEditCloud && window.__ftCloud ? '<button class="primary-btn" id="mn_invite" style="margin-top:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '') +
       (window.__ftCloud ? '<button class="primary-btn" id="mn_activity" style="margin-top:10px; background:var(--plum);">📋 سجل النشاط</button>' : '')
     );
+    document.getElementById('mn_kinship').onclick = function(){ closeSheet(); startKinship(); };
     document.getElementById('mn_export').onclick = function(){ closeSheet(); document.getElementById('exportBtn').click(); };
     if(canEditCloud){
       document.getElementById('mn_import').onclick = function(){ closeSheet(); document.getElementById('importBtn').click(); };

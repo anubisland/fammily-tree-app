@@ -289,6 +289,7 @@
         return;
       }
       var rows = '';
+      var esc = window.__ftEscapeHtml || function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
       var seenLogin = {};   // collapse repeated logins: one per member per day
       snap.forEach(function(d){
         var v = d.data();
@@ -301,9 +302,9 @@
         var when = at ? timeAgo(at) : '';
         var isPersonAction = (v.action === 'add' || v.action === 'edit' || v.action === 'delete');
         rows += '<div style="padding:9px 0; border-bottom:1px solid var(--paper-deep); font-size:13px;">' +
-          '<b>' + (v.byEmail || '؟') + '</b> ' + actionLabel(v.action) +
-          (isPersonAction ? ' «' + (v.personName || '') + '»' : '') +
-          (v.detail ? ' <span style="color:var(--ink-soft);">(' + v.detail + ')</span>' : '') +
+          '<b>' + esc(v.byEmail || '؟') + '</b> ' + esc(actionLabel(v.action)) +
+          (isPersonAction ? ' «' + esc(v.personName || '') + '»' : '') +
+          (v.detail ? ' <span style="color:var(--ink-soft);">(' + esc(v.detail) + ')</span>' : '') +
           '<div style="color:var(--ink-soft); font-size:11px; margin-top:2px;">' + when + '</div>' +
         '</div>';
       });
@@ -322,6 +323,7 @@
     try{
       var snap = await getDocs(collection(db, 'trees', currentTreeId, 'members'));
       var rows = '';
+      var esc = window.__ftEscapeHtml || function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
       snap.forEach(function(d){
         var v = d.data();
         var uid = d.id;
@@ -329,7 +331,7 @@
         var roleLabel = role === 'owner' ? 'مالك' : (role === 'viewer' ? 'مشاهدة فقط' : 'محرِّر');
         var isSelf = uid === currentUid;
         rows += '<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 0; border-bottom:1px solid var(--paper-deep);">' +
-          '<div style="font-size:12.5px;"><b>' + (v.email || uid) + '</b>' + (isSelf ? ' (أنت)' : '') +
+          '<div style="font-size:12.5px;"><b>' + esc(v.email || uid) + '</b>' + (isSelf ? ' (أنت)' : '') +
           '<div style="color:var(--ink-soft); font-size:11px;">' + roleLabel + '</div></div>' +
           (currentRole === 'owner' && !isSelf ? (
             '<div style="display:flex; gap:5px;">' +
@@ -375,7 +377,7 @@
       list.innerHTML = '<div class="moments-empty">لا توجد لحظات بعد — كن أول من يشارك خبرًا مع العائلة!</div>';
       return;
     }
-    var esc = window.__ftEscapeHtml || function(s){ return s; };
+    var esc = window.__ftEscapeHtml || function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
     var timeAgoFn = window.__ftTimeAgo || function(){ return ''; };
     var html = '';
     docs.forEach(function(d){
@@ -386,7 +388,7 @@
         '<div class="moment-head"><span class="moment-author">' + esc(v.byEmail || '؟') + '</span>' +
         '<span class="moment-time">' + when + '</span></div>' +
         (v.text ? '<div class="moment-text">' + esc(v.text) + '</div>' : '') +
-        (v.photo ? '<img class="moment-photo" src="' + v.photo + '">' : '') +
+        (v.photo ? '<img class="moment-photo" src="' + esc(v.photo) + '">' : '') +
         (canDelete ? '<button class="moment-del" data-id="' + d.id + '">🗑 حذف</button>' : '') +
       '</div>';
     });
@@ -522,11 +524,12 @@
     var overlay = document.getElementById('overlay');
     var sheet = document.getElementById('sheet');
     var body = document.getElementById('sheetBody');
+    var esc = window.__ftEscapeHtml || function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
     var currentEmail = (auth.currentUser && auth.currentUser.email) || '';
     var roleLabel = currentRole === 'owner' ? 'مالك العائلة' : (currentRole === 'viewer' ? 'مشاهدة فقط' : 'محرِّر');
     body.innerHTML =
       '<h3>المزامنة السحابية</h3>' +
-      '<div class="context">مسجّل الدخول باسم: <strong>' + currentEmail + '</strong> (' + roleLabel + ')</div>' +
+      '<div class="context">مسجّل الدخول باسم: <strong>' + esc(currentEmail) + '</strong> (' + roleLabel + ')</div>' +
       (canEditCloud ? (
         '<div class="context">' + t('inviteShareHint') + '</div>' +
         (window.__ftCloud && window.__ftCloud.createInvite ? '<button class="primary-btn" id="cf_invite" style="margin-bottom:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '')

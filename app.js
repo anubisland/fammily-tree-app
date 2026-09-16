@@ -527,7 +527,7 @@
     el.dataset.id = id;
     var childCount = p.childrenIds.length;
     var age = calcAge(p.birthDate);
-    var avatarInner = p.photo ? '<img src="'+p.photo+'" alt="">' : (p.gender==='f' ? '👩' : '👨');
+    var avatarInner = p.photo ? '<img src="'+escapeHtml(p.photo)+'" alt="">' : (p.gender==='f' ? '👩' : '👨');
     var siblingInfo = null;
     if(p.parentId){
       var parentP = getPerson(p.parentId);
@@ -545,12 +545,12 @@
       (p.residence ? '<div class="meta-line">📍 '+escapeHtml(p.residence)+'</div>' : '') +
       (canEditCloud ? (
       '<div class="card-actions">' +
-        '<button class="mini-btn" data-act="child" data-id="'+id+'" title="'+t('addChildTitle')+'">＋👶</button>' +
-        (p.spouseIds.length < 4 ? '<button class="mini-btn" data-act="spouse" data-id="'+id+'" title="'+t('addSpouseTitle')+'">＋💍</button>' : '') +
-        '<button class="mini-btn" data-act="edit" data-id="'+id+'" title="'+t('editTitle')+'">✎</button>' +
-        (siblingInfo && siblingInfo.idx > 0 ? '<button class="mini-btn" data-act="moveleft" data-id="'+id+'" title="'+t('moveRightTitle')+'">▶</button>' : '') +
-        (siblingInfo && siblingInfo.idx < siblingInfo.count - 1 ? '<button class="mini-btn" data-act="moveright" data-id="'+id+'" title="'+t('moveLeftTitle')+'">◀</button>' : '') +
-        '<button class="mini-btn danger" data-act="delete" data-id="'+id+'" title="delete">🗑</button>' +
+        '<button class="mini-btn" data-act="child" data-id="'+escapeHtml(id)+'" title="'+t('addChildTitle')+'">＋👶</button>' +
+        (p.spouseIds.length < 4 ? '<button class="mini-btn" data-act="spouse" data-id="'+escapeHtml(id)+'" title="'+t('addSpouseTitle')+'">＋💍</button>' : '') +
+        '<button class="mini-btn" data-act="edit" data-id="'+escapeHtml(id)+'" title="'+t('editTitle')+'">✎</button>' +
+        (siblingInfo && siblingInfo.idx > 0 ? '<button class="mini-btn" data-act="moveleft" data-id="'+escapeHtml(id)+'" title="'+t('moveRightTitle')+'">▶</button>' : '') +
+        (siblingInfo && siblingInfo.idx < siblingInfo.count - 1 ? '<button class="mini-btn" data-act="moveright" data-id="'+escapeHtml(id)+'" title="'+t('moveLeftTitle')+'">◀</button>' : '') +
+        '<button class="mini-btn danger" data-act="delete" data-id="'+escapeHtml(id)+'" title="delete">🗑</button>' +
       '</div>') : '') +
       '';
     if(childCount > 0){
@@ -639,7 +639,7 @@
     document.querySelectorAll('.children-row').forEach(function(row){
       if(row.classList.contains('collapsed')) return;
       var parentId = row.dataset.parentUnit;
-      var coupleEl = document.querySelector('.couple[data-couple-for="'+parentId+'"]');
+      var coupleEl = document.querySelector('.couple[data-couple-for="'+(window.CSS && CSS.escape ? CSS.escape(parentId) : parentId)+'"]');
       if(!coupleEl) return;
       var coupleRect = coupleEl.getBoundingClientRect();
       var startX = (coupleRect.left + coupleRect.right)/2 - canvasRect.left;
@@ -871,7 +871,7 @@
   function photoRowHtml(existingPhoto){
     return '<div class="field"><label>'+t('photoLabel')+'</label>'+
       '<div class="photo-row">'+
-        '<div class="photo-preview" id="pf_photoPreview">'+(existingPhoto ? '<img src="'+existingPhoto+'">' : '👤')+'</div>'+
+        '<div class="photo-preview" id="pf_photoPreview">'+(existingPhoto ? '<img src="'+escapeHtml(existingPhoto)+'">' : '👤')+'</div>'+
         '<div class="photo-btns">'+
           '<button type="button" id="pf_choosePhoto">'+t('photoChoose')+'</button>'+
           '<button type="button" id="pf_removePhoto" style="'+(existingPhoto?'':'display:none;')+'">'+t('photoRemove')+'</button>'+
@@ -919,7 +919,7 @@
         '</div>'+
       '</div>'+
       (isEdit ? photoRowHtml(target.photo) : '') +
-      (isEdit ? '<div class="field"><label>'+t('birthLabel')+'</label><input type="date" id="pf_birth" value="'+(target.birthDate||'')+'"></div>' : '') +
+      (isEdit ? '<div class="field"><label>'+t('birthLabel')+'</label><input type="date" id="pf_birth" value="'+escapeHtml(target.birthDate||'')+'"></div>' : '') +
       (isEdit ? '<div class="field"><label>'+t('residenceLabel')+'</label><input type="text" id="pf_residence" placeholder="'+t('residencePh')+'" value="'+escapeHtml(target.residence||'')+'"></div>' : '') +
       (mode === 'child' ? '<div class="keep-open-row"><input type="checkbox" id="pf_keep" checked><label for="pf_keep">'+t('keepAdding')+'</label></div>' : '') +
       '<button class="primary-btn" id="pf_save">'+t('saveBtn')+'</button>'

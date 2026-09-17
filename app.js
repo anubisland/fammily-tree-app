@@ -835,7 +835,17 @@
       var q = this.value.trim().toLowerCase();
       resultsEl.innerHTML = '';
       if(!q) return;
-      var matches = ids.filter(function(id){ return String(ppl[id].name || '').toLowerCase().indexOf(q) !== -1; }).slice(0, 8);
+      var matches = ids.filter(function(id){ return String(ppl[id].name || '').toLowerCase().indexOf(q) !== -1; });
+      // Rank: the earlier the match sits in the name, the higher — so a person
+      // whose FIRST name is the query (position 0) beats one who only carries it
+      // in the nasab. Ties break alphabetically (Arabic-aware).
+      matches.sort(function(a, b){
+        var na = String(ppl[a].name || '').toLowerCase(), nb = String(ppl[b].name || '').toLowerCase();
+        var ia = na.indexOf(q), ib = nb.indexOf(q);
+        if(ia !== ib) return ia - ib;
+        return na.localeCompare(nb, 'ar');
+      });
+      matches = matches.slice(0, 8);
       if(!matches.length){ resultsEl.innerHTML = '<div class="hs-empty">'+t('searchNoResults')+'</div>'; return; }
       resultsEl.innerHTML = matches.map(function(id){
         return '<div class="hs-result" data-id="'+escapeHtml(id)+'"><span class="hs-av">'+(ppl[id].gender==='f'?'👩':'👨')+'</span>'+escapeHtml(ppl[id].name)+'</div>';

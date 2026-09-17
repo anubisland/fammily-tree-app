@@ -6,7 +6,7 @@
 <title>شجرة العائلة</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;500;600;700;800&family=Lora:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=9">
 </head>
 <body>
 
@@ -139,9 +139,25 @@
   </div>
   <div class="toast" id="toast"></div>
 
-<script src="kinship.js"></script>
-<script src="app.js"></script>
-
-<script type="module" src="cloud.js"></script>
+<script>
+  /* Cache-buster: load the logic files fresh on every visit so fixes reach
+     everyone immediately (GitHub Pages caches assets for ~10 min, which made
+     updates look like they "didn't work"). Order is preserved by chaining on
+     load: kinship -> app (sets window.__ft*) -> cloud (module, uses them). */
+  (function(){
+    var bust = '?t=' + Date.now();
+    function add(src, type){
+      return new Promise(function(resolve){
+        var s = document.createElement('script');
+        s.src = src + bust; if(type) s.type = type;
+        s.onload = resolve; s.onerror = resolve;
+        document.body.appendChild(s);
+      });
+    }
+    add('kinship.js')
+      .then(function(){ return add('app.js'); })
+      .then(function(){ return add('cloud.js', 'module'); });
+  })();
+</script>
 </body>
 </html>

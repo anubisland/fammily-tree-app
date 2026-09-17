@@ -678,6 +678,27 @@
   }
   window.addEventListener('resize', function(){ requestAnimationFrame(drawLinks); });
 
+  /* Glue the connector lines to the cards. The lines are positioned from
+     getBoundingClientRect, so any change to card geometry moves the cards out
+     from under the curves — most visibly when the font-size setting resizes
+     every card, but also when the Arabic web fonts (Amiri/Cairo) finish loading
+     a frame late, or when the tree tab goes from hidden (0px) to visible. A
+     ResizeObserver fires exactly when the layout has actually settled at its new
+     size, so we redraw then instead of guessing with a single rAF. Debounced via
+     rAF so a burst of callbacks collapses into one redraw. */
+  (function observeTreeGeometry(){
+    if(typeof ResizeObserver === 'undefined') return; // graceful: other redraw paths still run
+    var treeRoot = document.getElementById('treeRoot');
+    if(!treeRoot) return;
+    var scheduled = false;
+    var ro = new ResizeObserver(function(){
+      if(scheduled) return;
+      scheduled = true;
+      requestAnimationFrame(function(){ scheduled = false; drawLinks(); });
+    });
+    ro.observe(treeRoot);
+  })();
+
   /* When the tree is wider than the stage (any real family, on any viewport),
      the stage opens scrolled to its start edge — the visitor lands on a stray
      spouse card or blank canvas instead of the root couple. Center the stage's

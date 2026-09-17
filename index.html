@@ -2,8 +2,16 @@
 <html lang="ar" dir="rtl" id="htmlRoot">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>شجرة العائلة</title>
+<!-- PWA: installable web + mobile app from one source -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F5B4B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="شجرة العائلة">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;500;600;700;800&family=Lora:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css?v=9">
@@ -140,6 +148,21 @@
   <div class="toast" id="toast"></div>
 
 <script>
+  /* Capture the install prompt as early as possible — the browser fires
+     `beforeinstallprompt` once, and if we are not listening yet it is lost.
+     app.js reads window.__ftDeferredInstall when rendering the settings row. */
+  window.__ftDeferredInstall = null;
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    window.__ftDeferredInstall = e;
+    if(window.__ftRenderSettings) window.__ftRenderSettings();
+  });
+  window.addEventListener('appinstalled', function(){
+    window.__ftDeferredInstall = null;
+    if(window.__ftRenderSettings) window.__ftRenderSettings();
+  });
+</script>
+<script>
   /* Cache-buster: load the logic files fresh on every visit so fixes reach
      everyone immediately (GitHub Pages caches assets for ~10 min, which made
      updates look like they "didn't work"). Order is preserved by chaining on
@@ -158,6 +181,15 @@
       .then(function(){ return add('app.js'); })
       .then(function(){ return add('cloud.js', 'module'); });
   })();
+
+  /* PWA service worker — registered without the cache-buster. It is
+     network-first (see sw.js), so it never serves stale code online; it only
+     gives us offline support and the installable-app experience. */
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(){ /* offline/unsupported: app still works online */ });
+    });
+  }
 </script>
 </body>
 </html>

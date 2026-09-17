@@ -131,6 +131,13 @@
     setInvite:{ar:'دعوة فرد للعائلة', en:'Invite a family member'},
     setMembers:{ar:'أفراد العائلة', en:'Family members'},
     setInstall:{ar:'تثبيت التطبيق', en:'Install app'},
+    setApp:{ar:'التطبيق', en:'App'},
+    installReady:{ar:'ثبّت على جهازك', en:'Add to your device'},
+    installIosTitle:{ar:'التثبيت على iPhone/iPad', en:'Install on iPhone/iPad'},
+    installIosSteps:{ar:'من متصفح Safari: اضغط زر المشاركة ⬆︎ ثم اختر «إضافة إلى الشاشة الرئيسية».', en:'In Safari: tap the Share button ⬆︎, then choose “Add to Home Screen”.'},
+    installMenuTitle:{ar:'تثبيت التطبيق', en:'Install the app'},
+    installMenuSteps:{ar:'من قائمة المتصفح (⋮) اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».', en:'From your browser menu (⋮), choose “Install app” or “Add to Home Screen”.'},
+    installDone:{ar:'التطبيق مُثبَّت على جهازك ✓', en:'App installed on your device ✓'},
     setSignout:{ar:'تسجيل الخروج', en:'Sign out'}
   };
   var genLabelsMap = {
@@ -771,6 +778,44 @@
     }).join('') + '</span>';
   }
 
+  // ---- PWA install helpers ----
+  function ftIsStandalone(){
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+           window.navigator.standalone === true;
+  }
+  function ftIsIos(){
+    return /iphone|ipad|ipod/i.test(window.navigator.userAgent) && !window.MSStream;
+  }
+  // Build the "App" settings section. Three states: already installed, a live
+  // install prompt available, or (iOS/unsupported) manual instructions.
+  function installSectionHtml(){
+    var installed = ftIsStandalone();
+    var rowInner = installed
+      ? '<span>📱 '+t('setInstall')+'</span><span class="set-val">'+t('installDone')+'</span>'
+      : '<span>📱 '+t('setInstall')+'</span><span class="set-val set-val-accent">'+t('installReady')+' ›</span>';
+    return '<div class="section-eyebrow" style="margin-top:18px;"><span class="dia">◆</span><span>'+t('setApp')+'</span></div>' +
+      '<div class="set-group">' +
+        '<div class="set-row'+(installed ? '' : ' set-row-click')+'" id="setInstallRow">'+rowInner+'</div>' +
+      '</div>';
+  }
+  function ftTriggerInstall(){
+    var dp = window.__ftDeferredInstall;
+    if(dp && dp.prompt){
+      dp.prompt();
+      dp.userChoice && dp.userChoice.then(function(){ window.__ftDeferredInstall = null; renderSettings(); });
+      return;
+    }
+    // No native prompt (iOS Safari, or the prompt was already dismissed): show
+    // instructions in a sheet so they stay on screen. Branch on platform so a
+    // non-Safari user is never handed iOS-only "Share button" steps.
+    var title = ftIsIos() ? t('installIosTitle') : t('installMenuTitle');
+    var steps = ftIsIos() ? t('installIosSteps') : t('installMenuSteps');
+    openSheet(
+      '<h3>'+title+'</h3>' +
+      '<p style="line-height:1.9; font-size:15px; color:var(--ink-soft);">'+steps+'</p>'
+    );
+  }
+
   function renderSettings(){
     var host = document.getElementById('tab-settings');
     if(!host) return;
@@ -810,6 +855,7 @@
             ], curFont) +
           '</div>' +
         '</div>' +
+        installSectionHtml() +
         '<div class="section-eyebrow" style="margin-top:18px;"><span class="dia">◆</span><span>'+t('setFamily')+'</span></div>' +
         '<div class="set-group">' +
           '<div class="set-row'+(canEditCloud ? ' set-row-click' : '')+'" id="setFamilyNameRow">' +
@@ -842,6 +888,8 @@
     host.querySelectorAll('#setFontSeg button').forEach(function(btn){
       btn.onclick = function(){ ftSetFontScale(btn.dataset.val); renderSettings(); };
     });
+    var installRow = document.getElementById('setInstallRow');
+    if(installRow && !ftIsStandalone()) installRow.onclick = ftTriggerInstall;
     if(canEditCloud){
       document.getElementById('setFamilyNameRow').onclick = function(){
         showTab('tree');

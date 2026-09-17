@@ -30,7 +30,10 @@
   var MAX_DOC_BYTES = 900000; // safety margin under Firestore's 1MB document limit
 
   var authGate = document.getElementById('authGate');
-  var cloudBtn = document.getElementById('cloudBtn');
+  /* The banner cloud/sync button was removed (its account + sync actions live in
+     Settings now). Keep a null-safe stand-in so the many cloudBtn.* references
+     below don't need touching and never crash if the element is absent. */
+  var cloudBtn = document.getElementById('cloudBtn') || { style:{}, dataset:{}, title:'', addEventListener:function(){} };
   var authErr = document.getElementById('authErr');
   var authLoading = document.getElementById('authLoading');
   var authSubmitBtn = document.getElementById('authSubmitBtn');

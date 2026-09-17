@@ -48,6 +48,7 @@
     moveLeftTitle:{ar:'نقل لليسار', en:'Move left'},
     moveRightTitle:{ar:'نقل لليمين', en:'Move right'},
     contextChild:{ar:'سيُضاف كابن/ابنة لـ «{name}»', en:'Will be added as a child of "{name}"'},
+    childNeedsFather:{ar:'⚠️ أضف الأب (الزوج) أولاً لينسب الأبناء إليه', en:'⚠️ Add the father (husband) first so children are attributed to him'},
     contextSpouse:{ar:'سيُضاف كزوج/زوجة لـ «{name}»', en:'Will be added as a spouse of "{name}"'},
     contextEdit:{ar:'تعديل بيانات «{name}»', en:'Editing "{name}"'},
     deleteTitle:{ar:'حذف «{name}»؟', en:'Delete "{name}"?'},
@@ -437,6 +438,29 @@
     logActivity('add', name);
   }
 
+  /* A blood-line member is the root or anyone with a parent in the tree; an
+     in-law spouse has no parent and isn't the root. */
+  function isBloodMember(pid){
+    var p = getPerson(pid);
+    return !!p && (pid === state.rootId || p.parentId != null);
+  }
+  /* Given the card the user clicked +child on, resolve where the child must
+     actually attach and whose name the nasab uses:
+       - anchorId: the couple's blood-line member, so the child RENDERS (renderUnit
+         only shows the primary member's childrenIds — a child hung off an in-law
+         spouse would be invisible).
+       - fatherId: the male of the couple, because a child is nasab'd to the FATHER,
+         not to whichever parent's card was tapped. */
+  function coupleContext(clickedId){
+    var clicked = getPerson(clickedId);
+    var spId = (clicked.spouseIds && clicked.spouseIds[0]) || null;
+    var sp = spId ? getPerson(spId) : null;
+    var anchorId = clickedId;
+    if(sp && !isBloodMember(clickedId) && isBloodMember(spId)) anchorId = spId; // tapped the in-law
+    var fatherId = clicked.gender === 'm' ? clickedId : (sp && sp.gender === 'm' ? spId : null);
+    return { anchorId: anchorId, fatherId: fatherId };
+  }
+
   function addChild(parentId, name, gender){
     var child = newPerson(name, gender, parentId);
     state.people[child.id] = child;
@@ -633,7 +657,11 @@
     /* Title centered above the root couple, inside the canvas — so it scales and
        stays above the grandparents as the tree is zoomed. */
     var treeTitle = document.getElementById('treeTitle');
-    if(treeTitle) treeTitle.textContent = (state.familyName && state.familyName.trim()) ? state.familyName.trim() : '';
+    if(treeTitle){
+      var famName = (state.familyName && state.familyName.trim()) ? state.familyName.trim() : '';
+      // Always show the word "tree" so the screen reads clearly as a family TREE.
+      treeTitle.textContent = famName ? (state.lang === 'en' ? (famName + ' Tree') : ('شجرة ' + famName)) : '';
+    }
 
     requestAnimationFrame(drawLinks);
   }
@@ -1027,12 +1055,17 @@
     document.getElementById('pf_male').onclick = function(){ gender='m'; this.className='active-m'; document.getElementById('pf_female').className=''; };
     document.getElementById('pf_female').onclick = function(){ gender='f'; this.className='active-f'; document.getElementById('pf_male').className=''; };
     if(isEdit) wirePhotoRow(target.photo);
+    /* A child is nasab'd to the FATHER and attached to the couple's blood-line
+       member (so it renders) — never to whichever card was tapped. */
+    var childCtx = mode === 'child' ? coupleContext(targetId) : null;
+    var childFatherName = (childCtx && childCtx.fatherId) ? getPerson(childCtx.fatherId).name : '';
     // Live full-name preview for a new child.
     if(mode === 'child'){
       var nameInput = document.getElementById('pf_name');
       var preview = document.getElementById('pf_fullPreview');
       var updatePreview = function(){
-        var full = buildFullName(nameInput.value, target.name);
+        if(!childFatherName){ preview.textContent = t('childNeedsFather'); return; }
+        var full = buildFullName(nameInput.value, childFatherName);
         preview.textContent = full ? (t('fullNamePreview') + ' ' + full) : '';
       };
       nameInput.addEventListener('input', updatePreview);
@@ -1043,7 +1076,7 @@
     document.getElementById('pf_save').onclick = function(){
       var name = document.getElementById('pf_name').value.trim();
       if(!name){ toast(t('toastNameRequired')); return; }
-      if(mode === 'child') addChild(targetId, buildFullName(name, target.name), gender);
+      if(mode === 'child') addChild(childCtx.anchorId, buildFullName(name, childFatherName), gender);
       else if(mode === 'spouse') addSpouse(targetId, name, gender);
       else {
         updatePerson(targetId, {

@@ -180,6 +180,16 @@
           return (gender(bId) === 'f' ? 'زوجة ' : 'زوج ') + genitive(ra);
         }
       }
+      // A and B are each married, and their two spouses are blood siblings —
+      // classically married to two brothers/sisters: سِلفة (two wives) / عديل (two husbands).
+      if(sA && sB && sA !== sB){
+        var rr = bloodRelation(sA, sB);                 // how B's spouse relates to A's spouse
+        if(rr && rr.indexOf('أخ') === 0){               // أخ / أخت / أخ لأب / أخت لأم …
+          if(gender(aId) === 'f' && gender(bId) === 'f') return 'سِلفة';  // two women married to brothers
+          if(gender(aId) === 'm' && gender(bId) === 'm') return 'عديل';   // two men married to sisters
+          return gender(bId) === 'f' ? 'زوجة قريب' : 'زوج قريبة';        // mixed: spouse of A's in-law sibling
+        }
+      }
       return 'قرابة بعيدة';
     }
 

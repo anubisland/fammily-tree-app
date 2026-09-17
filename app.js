@@ -230,6 +230,27 @@
     return p;
   }
 
+  /* One-time migration: legacy single-string names -> {ar,en} own-segments.
+     Two-pass so a child's stripping of the father's name always uses the
+     father's OLD (pre-migration) full name, regardless of processing order.
+     Idempotent: any person whose name is already an object is left alone. */
+  function migrateNames(state){
+    var ppl = state.people || {};
+    var ids = Object.keys(ppl);
+    var oldFull = {};
+    ids.forEach(function(id){ if(typeof ppl[id].name === 'string') oldFull[id] = ppl[id].name; });
+    function father(p){ if(!p||!p.parentId) return null; var par=ppl[p.parentId]; if(!par) return null;
+      if(par.gender==='m') return par; var sp=par.spouseIds&&par.spouseIds[0]?ppl[par.spouseIds[0]]:null; return (sp&&sp.gender==='m')?sp:null; }
+    ids.forEach(function(id){
+      var p = ppl[id]; if(typeof p.name !== 'string') return;
+      var full = oldFull[id], f = father(p);
+      var fatherFull = f ? oldFull[f.id] : null;
+      var ownAr = (fatherFull && full.slice(-(fatherFull.length+1)) === (' '+fatherFull)) ? full.slice(0, full.length-fatherFull.length-1) : full;
+      p.name = { ar: ownAr, en: window.ftTranslit(ownAr) };
+    });
+    if(typeof state.familyName === 'string') state.familyName = { ar: state.familyName, en: window.ftTranslit(state.familyName) };
+  }
+
   /* ============== Persistence ============== */
   function scheduleSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(save, 350); }
 
@@ -250,6 +271,7 @@
           state = parsed;
           state.lang = state.lang || 'ar';
           Object.keys(state.people).forEach(function(id){ migratePerson(state.people[id]); });
+          migrateNames(state);
         }
       }
     }catch(e){ showStorageWarn(); }
@@ -263,6 +285,7 @@
     state = remoteState;
     state.lang = state.lang || 'ar';
     Object.keys(state.people).forEach(function(id){ migratePerson(state.people[id]); });
+    migrateNames(state);
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
     applyLang(); render();
   };

@@ -84,6 +84,8 @@
     themeLight:{ar:'الوضع الفاتح', en:'Light mode'},
     navHome:{ar:'الرئيسية', en:'Home'},
     navTree:{ar:'الشجرة', en:'Tree'},
+    navKinship:{ar:'القرابة', en:'Kinship'},
+    navActivity:{ar:'السجل', en:'Activity'},
     navMoments:{ar:'اللحظات', en:'Moments'},
     navSettings:{ar:'إعدادات', en:'Settings'},
     immersiveOn:{ar:'ملء الشاشة', en:'Full screen'},
@@ -299,6 +301,8 @@
     document.getElementById('joinCode').placeholder = t('joinCodePh');
     document.getElementById('nav_home').textContent = t('navHome');
     document.getElementById('nav_tree').textContent = t('navTree');
+    document.getElementById('nav_kinship').textContent = t('navKinship');
+    document.getElementById('nav_activity').textContent = t('navActivity');
     document.getElementById('nav_moments').textContent = t('navMoments');
     document.getElementById('nav_settings').textContent = t('navSettings');
   }
@@ -352,7 +356,13 @@
   }
   window.__ftShowTab = showTab;
   document.querySelectorAll('.bottom-nav .nav-item').forEach(function(b){
-    b.addEventListener('click', function(){ showTab(b.getAttribute('data-tab')); });
+    b.addEventListener('click', function(){
+      // Two nav slots are ACTIONS (open a sheet / start a mode), not view tabs.
+      var action = b.getAttribute('data-action');
+      if(action === 'kinship'){ startKinship(); return; }
+      if(action === 'activity'){ if(window.__ftCloud && window.__ftCloud.showActivityLog) window.__ftCloud.showActivityLog(); else toast(t('comingSoon')); return; }
+      showTab(b.getAttribute('data-tab'));
+    });
   });
   initImmersiveTree();
 
@@ -1309,14 +1319,11 @@
     openSheet(
       '<h3>'+t('menuTitle')+'</h3>'+
       '<div class="context">'+t('menuDesc')+'</div>'+
-      '<button class="primary-btn" id="mn_kinship" style="margin-bottom:10px; background:var(--plum);">'+t('kinshipMenu')+'</button>'+
       '<button class="primary-btn" id="mn_export" style="margin-bottom:10px;">'+t('menuExport')+'</button>'+
       (canEditCloud ? '<button class="primary-btn" id="mn_import" style="margin-bottom:10px; background:var(--teal);">'+t('menuImport')+'</button>' : '') +
       (canEditCloud ? '<button class="primary-btn" id="mn_reset" style="background:var(--danger);">'+t('menuReset')+'</button>' : '') +
-      (canEditCloud && window.__ftCloud ? '<button class="primary-btn" id="mn_invite" style="margin-top:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '') +
-      (window.__ftCloud ? '<button class="primary-btn" id="mn_activity" style="margin-top:10px; background:var(--plum);">📋 سجل النشاط</button>' : '')
+      (canEditCloud && window.__ftCloud ? '<button class="primary-btn" id="mn_invite" style="margin-top:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '')
     );
-    document.getElementById('mn_kinship').onclick = function(){ closeSheet(); startKinship(); };
     document.getElementById('mn_export').onclick = function(){ closeSheet(); document.getElementById('exportBtn').click(); };
     if(canEditCloud){
       document.getElementById('mn_import').onclick = function(){ closeSheet(); document.getElementById('importBtn').click(); };
@@ -1325,9 +1332,6 @@
     if(canEditCloud && window.__ftCloud && window.__ftCloud.createInvite){
       var invBtn = document.getElementById('mn_invite');
       if(invBtn) invBtn.onclick = function(){ closeSheet(); window.__ftCloud.createInvite('editor'); };
-    }
-    if(window.__ftCloud){
-      document.getElementById('mn_activity').onclick = function(){ closeSheet(); window.__ftCloud.showActivityLog(); };
     }
   });
 

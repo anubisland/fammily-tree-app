@@ -179,6 +179,7 @@
       });
     }
     add('kinship.js')
+      .then(function(){ return add('translit.js'); })
       .then(function(){ return add('app.js'); })
       .then(function(){ return add('cloud.js', 'module'); });
   })();

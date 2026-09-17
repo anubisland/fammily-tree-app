@@ -1,6 +1,19 @@
 (function(){
   "use strict";
 
+  // Node test hook: a self-contained pure nasab computer over a people map.
+  // Runs before any DOM access so `require('./app.js')` works under node
+  // (see scripts/names.test.cjs).
+  if(typeof document === 'undefined'){
+    (typeof global !== 'undefined' ? global : this).__ftComputeFullName = function(people, id, lang){
+      function own(p){ var n=p&&p.name; if(typeof n==='string') return n; if(!n) return ''; return n[lang]||n[lang==='ar'?'en':'ar']||''; }
+      function father(p){ if(!p||!p.parentId) return null; var par=people[p.parentId]; if(!par) return null;
+        if(par.gender==='m') return par; var sp=par.spouseIds&&par.spouseIds[0]?people[par.spouseIds[0]]:null; return (sp&&sp.gender==='m')?sp:null; }
+      var parts=[], cur=people[id], guard=0; while(cur&&guard++<64){ parts.push(own(cur)); cur=father(cur); } return parts.filter(Boolean).join(' ');
+    };
+    return;   // don't run the DOM app under node
+  }
+
   /* Set html.dark before first paint (per persisted choice or OS setting) to avoid a flash. */
   try { document.documentElement.classList.toggle('dark',
     (function(m){ return m === 'dark' || (m === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); })(localStorage.getItem('ft_theme') || 'auto')); } catch(e){}
@@ -383,6 +396,36 @@
 
   /* ============== Helpers ============== */
   function getPerson(id){ return state.people[id]; }
+
+  /* ---- Name helpers (bilingual + live nasab) ---- */
+  function ownName(p, lang){
+    if(!p) return '';
+    var n = p.name;
+    if(typeof n === 'string') return n;                 // legacy, pre-migration
+    if(!n) return '';
+    return n[lang] || n[lang === 'ar' ? 'en' : 'ar'] || '';
+  }
+  function firstNameOf(p){ return ownName(p, state.lang); }
+  function fatherOfPerson(p){
+    if(!p || !p.parentId) return null;
+    var par = getPerson(p.parentId); if(!par) return null;
+    if(par.gender === 'm') return par;                  // parent is the father
+    var spId = par.spouseIds && par.spouseIds[0];       // parent is mother -> father = her husband
+    var sp = spId ? getPerson(spId) : null;
+    return (sp && sp.gender === 'm') ? sp : null;
+  }
+  function fullNameOf(p){
+    var parts = [], cur = p, guard = 0;
+    while(cur && guard++ < 64){ parts.push(ownName(cur, state.lang)); cur = fatherOfPerson(cur); }
+    return parts.filter(Boolean).join(' ');
+  }
+  function famNameOf(){
+    var f = state.familyName;
+    if(typeof f === 'string') return f;
+    if(!f) return '';
+    return f[state.lang] || f[state.lang === 'ar' ? 'en' : 'ar'] || '';
+  }
+
   function genOfPerson(id){ var p = getPerson(id), depth = 0; while(p && p.parentId){ depth++; p = getPerson(p.parentId); } return depth; }
   var genColors = ["var(--emerald)","var(--teal)","var(--gold)","var(--plum)"];
 

@@ -107,7 +107,11 @@
   .canvas{ position:relative; min-width:100%; width:max-content; margin:0 auto; padding:46px 24px 90px; transform-origin: top center;}
   .tree-title{ text-align:center; font-family:var(--f-head); font-size:22px; font-weight:700; color:var(--ink); padding:0 0 20px; }
   .tree-title:empty{ display:none; }
-  svg.links{position:absolute; pointer-events:none; overflow:visible; z-index:1;}
+  /* The links svg lives INSIDE .canvas so it scales together with the cards
+     under both interactive transform:scale and print zoom — a sibling svg would
+     stay unscaled and the lines would detach from the cards. z-index:-1 keeps it
+     above the canvas background but behind the in-flow cards. */
+  svg.links{position:absolute; top:0; left:0; pointer-events:none; overflow:visible; z-index:-1;}
   svg.links path{ fill:none; stroke:var(--line); stroke-width:2; stroke-linecap:round;}
   .canvas{position:relative; z-index:2;}
 

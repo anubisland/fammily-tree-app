@@ -638,37 +638,40 @@
     requestAnimationFrame(drawLinks);
   }
 
+  /* Offset of `el` relative to the canvas content origin, accumulated up the
+     offsetParent chain. offsetLeft/offsetTop are LAYOUT metrics — unaffected by
+     the canvas's transform:scale (interactive zoom) or its print-time zoom — so
+     the coordinates we compute are in the canvas's own untransformed space. The
+     svg lives inside the canvas, so it is scaled by exactly the same factor as
+     the cards, and the lines stay glued to them at any zoom and when printing. */
+  function offsetInCanvas(el, canvas){
+    var x = 0, y = 0;
+    while(el && el !== canvas){ x += el.offsetLeft; y += el.offsetTop; el = el.offsetParent; }
+    return { x: x, y: y };
+  }
   function drawLinks(){
     var svg = document.getElementById('linksSvg');
     var canvas = document.getElementById('canvas');
-    var stage = document.getElementById('stage');
     svg.innerHTML = '';
-    var canvasRect = canvas.getBoundingClientRect();
-    var stageRect = stage.getBoundingClientRect();
-    /* Position the svg to exactly overlay canvas's current rendered box, expressed in
-       stage's SCROLLABLE CONTENT coordinates (not viewport coordinates). Once set, the
-       svg is a normal sibling within the same scrolling content as canvas, so it scrolls
-       natively with it in the browser's own compositor — no scroll-event syncing needed. */
-    svg.style.left = (canvasRect.left - stageRect.left + stage.scrollLeft) + 'px';
-    svg.style.top = (canvasRect.top - stageRect.top + stage.scrollTop) + 'px';
-    svg.style.width = canvasRect.width + 'px';
-    svg.style.height = canvasRect.height + 'px';
+    // Cover the canvas content box in its own (untransformed) layout pixels.
+    svg.style.width = canvas.scrollWidth + 'px';
+    svg.style.height = canvas.scrollHeight + 'px';
 
     document.querySelectorAll('.children-row').forEach(function(row){
       if(row.classList.contains('collapsed')) return;
       var parentId = row.dataset.parentUnit;
       var coupleEl = document.querySelector('.couple[data-couple-for="'+(window.CSS && CSS.escape ? CSS.escape(parentId) : parentId)+'"]');
       if(!coupleEl) return;
-      var coupleRect = coupleEl.getBoundingClientRect();
-      var startX = (coupleRect.left + coupleRect.right)/2 - canvasRect.left;
-      var startY = coupleRect.bottom - canvasRect.top;
+      var cp = offsetInCanvas(coupleEl, canvas);
+      var startX = cp.x + coupleEl.offsetWidth/2;
+      var startY = cp.y + coupleEl.offsetHeight;
       var childUnits = row.children;
       for(var i=0;i<childUnits.length;i++){
         var childCouple = childUnits[i].querySelector('.couple');
         if(!childCouple) continue;
-        var cRect = childCouple.getBoundingClientRect();
-        var endX = (cRect.left + cRect.right)/2 - canvasRect.left;
-        var endY = cRect.top - canvasRect.top;
+        var ch = offsetInCanvas(childCouple, canvas);
+        var endX = ch.x + childCouple.offsetWidth/2;
+        var endY = ch.y;
         var midY = startY + (endY - startY) * 0.55;
         var path = document.createElementNS('http://www.w3.org/2000/svg','path');
         path.setAttribute('d', 'M '+startX+' '+startY+' C '+startX+' '+midY+', '+endX+' '+midY+', '+endX+' '+endY);

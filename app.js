@@ -107,12 +107,14 @@
     cardTreeSub:{ar:'استعرض النسب كاملاً', en:'Browse the full lineage'},
     cardFeed:{ar:'اللحظات', en:'Moments'},
     cardFeedSub:{ar:'أخبار العائلة وأحداثها', en:'Family news and events'},
-    cardSearch:{ar:'البحث', en:'Search'},
-    cardSearchSub:{ar:'ابحث بالاسم عربي/EN', en:'Search by name, AR/EN'},
+    cardActivity:{ar:'السجل', en:'Activity'},
+    cardActivitySub:{ar:'نشاط العائلة اليوم', en:"Today's family activity"},
     cardMembers:{ar:'الأعضاء', en:'Members'},
     cardMembersSub:{ar:'إدارة صلاحيات الأفراد', en:'Manage member permissions'},
+    searchPlaceholder:{ar:'🔍 ابحث عن فرد بالاسم…', en:'🔍 Search a person by name…'},
+    searchNoResults:{ar:'لا توجد نتائج', en:'No matches'},
     statPhotos:{ar:'صورة', en:'Photos'},
-    completionTitle:{ar:'اكتمال الشجرة', en:'Tree completeness'},
+    completionTitle:{ar:'اكتمال الملفات', en:'Profile completeness'},
     completionHintMissingPhoto:{ar:'«{name}» بلا صورة', en:'"{name}" has no photo'},
     completionHintMissingBirth:{ar:'«{name}» بلا تاريخ ميلاد', en:'"{name}" has no birth date'},
     completionHintDone:{ar:'أحسنت! جميع البيانات مكتملة', en:'Great! All info is complete'},
@@ -806,9 +808,10 @@
         '<div class="grid">' +
           '<div class="leaf tree" data-go="tree"><span class="corner">۞</span><div class="ic">🌳</div><h3>'+t('cardTree')+'</h3><p>'+t('cardTreeSub')+'</p></div>' +
           '<div class="leaf feed" data-go="moments"><span class="corner">۞</span><div class="ic">📰</div><h3>'+t('cardFeed')+'</h3><p>'+t('cardFeedSub')+'</p></div>' +
-          '<div class="leaf search" data-go="search"><span class="corner">۞</span><div class="ic">🔍</div><h3>'+t('cardSearch')+'</h3><p>'+t('cardSearchSub')+'</p></div>' +
+          '<div class="leaf activity" data-go="activity"><span class="corner">۞</span><div class="ic">📋</div><h3>'+t('cardActivity')+'</h3><p>'+t('cardActivitySub')+'</p></div>' +
           '<div class="leaf members" data-go="members"><span class="corner">۞</span><div class="ic">👥</div><h3>'+t('cardMembers')+'</h3><p>'+t('cardMembersSub')+'</p></div>' +
         '</div>' +
+        '<div class="home-search"><input type="text" id="homeSearch" placeholder="'+escapeHtml(t('searchPlaceholder'))+'"><div class="home-search-results" id="homeSearchResults"></div></div>' +
         '<div class="meter-card">' +
           '<div class="meter-top"><h3>'+t('completionTitle')+'</h3><b>'+localeDigits(pct)+'%</b></div>' +
           '<div class="bar"><i style="width:'+pct+'%"></i></div>' +
@@ -818,8 +821,39 @@
 
     host.querySelector('[data-go="tree"]').onclick = function(){ showTab('tree'); };
     host.querySelector('[data-go="moments"]').onclick = function(){ showTab('moments'); };
-    host.querySelector('[data-go="search"]').onclick = function(){ toast(t('comingSoon')); };
-    host.querySelector('[data-go="members"]').onclick = function(){ toast(t('comingSoon')); };
+    host.querySelector('[data-go="activity"]').onclick = function(){
+      if(window.__ftCloud && window.__ftCloud.showActivityLog) window.__ftCloud.showActivityLog(); else toast(t('comingSoon'));
+    };
+    host.querySelector('[data-go="members"]').onclick = function(){
+      if(window.__ftCloud && window.__ftCloud.showMembers) window.__ftCloud.showMembers(); else toast(t('comingSoon'));
+    };
+
+    // Live people search: type a name → matching people → tap to jump to the card.
+    var searchInput = document.getElementById('homeSearch');
+    var resultsEl = document.getElementById('homeSearchResults');
+    searchInput.addEventListener('input', function(){
+      var q = this.value.trim().toLowerCase();
+      resultsEl.innerHTML = '';
+      if(!q) return;
+      var matches = ids.filter(function(id){ return String(ppl[id].name || '').toLowerCase().indexOf(q) !== -1; }).slice(0, 8);
+      if(!matches.length){ resultsEl.innerHTML = '<div class="hs-empty">'+t('searchNoResults')+'</div>'; return; }
+      resultsEl.innerHTML = matches.map(function(id){
+        return '<div class="hs-result" data-id="'+escapeHtml(id)+'"><span class="hs-av">'+(ppl[id].gender==='f'?'👩':'👨')+'</span>'+escapeHtml(ppl[id].name)+'</div>';
+      }).join('');
+      resultsEl.querySelectorAll('.hs-result').forEach(function(r){ r.onclick = function(){ focusPerson(r.getAttribute('data-id')); }; });
+    });
+  }
+  /* Jump to a person's card on the tree and flash it. */
+  function focusPerson(id){
+    showTab('tree');
+    setTimeout(function(){
+      var sel = '.card[data-id="'+(window.CSS && CSS.escape ? CSS.escape(id) : id)+'"]';
+      var card = document.querySelector(sel);
+      if(!card) return;
+      card.scrollIntoView({ behavior:'smooth', block:'center', inline:'center' });
+      card.classList.add('kin-a');
+      setTimeout(function(){ card.classList.remove('kin-a'); }, 1800);
+    }, 80);
   }
   window.__ftRenderHome = renderHome;
 

@@ -298,14 +298,14 @@
   #tab-home .crest{ width:46px; height:46px; border-radius:13px; background:rgba(246,239,221,.12); border:1px solid rgba(223,201,152,.5); display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0;}
   /* App name is the primary title (it's the app's name); family name is the subtitle. */
   #tab-home .app-name{font-family:var(--f-head); font-size:25px; font-weight:700; color:#F6EFDD; line-height:1.1;}
-  #tab-home .family-name{font-size:15px; color:#DFC998; margin-top:2px;}
+  #tab-home .family-name{font-family:var(--f-head); font-size:18px; font-weight:700; color:#DFC998; margin-top:3px;}
   #tab-home .tadhib{display:flex; align-items:center; gap:7px; margin-top:7px; position:relative; z-index:1;}
   #tab-home .tadhib .rule{height:1.5px; background:linear-gradient(90deg, transparent, var(--gold-soft) 30%, var(--gold-soft) 70%, transparent); flex:1;}
   #tab-home .tadhib .dia{color:var(--gold-soft); font-size:11px;}
   #tab-home .home-stat-row{display:flex; gap:9px; margin-top:16px; position:relative; z-index:1;}
-  #tab-home .home-stat{flex:1; background:rgba(246,239,221,.12); border:1px solid rgba(246,239,221,.22); border-radius:13px; padding:9px 6px; text-align:center;}
-  #tab-home .home-stat b{display:block; font-family:var(--f-head); font-size:22px; font-weight:700;}
-  #tab-home .home-stat span{font-size:10.5px; color:#CFE3DC;}
+  #tab-home .home-stat{flex:1; background:rgba(246,239,221,.12); border:1px solid rgba(246,239,221,.22); border-radius:12px; padding:6px 5px; text-align:center;}
+  #tab-home .home-stat b{display:block; font-family:var(--f-head); font-size:18px; font-weight:700; line-height:1.2;}
+  #tab-home .home-stat span{font-size:11px; color:#CFE3DC;}
 
   #tab-home .home-body{padding:18px 16px 16px;}
   #tab-home .section-eyebrow{display:flex; align-items:center; gap:8px; margin:2px 2px 12px;}
@@ -347,9 +347,9 @@
   @media (max-width:430px){
     #tab-home .masthead{ padding:14px 16px 16px;}
     #tab-home .home-stat-row{ margin-top:12px; gap:7px;}
-    #tab-home .home-stat{ padding:6px 4px; border-radius:11px;}
-    #tab-home .home-stat b{ font-size:18px;}
-    #tab-home .home-stat span{ font-size:9.5px;}
+    #tab-home .home-stat{ padding:5px 4px; border-radius:11px;}
+    #tab-home .home-stat b{ font-size:16px;}
+    #tab-home .home-stat span{ font-size:10.5px;}
     #tab-home .home-body{ padding:14px 14px 14px;}
     #tab-home .grid{ gap:10px;}
     #tab-home .leaf{ padding:11px 12px 12px; border-radius:14px;}

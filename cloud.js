@@ -285,33 +285,36 @@
     body.innerHTML = '<h3>📋 سجل النشاط</h3><div class="context">جارِ التحميل…</div>';
     overlay.classList.add('open'); sheet.classList.add('open');
     try{
-      var q = query(collection(db, 'trees', currentTreeId, 'activity'), orderBy('at', 'desc'), limit(30));
-      var snap = await getDocs(q);
-      if(snap.empty){
-        body.innerHTML = '<h3>📋 سجل النشاط</h3><div class="context">لا يوجد أي نشاط مسجَّل بعد.</div>';
-        return;
-      }
-      var rows = '';
       var esc = window.__ftEscapeHtml || function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
-      var seenLogin = {};   // collapse repeated logins: one per member per day
+      // Today only: a session's activity for the day it's opened, dated at the top.
+      var lang = (window.__ftGetState && window.__ftGetState() && window.__ftGetState().lang) || 'ar';
+      var dateStr = new Date().toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-EG',
+        { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+      var header = '<h3>📋 سجل النشاط</h3>' +
+        '<div style="text-align:center; font-family:var(--f-head); font-weight:700; color:var(--emerald); font-size:14px; margin:2px 0 12px;">📅 ' + esc(dateStr) + '</div>';
+      var todayStart = new Date(); todayStart.setHours(0,0,0,0);
+      var q = query(collection(db, 'trees', currentTreeId, 'activity'), orderBy('at', 'desc'), limit(80));
+      var snap = await getDocs(q);
+      var rows = '';
+      var seenLogin = {};   // collapse repeated logins: one per member
       snap.forEach(function(d){
         var v = d.data();
         var at = v.at && v.at.toDate ? v.at.toDate() : null;
+        if(!at || at < todayStart) return;             // today's activity only
         if(v.action === 'login'){
-          var dayKey = (v.byUid || v.byEmail || '?') + '|' + (at ? at.toISOString().slice(0,10) : '?');
-          if(seenLogin[dayKey]) return;   // skip duplicate login for the same member/day
-          seenLogin[dayKey] = true;
+          var key = (v.byUid || v.byEmail || '?');
+          if(seenLogin[key]) return;                   // one login line per member today
+          seenLogin[key] = true;
         }
-        var when = at ? timeAgo(at) : '';
         var isPersonAction = (v.action === 'add' || v.action === 'edit' || v.action === 'delete');
         rows += '<div style="padding:9px 0; border-bottom:1px solid var(--paper-deep); font-size:13px;">' +
           '<b>' + esc(v.byEmail || '؟') + '</b> ' + esc(actionLabel(v.action)) +
           (isPersonAction ? ' «' + esc(v.personName || '') + '»' : '') +
           (v.detail ? ' <span style="color:var(--ink-soft);">(' + esc(v.detail) + ')</span>' : '') +
-          '<div style="color:var(--ink-soft); font-size:11px; margin-top:2px;">' + when + '</div>' +
+          '<div style="color:var(--ink-soft); font-size:11px; margin-top:2px;">' + (at ? timeAgo(at) : '') + '</div>' +
         '</div>';
       });
-      body.innerHTML = '<h3>📋 سجل النشاط</h3><div class="context">آخر ' + snap.size + ' نشاط</div>' + rows;
+      body.innerHTML = rows ? (header + rows) : (header + '<div class="context">لا يوجد نشاط اليوم.</div>');
     }catch(e){
       body.innerHTML = '<h3>📋 سجل النشاط</h3><div class="context">تعذّر تحميل السجل.</div>';
     }

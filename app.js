@@ -511,7 +511,10 @@
       root.spouseIds.push(sp.id);
       sp.spouseIds.push(root.id);
     }
-    if(!state.familyName || state.familyName === t('appName')){ state.familyName = t('familyPrefix') + name.split(' ')[0] + t('familySuffix'); }
+    if(!famNameOf() || famNameOf() === t('appName')){
+      var first = name.split(' ')[0];
+      state.familyName = { ar: t('familyPrefix')+first+t('familySuffix'), en: (window.ftTranslit?window.ftTranslit(first):first)+' Family' };
+    }
     scheduleSave(); render();
     logActivity('add', name);
   }
@@ -659,7 +662,7 @@
     el.innerHTML =
       (isRoot ? '<div class="root-badge">'+t('rootBadge')+'</div>' : '') +
       '<div class="avatar">'+avatarInner+'</div>' +
-      '<div class="name">'+escapeHtml(p.name)+'</div>' +
+      '<div class="name">'+escapeHtml(fullNameOf(p))+'</div>' +
       '<div class="gen-badge">'+genLabel(depth)+'</div>' +
       (age !== null ? '<div class="meta-line">🎂 '+ageText(age)+'</div>' : '') +
       (p.residence ? '<div class="meta-line">📍 '+escapeHtml(p.residence)+'</div>' : '') +
@@ -723,7 +726,7 @@
       /* Otherwise the banner keeps showing whatever family name was there before
          the tree was cleared (e.g. after "start a new tree") — a brand-new,
          empty tree should read as empty, not as a leftover of the old one. */
-      titleEl2.textContent = state.familyName || t('appName');
+      titleEl2.textContent = famNameOf() || t('appName');
       return;
     }
     emptyWrap.style.display = 'none'; canvas.style.display = 'block'; toolbar.style.display = 'flex';
@@ -731,12 +734,12 @@
     var treeRoot = document.getElementById('treeRoot');
     treeRoot.innerHTML = '';
     treeRoot.appendChild(renderUnit(state.rootId));
-    document.getElementById('familyTitle').textContent = state.familyName || t('appName');
+    document.getElementById('familyTitle').textContent = famNameOf() || t('appName');
     /* Title centered above the root couple, inside the canvas — so it scales and
        stays above the grandparents as the tree is zoomed. */
     var treeTitle = document.getElementById('treeTitle');
     if(treeTitle){
-      var famName = (state.familyName && state.familyName.trim()) ? state.familyName.trim() : '';
+      var famName = famNameOf().trim();
       // Always show the word "tree" so the screen reads clearly as a family TREE.
       treeTitle.textContent = famName ? (state.lang === 'en' ? (famName + ' Tree') : ('شجرة ' + famName)) : '';
     }
@@ -837,8 +840,8 @@
     if(!ids.length) return t('completionHintEmpty');
     for(var i=0;i<ids.length;i++){
       var p = ppl[ids[i]];
-      if(!p.photo) return tf('completionHintMissingPhoto', {name: escapeHtml(p.name)});
-      if(!p.birthDate) return tf('completionHintMissingBirth', {name: escapeHtml(p.name)});
+      if(!p.photo) return tf('completionHintMissingPhoto', {name: escapeHtml(fullNameOf(p))});
+      if(!p.birthDate) return tf('completionHintMissingBirth', {name: escapeHtml(fullNameOf(p))});
     }
     return t('completionHintDone');
   }
@@ -853,7 +856,7 @@
     var photos = ids.filter(function(id){ return ppl[id].photo; }).length;
     var complete = ids.filter(function(id){ return ppl[id].photo && ppl[id].birthDate; }).length;
     var pct = count ? Math.round((complete / count) * 100) : 0;
-    var fam = (state.familyName && state.familyName.trim()) ? state.familyName : t('unnamedFamily');
+    var fam = famNameOf().trim() ? famNameOf() : t('unnamedFamily');
     var hint = homeCompletionHint(ppl, ids);
 
     host.innerHTML =
@@ -901,12 +904,12 @@
       var q = this.value.trim().toLowerCase();
       resultsEl.innerHTML = '';
       if(!q) return;
-      var matches = ids.filter(function(id){ return String(ppl[id].name || '').toLowerCase().indexOf(q) !== -1; });
+      var matches = ids.filter(function(id){ return fullNameOf(ppl[id]).toLowerCase().indexOf(q) !== -1; });
       // Rank: the earlier the match sits in the name, the higher — so a person
       // whose FIRST name is the query (position 0) beats one who only carries it
       // in the nasab. Ties break alphabetically (Arabic-aware).
       matches.sort(function(a, b){
-        var na = String(ppl[a].name || '').toLowerCase(), nb = String(ppl[b].name || '').toLowerCase();
+        var na = fullNameOf(ppl[a]).toLowerCase(), nb = fullNameOf(ppl[b]).toLowerCase();
         var ia = na.indexOf(q), ib = nb.indexOf(q);
         if(ia !== ib) return ia - ib;
         return na.localeCompare(nb, 'ar');
@@ -914,7 +917,7 @@
       matches = matches.slice(0, 8);
       if(!matches.length){ resultsEl.innerHTML = '<div class="hs-empty">'+t('searchNoResults')+'</div>'; return; }
       resultsEl.innerHTML = matches.map(function(id){
-        return '<div class="hs-result" data-id="'+escapeHtml(id)+'"><span class="hs-av">'+(ppl[id].gender==='f'?'👩':'👨')+'</span>'+escapeHtml(ppl[id].name)+'</div>';
+        return '<div class="hs-result" data-id="'+escapeHtml(id)+'"><span class="hs-av">'+(ppl[id].gender==='f'?'👩':'👨')+'</span>'+escapeHtml(fullNameOf(ppl[id]))+'</div>';
       }).join('');
       resultsEl.querySelectorAll('.hs-result').forEach(function(r){ r.onclick = function(){ focusPerson(r.getAttribute('data-id')); }; });
     });
@@ -991,7 +994,7 @@
   function renderSettings(){
     var host = document.getElementById('tab-settings');
     if(!host) return;
-    var fam = (state.familyName && state.familyName.trim()) ? state.familyName : t('unnamedFamily');
+    var fam = famNameOf().trim() ? famNameOf() : t('unnamedFamily');
     var curTheme = ftReadTheme();
     var curFont = ftReadFontScale();
     var hasCloud = !!window.__ftCloud;
@@ -1149,14 +1152,14 @@
     var isEdit = mode === 'edit';
     var target = getPerson(targetId);
     var titleTxt = mode === 'child' ? t('addChildTitle') : (mode === 'spouse' ? t('addSpouseTitle') : t('editTitle'));
-    var contextTxt = mode === 'child' ? tf('contextChild', {name: escapeHtml(target.name)})
-      : mode === 'spouse' ? tf('contextSpouse', {name: escapeHtml(target.name)})
-      : tf('contextEdit', {name: escapeHtml(target.name)});
+    var contextTxt = mode === 'child' ? tf('contextChild', {name: escapeHtml(fullNameOf(target))})
+      : mode === 'spouse' ? tf('contextSpouse', {name: escapeHtml(fullNameOf(target))})
+      : tf('contextEdit', {name: escapeHtml(fullNameOf(target))});
 
     openSheet(
       '<h3>'+titleTxt+'</h3>'+
       '<div class="context">'+contextTxt+'</div>'+
-      '<div class="field"><label>'+(mode==='child' ? t('firstNameLabel') : t('nameLabel'))+'</label><input type="text" id="pf_name" placeholder="'+(mode==='child' ? t('firstNamePh') : t('namePh'))+'" value="'+(isEdit ? escapeHtml(target.name) : '')+'"></div>'+
+      '<div class="field"><label>'+(mode==='child' ? t('firstNameLabel') : t('nameLabel'))+'</label><input type="text" id="pf_name" placeholder="'+(mode==='child' ? t('firstNamePh') : t('namePh'))+'" value="'+(isEdit ? escapeHtml(firstNameOf(target)) : '')+'"></div>'+
       (mode==='child' ? '<div class="name-preview" id="pf_fullPreview"></div>' : '')+
       '<div class="field"><label>'+t('genderLabel')+'</label>'+
         '<div class="gender-toggle">'+
@@ -1217,7 +1220,7 @@
     var n = countDescendants(id);
     var warn = n > 0 ? tf('deleteWarnN', {n: n}) : t('deleteWarnNone');
     openSheet(
-      '<h3>'+tf('deleteTitle', {name: escapeHtml(p.name)})+'</h3>'+
+      '<h3>'+tf('deleteTitle', {name: escapeHtml(fullNameOf(p))})+'</h3>'+
       '<div class="confirm-box"><p>'+warn+'</p>'+
         '<div class="confirm-actions">'+
           '<button class="btn-cancel" id="cf_cancel">'+t('deleteCancel')+'</button>'+
@@ -1284,9 +1287,9 @@
     openSheet(
       '<h3>🔗 '+t('kinshipTitle')+'</h3>'+
       '<div class="kin-result">'+
-        '<div class="kin-name">'+dotB+'<b>'+escapeHtml(B.name)+'</b> <span class="kin-verb">'+verb+'</span></div>'+
+        '<div class="kin-name">'+dotB+'<b>'+escapeHtml(fullNameOf(B))+'</b> <span class="kin-verb">'+verb+'</span></div>'+
         '<div class="kin-term">'+escapeHtml(rel)+'</div>'+
-        '<div class="kin-name">'+t('kinshipTo')+' '+dotA+'<b>'+escapeHtml(A.name)+'</b></div>'+
+        '<div class="kin-name">'+t('kinshipTo')+' '+dotA+'<b>'+escapeHtml(fullNameOf(A))+'</b></div>'+
       '</div>'+
       '<button class="primary-btn" id="kin_close">'+t('kinshipClose')+'</button>'
     );
@@ -1323,7 +1326,9 @@
   var titleEl = document.getElementById('familyTitle');
   titleEl.addEventListener('blur', function(){
     var v = titleEl.textContent.trim() || t('appName');
-    state.familyName = v; titleEl.textContent = v; scheduleSave();
+    if(typeof state.familyName!=='object'||!state.familyName) state.familyName={ar:'',en:''};
+    state.familyName[state.lang] = v;
+    titleEl.textContent = v; scheduleSave();
   });
   titleEl.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); titleEl.blur(); } });
 
@@ -1381,7 +1386,7 @@
     var blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url; a.download = (state.familyName || t('appName')) + '.json';
+    a.href = url; a.download = (famNameOf() || t('appName')) + '.json';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast(t('toastBackup'));

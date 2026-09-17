@@ -369,8 +369,17 @@
   body.kinship-mode .card{ cursor:pointer; }
   body.kinship-mode .card:hover{ outline:2px solid var(--plum); outline-offset:2px; }
   body.kinship-mode .card .card-actions{ pointer-events:none; opacity:.5; }
-  .card.kin-selected{ outline:3px solid var(--plum); outline-offset:2px; box-shadow:0 0 0 6px rgba(122,72,105,.18); }
+  /* Two distinct selection colours: first pick = emerald, second = gold. */
+  .card.kin-a{ outline:3px solid var(--emerald); outline-offset:2px; box-shadow:0 0 0 7px rgba(15,91,75,.20); transition:box-shadow .15s ease; }
+  .card.kin-b{ outline:3px solid var(--gold); outline-offset:2px; box-shadow:0 0 0 7px rgba(184,134,45,.24); transition:box-shadow .15s ease; }
+  html.dark .card.kin-a{ box-shadow:0 0 0 7px rgba(46,139,114,.28); }
+  html.dark .card.kin-b{ box-shadow:0 0 0 7px rgba(214,169,74,.28); }
   .kin-result{ text-align:center; padding:14px 0 18px; }
-  .kin-result .kin-people{ font-size:15px; color:var(--ink-soft); line-height:1.9; }
-  .kin-result .kin-people b{ color:var(--ink); font-family:var(--f-head); font-size:17px; }
-  .kin-result .kin-term{ font-family:var(--f-head); font-size:30px; font-weight:700; color:var(--plum); margin:6px 0; }
+  .kin-result .kin-name{ font-size:15px; color:var(--ink-soft); line-height:2; }
+  .kin-result .kin-name b{ color:var(--ink); font-family:var(--f-head); font-size:18px; }
+  .kin-dot{ display:inline-block; width:11px; height:11px; border-radius:50%; vertical-align:middle; margin-inline-end:7px; }
+  .kin-dot-a{ background:var(--emerald); }
+  .kin-dot-b{ background:var(--gold); }
+  .kin-result .kin-term{ font-family:var(--f-head); font-size:32px; font-weight:700; color:var(--plum); margin:8px 0; }
+  html.dark .kin-result .kin-term{ color:var(--plum); }
+  .kin-result .kin-verb{ color:var(--ink-soft); font-family:var(--f-body); font-size:14px; }

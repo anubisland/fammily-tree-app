@@ -96,7 +96,7 @@
     kinshipCancel:{ar:'إلغاء', en:'Cancel'},
     kinshipTitle:{ar:'القرابة', en:'Relationship'},
     kinshipConnector:{ar:'قرابة', en:'relationship'},
-    kinshipTo:{ar:'إلى', en:'to'},
+    kinshipTo:{ar:'لـ', en:'to'},
     kinshipClose:{ar:'إغلاق', en:'Close'},
     unnamedFamily:{ar:'عائلتي', en:'My family'},
     homeSectionsEyebrow:{ar:'أقسام العائلة', en:'Sections'},
@@ -876,7 +876,7 @@
   var sheetBody = document.getElementById('sheetBody');
 
   function openSheet(html){ sheetBody.innerHTML = html; overlay.classList.add('open'); sheet.classList.add('open'); }
-  function closeSheet(){ overlay.classList.remove('open'); sheet.classList.remove('open'); pendingPhoto = undefined; }
+  function closeSheet(){ overlay.classList.remove('open'); sheet.classList.remove('open'); pendingPhoto = undefined; if(typeof clearKinHighlights==='function') clearKinHighlights(); }
   overlay.addEventListener('click', closeSheet);
 
   function photoRowHtml(existingPhoto){
@@ -1014,12 +1014,16 @@
     showTab('tree');
     updateKinshipBanner();
   }
-  function endKinship(){
+  function clearKinHighlights(){
+    document.querySelectorAll('.card.kin-a, .card.kin-b').forEach(function(c){ c.classList.remove('kin-a', 'kin-b'); });
+  }
+  function endKinship(keepHighlights){
     kinshipMode = false; kinshipA = null;
     document.body.classList.remove('kinship-mode');
     var el = document.getElementById('kinshipBanner'); if(el) el.remove();
-    document.querySelectorAll('.card.kin-selected').forEach(function(c){ c.classList.remove('kin-selected'); });
+    if(keepHighlights !== true) clearKinHighlights();
   }
+  function kinCard(id){ return document.querySelector('.card[data-id="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]'); }
   function updateKinshipBanner(){
     var el = document.getElementById('kinshipBanner');
     if(!el){
@@ -1034,25 +1038,30 @@
     if(!getPerson(id)) return;
     if(kinshipMode === 'pick1'){
       kinshipA = id; kinshipMode = 'pick2';
-      var card = document.querySelector('.card[data-id="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]');
-      if(card) card.classList.add('kin-selected');
+      var card = kinCard(id); if(card) card.classList.add('kin-a');
       updateKinshipBanner();
     } else if(kinshipMode === 'pick2'){
       if(id === kinshipA){ return; }
-      showKinshipResult(kinshipA, id);
-      endKinship();
+      var card2 = kinCard(id); if(card2) card2.classList.add('kin-b');
+      var aId = kinshipA;
+      endKinship(true);            // keep both highlights while the result shows
+      showKinshipResult(aId, id);
     }
   }
   function showKinshipResult(aId, bId){
     var A = getPerson(aId), B = getPerson(bId);
     var rel = (window.ftKinship ? window.ftKinship(state.people, aId, bId) : '');
-    var verb = B.gender === 'f' ? 'هي' : 'هو';   // «B» هي/هو [rel] لـ «A»
+    // Use the pronoun matching B's gender only (هو for male, هي for female):
+    //   «B»  هو/هي  ——  [term]  ——  لـ «A»
+    var verb = (state.lang === 'en') ? 'is' : (B.gender === 'f' ? 'هي' : 'هو');
+    var dotA = '<span class="kin-dot kin-dot-a"></span>';
+    var dotB = '<span class="kin-dot kin-dot-b"></span>';
     openSheet(
       '<h3>🔗 '+t('kinshipTitle')+'</h3>'+
       '<div class="kin-result">'+
-        '<div class="kin-people"><b>'+escapeHtml(B.name)+'</b> '+verb+'</div>'+
+        '<div class="kin-name">'+dotB+'<b>'+escapeHtml(B.name)+'</b> <span class="kin-verb">'+verb+'</span></div>'+
         '<div class="kin-term">'+escapeHtml(rel)+'</div>'+
-        '<div class="kin-people">'+t('kinshipTo')+' <b>'+escapeHtml(A.name)+'</b></div>'+
+        '<div class="kin-name">'+t('kinshipTo')+' '+dotA+'<b>'+escapeHtml(A.name)+'</b></div>'+
       '</div>'+
       '<button class="primary-btn" id="kin_close">'+t('kinshipClose')+'</button>'
     );

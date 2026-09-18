@@ -155,7 +155,7 @@
         var treeRef = doc(collection(db, 'trees'));
         var newCode = treeRef.id;
         // Tree doc FIRST: the members bootstrap rule reads trees/{id}.createdBy.
-        await setDoc(treeRef, { familyName:'', lang:'ar', rootId:null, people:{}, createdBy: cred2.user.uid, updatedAt: serverTimestamp() });
+        await setDoc(treeRef, { familyName:{ar:'',en:''}, lang:'ar', rootId:null, people:{}, createdBy: cred2.user.uid, updatedAt: serverTimestamp() });
         await setDoc(doc(db, 'trees', newCode, 'members', cred2.user.uid), { email: email, role: 'owner', joinedAt: serverTimestamp() });
         await setDoc(doc(db, 'users', cred2.user.uid), { email: email, treeId: newCode });
         currentUid = cred2.user.uid; currentTreeId = newCode;

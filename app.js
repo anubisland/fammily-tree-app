@@ -235,21 +235,16 @@
      Two-pass so a child's stripping of the father's name always uses the
      father's OLD (pre-migration) full name, regardless of processing order.
      Idempotent: any person whose name is already an object is left alone. */
+  /* Add an English name alongside the existing Arabic. The stored Arabic name is
+     the full nasab as typed and is kept EXACTLY as-is (no stripping) — the English
+     is a transliteration suggestion the user can edit. Idempotent (skips objects). */
   function migrateNames(state){
     var ppl = state.people || {};
-    var ids = Object.keys(ppl);
-    var oldFull = {};
-    ids.forEach(function(id){ if(typeof ppl[id].name === 'string') oldFull[id] = ppl[id].name; });
-    function father(p){ if(!p||!p.parentId) return null; var par=ppl[p.parentId]; if(!par) return null;
-      if(par.gender==='m') return par; var sp=par.spouseIds&&par.spouseIds[0]?ppl[par.spouseIds[0]]:null; return (sp&&sp.gender==='m')?sp:null; }
-    ids.forEach(function(id){
-      var p = ppl[id]; if(typeof p.name !== 'string') return;
-      var full = oldFull[id], f = father(p);
-      var fatherFull = f ? oldFull[f.id] : null;
-      var ownAr = (fatherFull && full.slice(-(fatherFull.length+1)) === (' '+fatherFull)) ? full.slice(0, full.length-fatherFull.length-1) : full;
-      p.name = { ar: ownAr, en: window.ftTranslit(ownAr) };
+    Object.keys(ppl).forEach(function(id){
+      var p = ppl[id];
+      if(typeof p.name === 'string') p.name = { ar: p.name, en: (window.ftTranslit ? window.ftTranslit(p.name) : p.name) };
     });
-    if(typeof state.familyName === 'string') state.familyName = { ar: state.familyName, en: window.ftTranslit(state.familyName) };
+    if(typeof state.familyName === 'string') state.familyName = { ar: state.familyName, en: (window.ftTranslit ? window.ftTranslit(state.familyName) : state.familyName) };
   }
 
   /* ============== Persistence ============== */
@@ -440,11 +435,11 @@
     var sp = spId ? getPerson(spId) : null;
     return (sp && sp.gender === 'm') ? sp : null;
   }
-  function fullNameOf(p){
-    var parts = [], cur = p, guard = 0;
-    while(cur && guard++ < 64){ parts.push(ownName(cur, state.lang)); cur = fatherOfPerson(cur); }
-    return parts.filter(Boolean).join(' ');
-  }
+  /* The stored name IS the full nasab (as the user typed it), in the current
+     language. We do NOT recompute it by walking the tree — hand-typed Arabic
+     nasab doesn't strip/re-append cleanly (mixed alef forms, merged words), and
+     doing so duplicated the ancestor chain. Store and show the name as-is. */
+  function fullNameOf(p){ return ownName(p, state.lang); }
   function famNameOf(){
     var f = state.familyName;
     if(typeof f === 'string') return f;
@@ -1197,7 +1192,15 @@
       var en = document.getElementById('pf_name_en').value.trim();
       if(!ar || !en){ toast(t('toastNameRequired')); return; }
       var nm = { ar: ar, en: en };
-      if(mode === 'child') addChild(childCtx.anchorId, nm, gender);
+      if(mode === 'child'){
+        // A child's stored name is the full nasab: first name + the father's full name.
+        var fAr = fatherPerson ? ownName(fatherPerson, 'ar') : '';
+        var fEn = fatherPerson ? ownName(fatherPerson, 'en') : '';
+        addChild(childCtx.anchorId, {
+          ar: (fAr ? (ar + ' ' + fAr) : ar).trim(),
+          en: (fEn ? (en + ' ' + fEn) : en).trim()
+        }, gender);
+      }
       else if(mode === 'spouse') addSpouse(targetId, nm, gender);
       else {
         updatePerson(targetId, {

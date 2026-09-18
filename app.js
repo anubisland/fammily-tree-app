@@ -45,6 +45,7 @@
     male:{ar:'ذكر', en:'Male'},
     female:{ar:'أنثى', en:'Female'},
     nameLabel:{ar:'الاسم *', en:'Name *'},
+    nameEnLabel:{ar:'الاسم (English) *', en:'Name (English) *'},
     namePh:{ar:'اكتب الاسم هنا', en:'Enter name'},
     genderLabel:{ar:'النوع', en:'Gender'},
     birthLabel:{ar:'تاريخ الميلاد (اختياري)', en:'Date of birth (optional)'},
@@ -429,6 +430,8 @@
     return n[lang] || n[lang === 'ar' ? 'en' : 'ar'] || '';
   }
   function firstNameOf(p){ return ownName(p, state.lang); }
+  // A readable string from a raw name value ({ar,en} or legacy string) — for logs.
+  function nameStr(nm){ return typeof nm === 'string' ? nm : (nm && (nm[state.lang] || nm.ar || nm.en)) || ''; }
   function fatherOfPerson(p){
     if(!p || !p.parentId) return null;
     var par = getPerson(p.parentId); if(!par) return null;
@@ -516,7 +519,7 @@
       state.familyName = { ar: t('familyPrefix')+first+t('familySuffix'), en: (window.ftTranslit?window.ftTranslit(first):first)+' Family' };
     }
     scheduleSave(); render();
-    logActivity('add', name);
+    logActivity('add', nameStr(name));
   }
 
   /* A blood-line member is the root or anyone with a parent in the tree; an
@@ -547,7 +550,7 @@
     state.people[child.id] = child;
     getPerson(parentId).childrenIds.push(child.id);
     scheduleSave(); render();
-    logActivity('add', name);
+    logActivity('add', nameStr(name));
   }
 
   function addSpouse(personId, name, gender){
@@ -556,13 +559,13 @@
     getPerson(personId).spouseIds.push(sp.id);
     sp.spouseIds.push(personId);
     scheduleSave(); render();
-    logActivity('add', name);
+    logActivity('add', nameStr(name));
   }
 
   function updatePerson(id, data){
     var p = getPerson(id);
     var changed = [];
-    if(p.name !== data.name) changed.push('الاسم');
+    if(JSON.stringify(p.name) !== JSON.stringify(data.name)) changed.push('الاسم');
     if(p.gender !== data.gender) changed.push('النوع');
     if((p.birthDate || null) !== (data.birthDate || null)) changed.push('تاريخ الميلاد');
     if((p.residence || '') !== (data.residence || '')) changed.push('مكان الإقامة');
@@ -573,7 +576,7 @@
     p.residence = data.residence || '';
     if(data.photo !== undefined) p.photo = data.photo;
     scheduleSave(); render();
-    if(changed.length){ logActivity('edit', data.name, changed.join('، ')); }
+    if(changed.length){ logActivity('edit', nameStr(data.name), changed.join('، ')); }
   }
 
   function countDescendants(id){
@@ -585,7 +588,7 @@
   function deletePerson(id){
     var p = getPerson(id);
     if(!p) return;
-    var deletedName = p.name;
+    var deletedName = nameStr(p.name);
     (p.childrenIds || []).slice().forEach(deletePerson);
     (p.spouseIds || []).forEach(function(sid){
       var sp = getPerson(sid);
@@ -1134,19 +1137,6 @@
     };
   }
 
-  /* Nasab auto-fill: a child's full name is the entered first name followed by
-     the father's full name (which already carries the chain to the surname),
-     e.g. parent "محمد الوزير" + "خالد" -> "خالد محمد الوزير". If the user typed
-     the full chain already, don't duplicate it. */
-  function buildFullName(first, parentName){
-    first = (first || '').trim().replace(/\s+/g, ' ');
-    parentName = (parentName || '').trim();
-    if(!first) return '';
-    if(!parentName) return first;
-    if(first === parentName) return first;
-    if(first.length >= parentName.length && first.slice(-parentName.length) === parentName) return first;
-    return first + ' ' + parentName;
-  }
 
   function openPersonForm(mode, targetId){
     var isEdit = mode === 'edit';
@@ -1159,7 +1149,8 @@
     openSheet(
       '<h3>'+titleTxt+'</h3>'+
       '<div class="context">'+contextTxt+'</div>'+
-      '<div class="field"><label>'+(mode==='child' ? t('firstNameLabel') : t('nameLabel'))+'</label><input type="text" id="pf_name" placeholder="'+(mode==='child' ? t('firstNamePh') : t('namePh'))+'" value="'+(isEdit ? escapeHtml(firstNameOf(target)) : '')+'"></div>'+
+      '<div class="field"><label>'+(mode==='child' ? t('firstNameLabel') : t('nameLabel'))+' (عربي)</label><input type="text" id="pf_name_ar" dir="rtl" placeholder="'+(mode==='child' ? t('firstNamePh') : t('namePh'))+'" value="'+(isEdit ? escapeHtml(ownName(target,'ar')) : '')+'"></div>'+
+      '<div class="field"><label>'+t('nameEnLabel')+'</label><input type="text" id="pf_name_en" dir="ltr" placeholder="e.g. Khaled" value="'+(isEdit ? escapeHtml(ownName(target,'en')) : '')+'"></div>'+
       (mode==='child' ? '<div class="name-preview" id="pf_fullPreview"></div>' : '')+
       '<div class="field"><label>'+t('genderLabel')+'</label>'+
         '<div class="gender-toggle">'+
@@ -1181,29 +1172,36 @@
     /* A child is nasab'd to the FATHER and attached to the couple's blood-line
        member (so it renders) — never to whichever card was tapped. */
     var childCtx = mode === 'child' ? coupleContext(targetId) : null;
-    var childFatherName = (childCtx && childCtx.fatherId) ? getPerson(childCtx.fatherId).name : '';
-    // Live full-name preview for a new child.
-    if(mode === 'child'){
-      var nameInput = document.getElementById('pf_name');
-      var preview = document.getElementById('pf_fullPreview');
-      var updatePreview = function(){
-        if(!childFatherName){ preview.textContent = t('childNeedsFather'); return; }
-        var full = buildFullName(nameInput.value, childFatherName);
-        preview.textContent = full ? (t('fullNamePreview') + ' ' + full) : '';
-      };
-      nameInput.addEventListener('input', updatePreview);
-      updatePreview();
+    var fatherPerson = (childCtx && childCtx.fatherId) ? getPerson(childCtx.fatherId) : null;
+    var arIn = document.getElementById('pf_name_ar');
+    var enIn = document.getElementById('pf_name_en');
+    // English follows the Arabic transliteration until the user edits it by hand.
+    var enTouched = isEdit && !!ownName(target, 'en');
+    enIn.addEventListener('input', function(){ enTouched = true; });
+    function refreshName(){
+      if(!enTouched) enIn.value = window.ftTranslit ? window.ftTranslit(arIn.value) : arIn.value;
+      if(mode === 'child'){
+        var preview = document.getElementById('pf_fullPreview'); if(!preview) return;
+        if(!fatherPerson){ preview.textContent = t('childNeedsFather'); return; }
+        var chain = fullNameOf(fatherPerson);            // father's full nasab (current language)
+        var full = [arIn.value.trim()].concat(chain ? chain.split(' ') : []).filter(Boolean).join(' ');
+        preview.textContent = arIn.value.trim() ? (t('fullNamePreview') + ' ' + full) : '';
+      }
     }
-    document.getElementById('pf_name').focus();
+    arIn.addEventListener('input', refreshName);
+    refreshName();
+    arIn.focus();
 
     document.getElementById('pf_save').onclick = function(){
-      var name = document.getElementById('pf_name').value.trim();
-      if(!name){ toast(t('toastNameRequired')); return; }
-      if(mode === 'child') addChild(childCtx.anchorId, buildFullName(name, childFatherName), gender);
-      else if(mode === 'spouse') addSpouse(targetId, name, gender);
+      var ar = document.getElementById('pf_name_ar').value.trim();
+      var en = document.getElementById('pf_name_en').value.trim();
+      if(!ar || !en){ toast(t('toastNameRequired')); return; }
+      var nm = { ar: ar, en: en };
+      if(mode === 'child') addChild(childCtx.anchorId, nm, gender);
+      else if(mode === 'spouse') addSpouse(targetId, nm, gender);
       else {
         updatePerson(targetId, {
-          name: name, gender: gender,
+          name: nm, gender: gender,
           birthDate: document.getElementById('pf_birth').value || null,
           residence: document.getElementById('pf_residence').value.trim(),
           photo: pendingPhoto

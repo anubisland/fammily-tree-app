@@ -16,7 +16,7 @@
     G.__ftDateHelpers = (function(){
       function parseD(s){ if(!s) return null; var d=new Date(s); return isNaN(d.getTime())?null:d; }
       function greg(s,lang){ var d=parseD(s); if(!d) return ''; try{ return new Intl.DateTimeFormat(lang==='en'?'en-GB':'ar',{day:'numeric',month:'long',year:'numeric'}).format(d);}catch(e){return s;} }
-      function hijri(s,lang){ var d=parseD(s); if(!d) return ''; try{ var loc=(lang==='en'?'en-US':'ar-SA')+'-u-ca-islamic-umalqura'; return new Intl.DateTimeFormat(loc,{day:'numeric',month:'long',year:'numeric'}).format(d)+(lang==='en'?' AH':'هـ'); }catch(e){return '';} }
+      function hijri(s,lang){ var d=parseD(s); if(!d) return ''; try{ var loc=(lang==='en'?'en-US':'ar-SA')+'-u-ca-islamic-umalqura'; return new Intl.DateTimeFormat(loc,{day:'numeric',month:'long',year:'numeric',era:'short'}).format(d); }catch(e){return '';} }
       function age(b,ref){ var bd=parseD(b); if(!bd) return null; var r=ref?parseD(ref):new Date(); if(!r) return null; var a=r.getFullYear()-bd.getFullYear(); var m=r.getMonth()-bd.getMonth(); if(m<0||(m===0&&r.getDate()<bd.getDate())) a--; return a<0?null:a; }
       return {
         gregText:function(s,l){return greg(s,l||'ar');},
@@ -66,6 +66,16 @@
     birthLabel:{ar:'تاريخ الميلاد (اختياري)', en:'Date of birth (optional)'},
     deathLabel:{ar:'تاريخ الوفاة (اختياري)', en:'Date of death (optional)'},
     inMemory:{ar:'رحمه الله', en:'In memory'},
+    profileBirth:{ar:'الميلاد', en:'Born'},
+    profileDeath:{ar:'الوفاة', en:'Died'},
+    profileAge:{ar:'العمر', en:'Age'},
+    relFather:{ar:'الأب', en:'Father'},
+    relMother:{ar:'الأم', en:'Mother'},
+    relSpouse:{ar:'الزوج/الزوجة', en:'Spouse'},
+    relChildren:{ar:'الأبناء', en:'Children'},
+    profileEdit:{ar:'تعديل', en:'Edit'},
+    profileAddChild:{ar:'إضافة ابن/ابنة', en:'Add child'},
+    profileKinship:{ar:'القرابة', en:'Kinship'},
     residenceLabel:{ar:'مكان الإقامة (اختياري)', en:'Place of residence (optional)'},
     residencePh:{ar:'مثال: القاهرة، مصر', en:'e.g. Cairo, Egypt'},
     photoLabel:{ar:'الصورة الشخصية (اختياري)', en:'Photo (optional)'},
@@ -453,6 +463,14 @@
     var sp = spId ? getPerson(spId) : null;
     return (sp && sp.gender === 'm') ? sp : null;
   }
+  function motherOfPerson(p){
+    if(!p || !p.parentId) return null;
+    var par = getPerson(p.parentId); if(!par) return null;
+    if(par.gender === 'f') return par;                  // parent is the mother
+    var spId = par.spouseIds && par.spouseIds[0];       // parent is father -> mother = his wife
+    var sp = spId ? getPerson(spId) : null;
+    return (sp && sp.gender === 'f') ? sp : null;
+  }
   /* The stored name IS the full nasab (as the user typed it), in the current
      language. We do NOT recompute it by walking the tree — hand-typed Arabic
      nasab doesn't strip/re-append cleanly (mixed alef forms, merged words), and
@@ -492,7 +510,7 @@
     var d = parseDate(str); if(!d) return '';
     try {
       var loc = (state.lang === 'en' ? 'en-US' : 'ar-SA') + '-u-ca-islamic-umalqura';
-      return new Intl.DateTimeFormat(loc, { day:'numeric', month:'long', year:'numeric' }).format(d) + (state.lang === 'en' ? ' AH' : 'هـ');
+      return new Intl.DateTimeFormat(loc, { day:'numeric', month:'long', year:'numeric', era:'short' }).format(d);
     } catch(e){ return ''; }
   }
   function fmtDate(str){ var g = gregText(str), h = hijriText(str); return g ? (h ? (g + ' — ' + h) : g) : ''; }
@@ -1187,6 +1205,53 @@
   }
 
 
+  /* ---- Person profile sheet (tap a card) ---- */
+  function relRow(labelKey, people){
+    var items = (people || []).filter(Boolean);
+    if(!items.length) return '';
+    var chips = items.map(function(pp){
+      return '<button class="rel-chip" data-profile="'+escapeHtml(pp.id)+'">'+escapeHtml(fullNameOf(pp))+'</button>';
+    }).join('');
+    return '<div class="prof-rel"><span class="prof-rel-lbl">'+t(labelKey)+'</span><div class="prof-rel-chips">'+chips+'</div></div>';
+  }
+  function openProfile(id){
+    var p = getPerson(id); if(!p) return;
+    var other = ownName(p, state.lang === 'ar' ? 'en' : 'ar');
+    var deceased = !!p.deathDate;
+    var av = p.photo ? '<img src="'+escapeHtml(p.photo)+'" alt="">' : (p.gender==='f' ? '👩' : '👨');
+    var lines = '';
+    if(p.birthDate) lines += '<div class="prof-line">🎂 <b>'+t('profileBirth')+':</b> '+escapeHtml(fmtDate(p.birthDate))+
+      (!deceased && ageYears(p.birthDate)!==null ? ' <span class="prof-dim">('+t('profileAge')+' '+escapeHtml(ageText(ageYears(p.birthDate)))+')</span>' : '')+'</div>';
+    if(deceased) lines += '<div class="prof-line">🕊 <b>'+t('profileDeath')+':</b> '+escapeHtml(fmtDate(p.deathDate))+' · '+t('inMemory')+
+      (lifespanText(p.birthDate,p.deathDate) ? ' <span class="prof-dim">('+escapeHtml(lifespanText(p.birthDate,p.deathDate))+')</span>' : '')+'</div>';
+    if(p.residence) lines += '<div class="prof-line">📍 '+escapeHtml(p.residence)+'</div>';
+    var spouses = (p.spouseIds||[]).map(getPerson);
+    var children = (p.childrenIds||[]).map(getPerson);
+    var actions = canEditCloud
+      ? '<button class="primary-btn" id="prof_edit">✎ '+t('profileEdit')+'</button>'+
+        '<button class="primary-btn" id="prof_addchild" style="background:var(--teal);">＋ '+t('profileAddChild')+'</button>'
+      : '';
+    openSheet(
+      '<div class="prof-head"><div class="prof-av">'+av+'</div>'+
+        '<div><div class="prof-name">'+escapeHtml(fullNameOf(p))+'</div>'+
+        (other ? '<div class="prof-name-alt">'+escapeHtml(other)+'</div>' : '')+
+        '<div class="gen-badge">'+genLabel(genOfPerson(id))+'</div></div></div>'+
+      '<div class="prof-body">'+ (lines||'') +
+        relRow('relFather', [fatherOfPerson(p)]) +
+        relRow('relMother', [motherOfPerson(p)]) +
+        relRow('relSpouse', spouses) +
+        relRow('relChildren', children) +
+      '</div>'+
+      '<div class="prof-actions">'+actions+
+        '<button class="primary-btn" id="prof_kin" style="background:var(--plum);">🔗 '+t('profileKinship')+'</button>'+
+      '</div>'
+    );
+    sheetBody.querySelectorAll('[data-profile]').forEach(function(b){ b.onclick = function(){ openProfile(b.getAttribute('data-profile')); }; });
+    var pe = document.getElementById('prof_edit'); if(pe) pe.onclick = function(){ openPersonForm('edit', id); };
+    var pa = document.getElementById('prof_addchild'); if(pa) pa.onclick = function(){ openPersonForm('child', id); };
+    document.getElementById('prof_kin').onclick = function(){ closeSheet(); startKinship(); };
+  }
+
   function openPersonForm(mode, targetId){
     var isEdit = mode === 'edit';
     var target = getPerson(targetId);
@@ -1361,7 +1426,12 @@
       return;
     }
     var btn = e.target.closest('[data-act]');
-    if(!btn) return;
+    if(!btn){
+      // Tapping the card body (not an action control) opens the person profile.
+      var card = e.target.closest('.card');
+      if(card && card.dataset.id) openProfile(card.dataset.id);
+      return;
+    }
     var act = btn.dataset.act, id = btn.dataset.id;
     if(act === 'child') openPersonForm('child', id);
     else if(act === 'spouse') openPersonForm('spouse', id);

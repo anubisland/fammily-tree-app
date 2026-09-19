@@ -5,12 +5,27 @@
   // Runs before any DOM access so `require('./app.js')` works under node
   // (see scripts/names.test.cjs).
   if(typeof document === 'undefined'){
-    (typeof global !== 'undefined' ? global : this).__ftComputeFullName = function(people, id, lang){
+    var G = (typeof global !== 'undefined' ? global : this);
+    G.__ftComputeFullName = function(people, id, lang){
       function own(p){ var n=p&&p.name; if(typeof n==='string') return n; if(!n) return ''; return n[lang]||n[lang==='ar'?'en':'ar']||''; }
       function father(p){ if(!p||!p.parentId) return null; var par=people[p.parentId]; if(!par) return null;
         if(par.gender==='m') return par; var sp=par.spouseIds&&par.spouseIds[0]?people[par.spouseIds[0]]:null; return (sp&&sp.gender==='m')?sp:null; }
       var parts=[], cur=people[id], guard=0; while(cur&&guard++<64){ parts.push(own(cur)); cur=father(cur); } return parts.filter(Boolean).join(' ');
     };
+    // Date helpers mirror the runtime ones below (kept in sync); exposed for scripts/dates.test.cjs.
+    G.__ftDateHelpers = (function(){
+      function parseD(s){ if(!s) return null; var d=new Date(s); return isNaN(d.getTime())?null:d; }
+      function greg(s,lang){ var d=parseD(s); if(!d) return ''; try{ return new Intl.DateTimeFormat(lang==='en'?'en-GB':'ar',{day:'numeric',month:'long',year:'numeric'}).format(d);}catch(e){return s;} }
+      function hijri(s,lang){ var d=parseD(s); if(!d) return ''; try{ var loc=(lang==='en'?'en-US':'ar-SA')+'-u-ca-islamic-umalqura'; return new Intl.DateTimeFormat(loc,{day:'numeric',month:'long',year:'numeric'}).format(d)+(lang==='en'?' AH':'هـ'); }catch(e){return '';} }
+      function age(b,ref){ var bd=parseD(b); if(!bd) return null; var r=ref?parseD(ref):new Date(); if(!r) return null; var a=r.getFullYear()-bd.getFullYear(); var m=r.getMonth()-bd.getMonth(); if(m<0||(m===0&&r.getDate()<bd.getDate())) a--; return a<0?null:a; }
+      return {
+        gregText:function(s,l){return greg(s,l||'ar');},
+        hijriText:function(s,l){return hijri(s,l||'ar');},
+        fmtDate:function(s,l){l=l||'ar'; var g=greg(s,l),h=hijri(s,l); return g?(h?(g+' — '+h):g):'';},
+        ageYears:age,
+        lifespanText:function(b,d,l){var n=age(b,d); if(n===null||!d) return ''; return (l==='en')?('lived '+n+' years'):('عاش '+n+' سنة');}
+      };
+    })();
     return;   // don't run the DOM app under node
   }
 
@@ -221,11 +236,12 @@
   function newPerson(name, gender, parentId){
     return { id: uid(), name: name, gender: gender, parentId: parentId || null,
       spouseIds: [], childrenIds: [], collapsed: false,
-      birthDate: null, residence: '', photo: null };
+      birthDate: null, deathDate: null, residence: '', photo: null };
   }
 
   function migratePerson(p){
     if(p.birthDate === undefined) p.birthDate = null;
+    if(p.deathDate === undefined) p.deathDate = null;
     if(p.residence === undefined) p.residence = '';
     if(p.photo === undefined) p.photo = null;
     return p;
@@ -459,6 +475,37 @@
     var m = today.getMonth() - b.getMonth();
     if(m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
     return age >= 0 ? age : null;
+  }
+
+  /* Date helpers: show every date in Gregorian AND Hijri (Umm al-Qura) using the
+     browser's Intl — no libraries. If a runtime lacks the Islamic calendar,
+     hijriText returns '' (try/catch) and only the Gregorian date shows. */
+  function parseDate(str){ if(!str) return null; var d = new Date(str); return isNaN(d.getTime()) ? null : d; }
+  function gregText(str){
+    var d = parseDate(str); if(!d) return '';
+    try { return new Intl.DateTimeFormat(state.lang === 'en' ? 'en-GB' : 'ar', { day:'numeric', month:'long', year:'numeric' }).format(d); }
+    catch(e){ return str; }
+  }
+  function hijriText(str){
+    var d = parseDate(str); if(!d) return '';
+    try {
+      var loc = (state.lang === 'en' ? 'en-US' : 'ar-SA') + '-u-ca-islamic-umalqura';
+      return new Intl.DateTimeFormat(loc, { day:'numeric', month:'long', year:'numeric' }).format(d) + (state.lang === 'en' ? ' AH' : 'هـ');
+    } catch(e){ return ''; }
+  }
+  function fmtDate(str){ var g = gregText(str), h = hijriText(str); return g ? (h ? (g + ' — ' + h) : g) : ''; }
+  function ageYears(birthStr, refStr){
+    var b = parseDate(birthStr); if(!b) return null;
+    var ref = refStr ? parseDate(refStr) : new Date(); if(!ref) return null;
+    var a = ref.getFullYear() - b.getFullYear();
+    var m = ref.getMonth() - b.getMonth();
+    if(m < 0 || (m === 0 && ref.getDate() < b.getDate())) a--;
+    return a < 0 ? null : a;
+  }
+  function lifespanText(birthStr, deathStr){
+    var n = ageYears(birthStr, deathStr);
+    if(n === null || !deathStr) return '';
+    return state.lang === 'en' ? ('lived ' + n + ' years') : ('عاش ' + n + ' سنة');
   }
 
   function toast(msg){

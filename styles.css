@@ -126,6 +126,26 @@
   .card.female .avatar{background: linear-gradient(155deg, var(--gold), #8f6620); color:#FCF6E6;}
   .card .avatar img{width:100%; height:100%; object-fit:cover;}
   .card .name{font-size:13.5px; font-weight:700; line-height:1.35; word-break:break-word;}
+  .card.deceased{ opacity:.94; }
+  .card.deceased .avatar{ filter:grayscale(.35); }
+  .card .mem-tag{ font-size:10px; color:var(--ink-soft); margin:2px 0 3px; font-family:var(--f-body); }
+
+  /* ---- Person profile sheet ---- */
+  .prof-head{ display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+  .prof-av{ width:56px; height:56px; border-radius:50%; overflow:hidden; background:var(--ic-chip); border:2px solid var(--gold); display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; }
+  .prof-av img{ width:100%; height:100%; object-fit:cover; }
+  .prof-name{ font-family:var(--f-head); font-size:19px; font-weight:700; color:var(--ink); line-height:1.25; }
+  .prof-name-alt{ font-size:13px; color:var(--ink-soft); }
+  .prof-body{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  .prof-line{ font-size:13.5px; color:var(--ink); }
+  .prof-dim{ color:var(--ink-soft); font-size:12px; }
+  .prof-rel{ display:flex; gap:8px; align-items:flex-start; padding-top:8px; border-top:1px solid var(--line); }
+  .prof-rel-lbl{ font-size:12.5px; color:var(--ink-soft); min-width:64px; padding-top:6px; }
+  .prof-rel-chips{ display:flex; flex-wrap:wrap; gap:6px; flex:1; }
+  .rel-chip{ background:var(--card); border:1px solid var(--line); border-radius:999px; padding:6px 12px; font-size:12.5px; color:var(--emerald); font-family:var(--f-body); cursor:pointer; }
+  .rel-chip:active{ transform:scale(.97); }
+  .prof-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+  .prof-actions .primary-btn{ flex:1; min-width:120px; }
   .card .gen-badge{ font-size:9.5px; color:var(--ink-soft); background:var(--paper); border-radius:6px; padding:1px 6px; display:inline-block; margin-top:4px;}
   .card .meta-line{ font-size:10.5px; color:var(--ink-soft); margin-top:3px; display:flex; align-items:center; justify-content:center; gap:3px;}
   .card .root-badge{ position:absolute; top:-9px; inset-inline-end:-6px; background:var(--gold); color:#3a2a08; font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:8px; box-shadow:var(--shadow);}

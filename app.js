@@ -64,6 +64,8 @@
     namePh:{ar:'اكتب الاسم هنا', en:'Enter name'},
     genderLabel:{ar:'النوع', en:'Gender'},
     birthLabel:{ar:'تاريخ الميلاد (اختياري)', en:'Date of birth (optional)'},
+    deathLabel:{ar:'تاريخ الوفاة (اختياري)', en:'Date of death (optional)'},
+    inMemory:{ar:'رحمه الله', en:'In memory'},
     residenceLabel:{ar:'مكان الإقامة (اختياري)', en:'Place of residence (optional)'},
     residencePh:{ar:'مثال: القاهرة، مصر', en:'e.g. Cairo, Egypt'},
     photoLabel:{ar:'الصورة الشخصية (اختياري)', en:'Photo (optional)'},
@@ -610,11 +612,13 @@
     if(JSON.stringify(p.name) !== JSON.stringify(data.name)) changed.push('الاسم');
     if(p.gender !== data.gender) changed.push('النوع');
     if((p.birthDate || null) !== (data.birthDate || null)) changed.push('تاريخ الميلاد');
+    if((p.deathDate || null) !== (data.deathDate || null)) changed.push('تاريخ الوفاة');
     if((p.residence || '') !== (data.residence || '')) changed.push('مكان الإقامة');
     if(data.photo !== undefined && p.photo !== data.photo) changed.push('الصورة');
 
     p.name = data.name; p.gender = data.gender;
     p.birthDate = data.birthDate || null;
+    if(data.deathDate !== undefined) p.deathDate = data.deathDate || null;
     p.residence = data.residence || '';
     if(data.photo !== undefined) p.photo = data.photo;
     scheduleSave(); render();
@@ -690,11 +694,13 @@
     var depth = genOfPerson(id);
     var isRoot = id === state.rootId;
     var el = document.createElement('div');
-    el.className = 'card ' + (p.gender === 'f' ? 'female' : 'male');
+    var deceased = !!p.deathDate;
+    el.className = 'card ' + (p.gender === 'f' ? 'female' : 'male') + (deceased ? ' deceased' : '');
     el.style.borderTopColor = genColors[depth % genColors.length];
     el.dataset.id = id;
     var childCount = p.childrenIds.length;
     var age = calcAge(p.birthDate);
+    var lifespan = deceased ? lifespanText(p.birthDate, p.deathDate) : '';
     var avatarInner = p.photo ? '<img src="'+escapeHtml(p.photo)+'" alt="">' : (p.gender==='f' ? '👩' : '👨');
     var siblingInfo = null;
     if(p.parentId){
@@ -708,8 +714,9 @@
       (isRoot ? '<div class="root-badge">'+t('rootBadge')+'</div>' : '') +
       '<div class="avatar">'+avatarInner+'</div>' +
       '<div class="name">'+escapeHtml(fullNameOf(p))+'</div>' +
+      (deceased ? '<div class="mem-tag">🕊 '+t('inMemory')+(lifespan ? ' · '+escapeHtml(lifespan) : '')+'</div>' : '') +
       '<div class="gen-badge">'+genLabel(depth)+'</div>' +
-      (age !== null ? '<div class="meta-line">🎂 '+ageText(age)+'</div>' : '') +
+      (!deceased && age !== null ? '<div class="meta-line">🎂 '+ageText(age)+'</div>' : '') +
       (p.residence ? '<div class="meta-line">📍 '+escapeHtml(p.residence)+'</div>' : '') +
       (canEditCloud ? (
       '<div class="card-actions">' +
@@ -1202,6 +1209,7 @@
       '</div>'+
       (isEdit ? photoRowHtml(target.photo) : '') +
       (isEdit ? '<div class="field"><label>'+t('birthLabel')+'</label><input type="date" id="pf_birth" value="'+escapeHtml(target.birthDate||'')+'"></div>' : '') +
+      (isEdit ? '<div class="field"><label>'+t('deathLabel')+'</label><input type="date" id="pf_death" value="'+escapeHtml(target.deathDate||'')+'"></div>' : '') +
       (isEdit ? '<div class="field"><label>'+t('residenceLabel')+'</label><input type="text" id="pf_residence" placeholder="'+t('residencePh')+'" value="'+escapeHtml(target.residence||'')+'"></div>' : '') +
       (mode === 'child' ? '<div class="keep-open-row"><input type="checkbox" id="pf_keep" checked><label for="pf_keep">'+t('keepAdding')+'</label></div>' : '') +
       '<button class="primary-btn" id="pf_save">'+t('saveBtn')+'</button>'
@@ -1253,6 +1261,7 @@
         updatePerson(targetId, {
           name: nm, gender: gender,
           birthDate: document.getElementById('pf_birth').value || null,
+          deathDate: document.getElementById('pf_death').value || null,
           residence: document.getElementById('pf_residence').value.trim(),
           photo: pendingPhoto
         });

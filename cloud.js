@@ -29,6 +29,11 @@
   var pushTimer = null;
   var MAX_DOC_BYTES = 900000; // safety margin under Firestore's 1MB document limit
 
+  /* Translation bridge to app.js (this module can't see app.js's IIFE scope).
+     Falls back to the key so a missing bridge never throws. */
+  function t(key){ return (window.__ftT ? window.__ftT(key) : key); }
+  function tf(key, vars){ return (window.__ftTf ? window.__ftTf(key, vars) : key); }
+
   var authGate = document.getElementById('authGate');
   /* The banner cloud/sync button was removed (its account + sync actions live in
      Settings now). Keep a null-safe stand-in so the many cloudBtn.* references

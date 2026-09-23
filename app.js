@@ -759,33 +759,8 @@
     return el;
   }
 
-  /* Reverse parent index, rebuilt each render: parentId -> [childIds] taken from
-     every person's own parentId. It heals "one-way" links where a child's
-     parentId is set but the parent's childrenIds array lost the back-reference
-     (a desync that otherwise makes the child — and its whole branch — vanish). */
-  var reverseChildren = {};
-  function buildReverseChildren(){
-    reverseChildren = {};
-    Object.keys(state.people).forEach(function(k){
-      var pid = state.people[k].parentId;
-      if(pid && getPerson(pid)) (reverseChildren[pid] = reverseChildren[pid] || []).push(k);
-    });
-  }
-  // A person's children = their childrenIds UNION anyone who names them as parent,
-  // in childrenIds order first, de-duped against `seen` (shared across the couple).
-  function childrenOfHealed(id, seen){
-    var out = [];
-    function add(c){ if(c && getPerson(c) && !seen[c]){ seen[c] = true; out.push(c); } }
-    (getPerson(id).childrenIds || []).forEach(add);
-    (reverseChildren[id] || []).forEach(add);
-    return out;
-  }
-
-  var renderedUnits = {};   // guards against cycles and rendering a unit twice
   function renderUnit(id){
     var p = getPerson(id);
-    if(!p || renderedUnits[id]) return null;
-    renderedUnits[id] = true;
     var unit = document.createElement('div');
     unit.className = 'unit';
     var couple = document.createElement('div');
@@ -794,16 +769,11 @@
     couple.appendChild(personCard(id));
     p.spouseIds.forEach(function(sid){ if(getPerson(sid)) couple.appendChild(personCard(sid)); });
     unit.appendChild(couple);
-    // Children of the couple: the primary's children AND any hung off a spouse
-    // (an in-law), so children attached to the married-in partner still appear.
-    var seen = {};
-    var kids = childrenOfHealed(id, seen);
-    p.spouseIds.forEach(function(sid){ if(getPerson(sid)) kids = kids.concat(childrenOfHealed(sid, seen)); });
-    if(kids.length > 0){
+    if(p.childrenIds.length > 0){
       var row = document.createElement('div');
       row.className = 'children-row' + (p.collapsed ? ' collapsed' : '');
       row.dataset.parentUnit = id;
-      kids.forEach(function(cid){ var cu = renderUnit(cid); if(cu) row.appendChild(cu); });
+      p.childrenIds.forEach(function(cid){ if(getPerson(cid)) row.appendChild(renderUnit(cid)); });
       unit.appendChild(row);
     }
     return unit;
@@ -836,8 +806,6 @@
 
     var treeRoot = document.getElementById('treeRoot');
     treeRoot.innerHTML = '';
-    buildReverseChildren();
-    renderedUnits = {};
     treeRoot.appendChild(renderUnit(state.rootId));
     document.getElementById('familyTitle').textContent = famNameOf() || t('appName');
     /* Title centered above the root couple, inside the canvas — so it scales and

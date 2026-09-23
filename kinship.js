@@ -146,6 +146,14 @@
       if(term.indexOf('أخت') === 0) return 'الأخت';
       return term;
     }
+    // Construct (إضافة) form: drop the leading "ال" from the LAST word so a term
+    // like "ابن العم" reads naturally before "الزوج" -> "ابن عم الزوج".
+    function construct(term){
+      var w = String(term).split(' ');
+      var last = w[w.length - 1];
+      if(last.indexOf('ال') === 0) w[w.length - 1] = last.slice(2);
+      return w.join(' ');
+    }
 
     function relate(aId, bId){
       if(aId === bId) return 'الشخص نفسه';
@@ -167,7 +175,7 @@
           var sw = gender(sA) === 'f' ? 'الزوجة' : 'الزوج';
           if(rb.indexOf('أخت') === 0) return 'أخت ' + sw;
           if(rb.indexOf('أخ') === 0) return 'أخو ' + sw;
-          return rb + ' ' + sw;
+          return construct(rb) + ' ' + sw;   // e.g. "ابن العم" -> "ابن عم الزوج"
         }
       }
       // A is a blood relative of B's spouse
@@ -180,14 +188,18 @@
           return (gender(bId) === 'f' ? 'زوجة ' : 'زوج ') + genitive(ra);
         }
       }
-      // A and B are each married, and their two spouses are blood siblings —
-      // classically married to two brothers/sisters: سِلفة (two wives) / عديل (two husbands).
+      // A and B are each married, and their two spouses are blood relatives.
+      // Siblings -> سِلفة (two wives) / عديل (two husbands); otherwise a descriptive
+      // phrase, e.g. wives of two paternal cousins -> «زوجة ابن عم الزوج».
       if(sA && sB && sA !== sB){
         var rr = bloodRelation(sA, sB);                 // how B's spouse relates to A's spouse
-        if(rr && rr.indexOf('أخ') === 0){               // أخ / أخت / أخ لأب / أخت لأم …
-          if(gender(aId) === 'f' && gender(bId) === 'f') return 'سِلفة';  // two women married to brothers
-          if(gender(aId) === 'm' && gender(bId) === 'm') return 'عديل';   // two men married to sisters
-          return gender(bId) === 'f' ? 'زوجة قريب' : 'زوج قريبة';        // mixed: spouse of A's in-law sibling
+        if(rr){
+          if(rr.indexOf('أخ') === 0){                   // spouses are siblings
+            if(gender(aId) === 'f' && gender(bId) === 'f') return 'سِلفة';
+            if(gender(aId) === 'm' && gender(bId) === 'm') return 'عديل';
+          }
+          var connector = gender(sA) === 'm' ? 'الزوج' : 'الزوجة';   // A's spouse
+          return (gender(bId) === 'f' ? 'زوجة ' : 'زوج ') + construct(rr) + ' ' + connector;
         }
       }
       return 'قرابة بعيدة';

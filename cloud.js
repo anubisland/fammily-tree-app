@@ -348,7 +348,12 @@
           ) : '') +
         '</div>';
       });
-      body.innerHTML = '<h3>👥 أفراد العائلة (' + snap.size + ')</h3>' + rows;
+      var inviteBtn = (currentRole === 'owner' && createInvite)
+        ? '<button class="primary-btn" id="mem_invite" style="margin-top:14px; background:var(--teal);">＋ '+t('menuInvite')+'</button>'
+        : '';
+      body.innerHTML = '<h3>👥 أفراد العائلة (' + snap.size + ')</h3>' + rows + inviteBtn;
+      var mi = document.getElementById('mem_invite');
+      if(mi) mi.onclick = function(){ createInvite('editor'); };
       body.querySelectorAll('[data-mact="role"]').forEach(function(btn){
         btn.onclick = async function(){
           var uid = btn.dataset.uid, newRole = btn.dataset.newrole;

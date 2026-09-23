@@ -154,6 +154,7 @@
     cardMembersSub:{ar:'إدارة صلاحيات الأفراد', en:'Manage member permissions'},
     searchPlaceholder:{ar:'🔍 ابحث عن فرد بالاسم…', en:'🔍 Search a person by name…'},
     searchNoResults:{ar:'لا توجد نتائج', en:'No matches'},
+    personNotShown:{ar:'هذا الشخص غير ظاهر في الشجرة (قد يكون غير مرتبط) — أخبرني لأساعدك', en:'This person is not shown on the tree (may be disconnected)'},
     statPhotos:{ar:'صورة', en:'Photos'},
     completionTitle:{ar:'اكتمال الملفات', en:'Profile completeness'},
     completionHintMissingPhoto:{ar:'«{name}» بلا صورة', en:'"{name}" has no photo'},
@@ -994,15 +995,22 @@
   }
   /* Jump to a person's card on the tree and flash it. */
   function focusPerson(id){
+    var p = getPerson(id);
+    if(!p){ toast(t('personNotShown')); return; }
+    // Expand any collapsed ancestor so the target actually becomes visible
+    // (collapsed branches render hidden, so scrolling to them does nothing).
+    var changed = false, cur = getPerson(p.parentId), guard = 0;
+    while(cur && guard++ < 128){ if(cur.collapsed){ cur.collapsed = false; changed = true; } cur = getPerson(cur.parentId); }
+    if(changed){ scheduleSave(); render(); }
     showTab('tree');
     setTimeout(function(){
       var sel = '.card[data-id="'+(window.CSS && CSS.escape ? CSS.escape(id) : id)+'"]';
       var card = document.querySelector(sel);
-      if(!card) return;
+      if(!card){ toast(t('personNotShown')); return; }   // disconnected/orphan record
       card.scrollIntoView({ behavior:'smooth', block:'center', inline:'center' });
       card.classList.add('kin-a');
       setTimeout(function(){ card.classList.remove('kin-a'); }, 1800);
-    }, 80);
+    }, 120);
   }
   window.__ftRenderHome = renderHome;
 

@@ -203,6 +203,8 @@
     Object.keys(vars||{}).forEach(function(k){ s = s.replace('{'+k+'}', vars[k]); });
     return s;
   }
+  // Expose translation to the cloud.js ES module (which can't see this IIFE scope).
+  window.__ftT = t; window.__ftTf = tf;
   function genLabel(depth){
     var arr = genLabelsMap[state.lang];
     return arr[depth] || (t('statGenerations') + ' ' + (depth+1));

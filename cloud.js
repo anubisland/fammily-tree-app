@@ -67,9 +67,18 @@
       'auth/invalid-credential':'البريد أو كلمة المرور غير صحيحة',
       'auth/email-already-in-use':'هذا البريد مستخدم بالفعل — جرّب تسجيل الدخول',
       'auth/weak-password':'كلمة المرور ضعيفة جدًا (6 أحرف على الأقل)',
-      'auth/network-request-failed':'تعذّر الاتصال بالإنترنت'
+      'auth/network-request-failed':'تعذّر الاتصال بالإنترنت',
+      'auth/too-many-requests':'محاولات كثيرة — انتظر قليلاً ثم أعد المحاولة',
+      // Firestore codes that can surface during create/join
+      'permission-denied':'ليست لديك صلاحية لهذا الإجراء',
+      'unavailable':'تعذّر الاتصال بالخادم — تحقّق من الإنترنت وأعد المحاولة',
+      'deadline-exceeded':'انتهت مهلة الاتصال — أعد المحاولة',
+      'not-found':'العنصر المطلوب غير موجود'
     };
-    return map[code] || ('حدث خطأ: ' + code);
+    // Never surface a raw internal code to the user; fall back to a generic
+    // translated message and keep the code in the console for debugging.
+    if(!map[code] && code){ try { console.error('[auth] unmapped error code:', code); } catch(e){} }
+    return map[code] || 'حدث خطأ غير متوقّع — أعد المحاولة، وإن استمر تواصل مع الدعم';
   }
 
   var mode = 'login';
@@ -115,6 +124,9 @@
     var pass = document.getElementById('authPass').value;
     if(!email || !pass){ showErr('يرجى إدخال البريد وكلمة المرور'); return; }
     setLoading(true);
+    // Set true only once membership is fully committed; until then a thrown
+    // error must roll back the just-created account so none is left orphaned.
+    var joined = false;
     try{
       if(mode === 'login'){
         await signInWithEmailAndPassword(auth, email, pass);
@@ -124,16 +136,29 @@
         // handler below (on load) parses it into this field. No tree read
         // before join -- the invite doc is the only thing read, by token id.
         var joinRaw = document.getElementById('joinCode').value.trim();
+        // Accept either a full invite link (…#join=<treeId>.<token>) or the bare
+        // "<treeId>.<token>". Pasting the whole URL is the common case, so strip
+        // everything up to and including "#join=" before splitting -- otherwise
+        // the first dot lands in the domain (github.io) and the path is invalid.
+        var hashIdx = joinRaw.indexOf('#join=');
+        if(hashIdx !== -1) joinRaw = joinRaw.slice(hashIdx + '#join='.length);
+        try { joinRaw = decodeURIComponent(joinRaw); } catch(e){ /* keep as-is */ }
+        joinRaw = joinRaw.trim();
         var dot = joinRaw.indexOf('.');
-        if(dot < 1){ setLoading(false); showErr(t('errBadInvite')); return; }
+        if(dot < 1){ manualAuthFlow = false; setLoading(false); showErr(t('errBadInvite')); return; }
         var joinTreeId = joinRaw.slice(0, dot);
         var joinToken  = joinRaw.slice(dot + 1);
+        // A well-formed token is a single path segment; reject anything with a
+        // slash so a malformed paste fails cleanly instead of as invalid-argument.
+        if(!joinTreeId || !joinToken || joinTreeId.indexOf('/') !== -1 || joinToken.indexOf('/') !== -1){
+          setLoading(false); showErr(t('errBadInvite')); return;
+        }
         manualAuthFlow = true;
         var cred = await createUserWithEmailAndPassword(auth, email, pass);
         // Read the invite by token (rules: get allowed for any signed-in user).
         var invSnap = await getDoc(doc(db, 'trees', joinTreeId, 'invites', joinToken));
         if(!invSnap.exists()){
-          await cred.user.delete().catch(function(){});
+          await cred.user.delete().catch(function(e){ console.error('[join] cleanup after bad invite failed', e && e.code); });
           manualAuthFlow = false; setLoading(false); showErr(t('errBadInvite')); return;
         }
         var invRole = invSnap.data().role; // 'editor' | 'viewer'
@@ -141,6 +166,7 @@
         await setDoc(doc(db, 'trees', joinTreeId, 'members', cred.user.uid),
           { email: email, role: invRole, viaInvite: joinToken, joinedAt: serverTimestamp() });
         await setDoc(doc(db, 'users', cred.user.uid), { email: email, treeId: joinTreeId });
+        joined = true; // membership committed — the account is now valid, no rollback
         currentUid = cred.user.uid; currentTreeId = joinTreeId;
         currentRole = invRole;
         window.__ftSetEditable(invRole !== 'viewer');
@@ -163,6 +189,7 @@
         await setDoc(treeRef, { familyName:{ar:'',en:''}, lang:'ar', rootId:null, people:{}, createdBy: cred2.user.uid, updatedAt: serverTimestamp() });
         await setDoc(doc(db, 'trees', newCode, 'members', cred2.user.uid), { email: email, role: 'owner', joinedAt: serverTimestamp() });
         await setDoc(doc(db, 'users', cred2.user.uid), { email: email, treeId: newCode });
+        joined = true; // owner membership committed — no rollback
         currentUid = cred2.user.uid; currentTreeId = newCode;
         currentRole = 'owner';
         window.__ftSetEditable(true);
@@ -175,6 +202,13 @@
         logActivity('create_family', '');
       }
     }catch(err){
+      // A failure between account creation and committed membership would leave
+      // an orphaned auth account (signed in, no membership) that then dead-ends
+      // on "contact support" every reload. Roll it back before surfacing the error.
+      if(manualAuthFlow && !joined && auth.currentUser){
+        try { await auth.currentUser.delete(); }
+        catch(delErr){ console.error('[auth] orphan-account cleanup failed', delErr && delErr.code); }
+      }
       manualAuthFlow = false;
       setLoading(false);
       showErr(friendlyAuthError(err.code || err.message));

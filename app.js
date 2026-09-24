@@ -114,6 +114,26 @@
     hiddenDelete:{ar:'حذف', en:'Delete'},
     hiddenNone:{ar:'لا يوجد أفراد مخفيّون — كل الأفراد ظاهرون 🎉', en:'No hidden people — everyone is shown 🎉'},
     hiddenDelKids:{ar:'هذا السجل له أبناء سيُحذفون معه. متأكد؟', en:'This record has children who will be deleted too. Sure?'},
+    todayTitle:{ar:'🎉 اليوم في العائلة', en:'🎉 Today in the family'},
+    todaySectionToday:{ar:'اليوم', en:'Today'},
+    todaySectionSoon:{ar:'قريبًا', en:'Coming up'},
+    occBirthdayToday:{ar:'عيد ميلاده اليوم', en:'Birthday today'},
+    occBirthdayTodayF:{ar:'عيد ميلادها اليوم', en:'Birthday today'},
+    occMemorialToday:{ar:'ذكرى وفاته اليوم', en:'Anniversary today'},
+    occMemorialTodayF:{ar:'ذكرى وفاتها اليوم', en:'Anniversary today'},
+    occInDays:{ar:'بعد {n} يومًا', en:'in {n} days'},
+    occTurning:{ar:'يُتمّ {n}', en:'turning {n}'},
+    occYearsSince:{ar:'مرّت {n} سنة', en:'{n} years'},
+    occMemorialTag:{ar:'رحمه الله', en:'In memory'},
+    occGreetBtn:{ar:'🎉 هنّئ', en:'🎉 Greet'},
+    occDuaBtn:{ar:'🤲 ادعُ له', en:'🤲 Pray'},
+    greetBirthday:{ar:'كل عام و{name} بخير 🎉', en:'Happy birthday, {name} 🎉'},
+    greetMemorial:{ar:'اللهم ارحم {name} وأسكنه فسيح جنّاتك 🤲', en:'In loving memory of {name} 🤲'},
+    todayEmpty:{ar:'لا مناسبات قريبة — أضف تواريخ الميلاد لتظهر التذكيرات.', en:'No upcoming occasions — add birth dates to see reminders.'},
+    todayAddDates:{ar:'➕ أضف تواريخ', en:'➕ Add dates'},
+    addDatesTitle:{ar:'➕ إضافة تواريخ الميلاد', en:'➕ Add birth dates'},
+    addDatesDesc:{ar:'أفراد بلا تاريخ ميلاد — أدخل التاريخ ليُحفظ فورًا وتظهر تذكيراته.', en:'People with no birth date — set one and it saves instantly.'},
+    addDatesNone:{ar:'كل الأفراد لديهم تاريخ ميلاد 🎉', en:'Everyone has a birth date 🎉'},
     toastNameRequired:{ar:'يرجى إدخال الاسم', en:'Please enter a name'},
     toastSaved:{ar:'تم الحفظ بنجاح', en:'Saved successfully'},
     toastDeleted:{ar:'تم الحذف', en:'Deleted'},
@@ -1018,6 +1038,69 @@
     return t('completionHintDone');
   }
 
+  function occasionRowHtml(o){
+    var p = getPerson(o.id); if(!p) return '';
+    var female = p.gender === 'f';
+    var icon = o.type === 'memorial' ? '🕊' : '🎂';
+    var when = o.daysUntil === 0
+      ? (o.type === 'memorial' ? t(female ? 'occMemorialTodayF' : 'occMemorialToday')
+                               : t(female ? 'occBirthdayTodayF' : 'occBirthdayToday'))
+      : tf('occInDays', { n: localeDigits(o.daysUntil) });
+    var extra = o.type === 'memorial'
+      ? t('occMemorialTag') + ' · ' + tf('occYearsSince', { n: localeDigits(o.years) })
+      : tf('occTurning', { n: localeDigits(o.years) });
+    var btn = o.type === 'memorial'
+      ? '<button class="occ-greet" data-greet="'+escapeHtml(o.id)+'" data-otype="memorial">'+t('occDuaBtn')+'</button>'
+      : '<button class="occ-greet" data-greet="'+escapeHtml(o.id)+'" data-otype="birthday">'+t('occGreetBtn')+'</button>';
+    return '<div class="occ-row">'+
+        '<div class="occ-main" data-profile="'+escapeHtml(o.id)+'">'+
+          '<span class="occ-ic">'+icon+'</span>'+
+          '<div class="occ-text"><b>'+escapeHtml(fullNameOf(p))+'</b>'+
+            '<span class="occ-when">'+when+' · '+escapeHtml(extra)+'</span>'+
+            '<span class="occ-date">'+escapeHtml(fmtDate(o.dateStr))+'</span>'+
+          '</div>'+
+        '</div>'+ btn +
+      '</div>';
+  }
+
+  function occasionsCardHtml(){
+    var occ = (window.ftOccasions ? window.ftOccasions(state.people || {}, new Date(), 30) : []);
+    var body;
+    if(!occ.length){
+      body = '<div class="occ-empty">'+t('todayEmpty')+
+             '<button class="occ-adddates" data-go="adddates">'+t('todayAddDates')+'</button></div>';
+    } else {
+      var todayItems = occ.filter(function(o){ return o.daysUntil === 0; });
+      var soonItems  = occ.filter(function(o){ return o.daysUntil > 0; });
+      body = '';
+      if(todayItems.length) body += '<div class="occ-sub">'+t('todaySectionToday')+'</div>' + todayItems.map(occasionRowHtml).join('');
+      if(soonItems.length)  body += '<div class="occ-sub">'+t('todaySectionSoon')+'</div>' + soonItems.map(occasionRowHtml).join('');
+    }
+    return '<div class="occ-card"><div class="occ-head">'+t('todayTitle')+'</div>'+body+'</div>';
+  }
+
+  function wireOccasionsCard(host){
+    host.querySelectorAll('.occ-main[data-profile]').forEach(function(el){
+      el.onclick = function(){ openProfile(el.getAttribute('data-profile')); };
+    });
+    host.querySelectorAll('.occ-greet[data-greet]').forEach(function(btn){
+      btn.onclick = function(e){
+        e.stopPropagation();
+        var id = btn.getAttribute('data-greet');
+        var p = getPerson(id); if(!p) return;
+        var key = btn.getAttribute('data-otype') === 'memorial' ? 'greetMemorial' : 'greetBirthday';
+        var msg = tf(key, { name: fullNameOf(p) });
+        showTab('moments');
+        setTimeout(function(){
+          var ta = document.getElementById('momentText');
+          if(ta){ ta.value = msg; ta.focus(); }
+        }, 120);
+      };
+    });
+    var addBtn = host.querySelector('.occ-adddates[data-go="adddates"]');
+    if(addBtn) addBtn.onclick = function(){ showAddDates(); };
+  }
+
   function renderHome(){
     var host = document.getElementById('tab-home');
     if(!host) return;
@@ -1045,6 +1128,7 @@
         '</div>' +
       '</div>' +
       '<div class="home-body">' +
+        occasionsCardHtml() +
         '<div class="section-eyebrow"><span class="dia">◆</span><span>'+t('homeSectionsEyebrow')+'</span></div>' +
         '<div class="grid">' +
           '<div class="leaf tree" data-go="tree"><span class="corner">۞</span><div class="ic">🌳</div><h3>'+t('cardTree')+'</h3><p>'+t('cardTreeSub')+'</p></div>' +
@@ -1068,6 +1152,7 @@
     host.querySelector('[data-go="members"]').onclick = function(){
       if(window.__ftCloud && window.__ftCloud.showMembers) window.__ftCloud.showMembers(); else toast(t('comingSoon'));
     };
+    wireOccasionsCard(host);
 
     // Live people search: type a name → matching people → tap to jump to the card.
     var searchInput = document.getElementById('homeSearch');
@@ -1114,6 +1199,30 @@
     }, 120);
   }
   window.__ftRenderHome = renderHome;
+
+  function showAddDates(){
+    var missing = Object.keys(state.people).filter(function(id){ return !state.people[id].birthDate; });
+    var rows = missing.map(function(id){
+      return '<div class="adddate-row">'+
+        '<span class="adddate-name">'+escapeHtml(fullNameOf(getPerson(id)))+'</span>'+
+        '<input type="date" class="adddate-input" data-id="'+escapeHtml(id)+'">'+
+      '</div>';
+    }).join('');
+    openSheet('<h3>'+t('addDatesTitle')+'</h3>'+
+      '<div class="context">'+t('addDatesDesc')+'</div>'+
+      '<div class="adddate-list">'+(missing.length ? rows : '<div class="context">'+t('addDatesNone')+'</div>')+'</div>');
+    sheetBody.querySelectorAll('.adddate-input').forEach(function(inp){
+      inp.onchange = function(){
+        var id = inp.getAttribute('data-id'); var v = inp.value;
+        if(!v) return;
+        var p = getPerson(id); if(!p) return;
+        p.birthDate = v; scheduleSave();
+        var row = inp.parentNode; if(row) row.classList.add('saved');
+        if(window.__ftRenderHome) renderHome();
+      };
+    });
+  }
+  window.__ftShowAddDates = showAddDates;
 
   /* ============== Settings tab ============== */
   function ftReadFontScale(){ try { return localStorage.getItem('ft_fontscale') || 'md'; } catch(e){ return 'md'; } }

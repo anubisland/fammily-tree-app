@@ -66,6 +66,11 @@
     birthLabel:{ar:'تاريخ الميلاد (اختياري)', en:'Date of birth (optional)'},
     deathLabel:{ar:'تاريخ الوفاة (اختياري)', en:'Date of death (optional)'},
     inMemory:{ar:'رحمه الله', en:'In memory'},
+    deceasedLabel:{ar:'في ذمة الله (متوفّى)', en:'Deceased'},
+    menuMarkDeceased:{ar:'🕊 تعيين من في ذمة الله', en:'🕊 Mark deceased'},
+    markDeceasedTitle:{ar:'🕊 من في ذمة الله', en:'🕊 Mark deceased'},
+    markDeceasedDesc:{ar:'فعّل الخانة لكل من توفّي (بلا حاجة لتاريخ). يُحفظ فورًا.', en:'Tick anyone who has passed (no date needed). Saves instantly.'},
+    markDeceasedNone:{ar:'لا يوجد أفراد لعرضهم.', en:'No members to show.'},
     profileBirth:{ar:'الميلاد', en:'Born'},
     profileDeath:{ar:'الوفاة', en:'Died'},
     profileAge:{ar:'العمر', en:'Age'},
@@ -301,7 +306,7 @@
   function newPerson(name, gender, parentId){
     return { id: uid(), name: name, gender: gender, parentId: parentId || null,
       spouseIds: [], childrenIds: [], collapsed: false,
-      birthDate: null, deathDate: null, residence: '', bio: '', photo: null };
+      birthDate: null, deathDate: null, deceased: false, residence: '', bio: '', photo: null };
   }
 
   function migratePerson(p){
@@ -309,6 +314,7 @@
     if(p.deathDate === undefined) p.deathDate = null;
     if(p.residence === undefined) p.residence = '';
     if(p.bio === undefined) p.bio = '';
+    if(p.deceased === undefined) p.deceased = false;
     if(p.photo === undefined) p.photo = null;
     return p;
   }
@@ -687,6 +693,7 @@
     if((p.deathDate || null) !== (data.deathDate || null)) changed.push('تاريخ الوفاة');
     if((p.residence || '') !== (data.residence || '')) changed.push('مكان الإقامة');
     if((p.bio || '') !== (data.bio || '')) changed.push('النبذة');
+    if(!!p.deceased !== !!data.deceased) changed.push('الحالة');
     if(data.photo !== undefined && p.photo !== data.photo) changed.push('الصورة');
 
     p.name = data.name; p.gender = data.gender;
@@ -694,6 +701,7 @@
     if(data.deathDate !== undefined) p.deathDate = data.deathDate || null;
     p.residence = data.residence || '';
     p.bio = data.bio || '';
+    if(data.deceased !== undefined) p.deceased = !!data.deceased;
     if(data.photo !== undefined) p.photo = data.photo;
     scheduleSave(); render();
     if(changed.length){ logActivity('edit', nameStr(data.name), changed.join('، ')); }
@@ -853,12 +861,16 @@
       '<div class="stat-pill"><b>'+rootUnit+'</b><span>'+t('statRoot')+'</span></div>';
   }
 
+  // Deceased status: an explicit death date OR the dateless "deceased" flag
+  // (lets the first/older generations be marked رحمه الله before dates are known).
+  function isDeceased(p){ return !!(p && (p.deathDate || p.deceased)); }
+
   function personCard(id){
     var p = getPerson(id);
     var depth = genOfPerson(id);
     var isRoot = id === state.rootId;
     var el = document.createElement('div');
-    var deceased = !!p.deathDate;
+    var deceased = isDeceased(p);
     el.className = 'card ' + (p.gender === 'f' ? 'female' : 'male') + (deceased ? ' deceased' : '');
     el.style.borderTopColor = genColors[depth % genColors.length];
     el.dataset.id = id;
@@ -1285,6 +1297,30 @@
   }
   window.__ftShowStats = showStats;
 
+  // Bulk-mark deceased without dates (for the older generations). A person already
+  // deceased by a death date is shown checked & disabled (change that in their profile).
+  function showMarkDeceased(){
+    var ids = Object.keys(state.people);
+    var rows = ids.map(function(id){
+      var p = getPerson(id);
+      var byDate = !!p.deathDate;
+      return '<div class="adddate-row">'+
+        '<span class="adddate-name">'+escapeHtml(fullNameOf(p))+'</span>'+
+        '<input type="checkbox" class="deceased-check" data-id="'+escapeHtml(id)+'"'+(isDeceased(p)?' checked':'')+(byDate?' disabled':'')+'>'+
+      '</div>';
+    }).join('');
+    openSheet('<h3>'+t('markDeceasedTitle')+'</h3>'+
+      '<div class="context">'+t('markDeceasedDesc')+'</div>'+
+      '<div class="adddate-list">'+(ids.length ? rows : '<div class="context">'+t('markDeceasedNone')+'</div>')+'</div>');
+    sheetBody.querySelectorAll('.deceased-check').forEach(function(cb){
+      cb.onchange = function(){
+        var p = getPerson(cb.getAttribute('data-id')); if(!p) return;
+        p.deceased = cb.checked; scheduleSave(); render();
+      };
+    });
+  }
+  window.__ftShowMarkDeceased = showMarkDeceased;
+
   /* ============== Settings tab ============== */
   function ftReadFontScale(){ try { return localStorage.getItem('ft_fontscale') || 'md'; } catch(e){ return 'md'; } }
   function ftSetFontScale(v){ try { localStorage.setItem('ft_fontscale', v); } catch(e){} applyFontScale(v); }
@@ -1496,13 +1532,14 @@
   function openProfile(id){
     var p = getPerson(id); if(!p) return;
     var other = ownName(p, state.lang === 'ar' ? 'en' : 'ar');
-    var deceased = !!p.deathDate;
+    var deceased = isDeceased(p);
     var av = p.photo ? '<img src="'+escapeHtml(p.photo)+'" alt="">' : (p.gender==='f' ? '👩' : '👨');
     var lines = '';
     if(p.birthDate) lines += '<div class="prof-line">🎂 <b>'+t('profileBirth')+':</b> '+escapeHtml(fmtDate(p.birthDate))+
       (!deceased && ageYears(p.birthDate)!==null ? ' <span class="prof-dim">('+t('profileAge')+' '+escapeHtml(ageText(ageYears(p.birthDate)))+')</span>' : '')+'</div>';
-    if(deceased) lines += '<div class="prof-line">🕊 <b>'+t('profileDeath')+':</b> '+escapeHtml(fmtDate(p.deathDate))+' · '+t('inMemory')+
+    if(deceased && p.deathDate) lines += '<div class="prof-line">🕊 <b>'+t('profileDeath')+':</b> '+escapeHtml(fmtDate(p.deathDate))+' · '+t('inMemory')+
       (lifespanText(p.birthDate,p.deathDate) ? ' <span class="prof-dim">('+escapeHtml(lifespanText(p.birthDate,p.deathDate))+')</span>' : '')+'</div>';
+    else if(deceased) lines += '<div class="prof-line">🕊 '+t('inMemory')+'</div>';
     if(p.residence) lines += '<div class="prof-line">📍 '+escapeHtml(p.residence)+'</div>';
     if(p.bio) lines += '<div class="prof-bio">'+escapeHtml(p.bio)+'</div>';
     var spouses = (p.spouseIds||[]).map(getPerson);
@@ -1555,6 +1592,7 @@
       (isEdit ? photoRowHtml(target.photo) : '') +
       (isEdit ? '<div class="field"><label>'+t('birthLabel')+'</label><input type="date" id="pf_birth" value="'+escapeHtml(target.birthDate||'')+'"></div>' : '') +
       (isEdit ? '<div class="field"><label>'+t('deathLabel')+'</label><input type="date" id="pf_death" value="'+escapeHtml(target.deathDate||'')+'"></div>' : '') +
+      (isEdit ? '<div class="keep-open-row"><input type="checkbox" id="pf_deceased"'+(isDeceased(target)?' checked':'')+'><label for="pf_deceased">🕊 '+t('deceasedLabel')+'</label></div>' : '') +
       (isEdit ? '<div class="field"><label>'+t('residenceLabel')+'</label><input type="text" id="pf_residence" placeholder="'+t('residencePh')+'" value="'+escapeHtml(target.residence||'')+'"></div>' : '') +
       (isEdit ? '<div class="field"><label>'+t('bioLabel')+'</label><textarea id="pf_bio" rows="3" placeholder="'+t('bioPh')+'">'+escapeHtml(target.bio||'')+'</textarea></div>' : '') +
       (mode === 'child' ? '<div class="keep-open-row"><input type="checkbox" id="pf_keep" checked><label for="pf_keep">'+t('keepAdding')+'</label></div>' : '') +
@@ -1610,6 +1648,7 @@
           deathDate: document.getElementById('pf_death').value || null,
           residence: document.getElementById('pf_residence').value.trim(),
           bio: document.getElementById('pf_bio').value.trim(),
+          deceased: document.getElementById('pf_deceased').checked,
           photo: pendingPhoto
         });
       }
@@ -1846,6 +1885,7 @@
       '<button class="primary-btn" id="mn_export" style="margin-bottom:10px;">'+t('menuExport')+'</button>'+
       (canEditCloud ? '<button class="primary-btn" id="mn_import" style="margin-bottom:10px; background:var(--teal);">'+t('menuImport')+'</button>' : '') +
       (canEditCloud ? '<button class="primary-btn" id="mn_hidden" style="margin-bottom:10px; background:var(--plum);">'+t('menuHidden')+'</button>' : '') +
+      (canEditCloud ? '<button class="primary-btn" id="mn_deceased" style="margin-bottom:10px; background:var(--ink-soft);">'+t('menuMarkDeceased')+'</button>' : '') +
       (canEditCloud ? '<button class="primary-btn" id="mn_reset" style="background:var(--danger);">'+t('menuReset')+'</button>' : '') +
       (canEditCloud && window.__ftCloud ? '<button class="primary-btn" id="mn_invite" style="margin-top:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '')
     );
@@ -1853,6 +1893,7 @@
     if(canEditCloud){
       document.getElementById('mn_import').onclick = function(){ closeSheet(); document.getElementById('importBtn').click(); };
       document.getElementById('mn_hidden').onclick = function(){ showHiddenReview(); };
+      document.getElementById('mn_deceased').onclick = function(){ showMarkDeceased(); };
       document.getElementById('mn_reset').onclick = function(){ closeSheet(); document.getElementById('resetBtn').click(); };
     }
     if(canEditCloud && window.__ftCloud && window.__ftCloud.createInvite){

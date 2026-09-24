@@ -42,15 +42,16 @@
 
     ids.forEach(function(id){
       var p = people[id];
+      var isDead = !!(p.deathDate || p.deceased);  // date OR the dateless flag
       if(p.gender === 'f') females++; else males++;
-      if(p.deathDate) deceased++; else living++;
+      if(isDead) deceased++; else living++;
       if(p.birthDate) withBirthDate++;
       if(p.photo) withPhoto++;
       if(p.residence && String(p.residence).trim()){
         var c = String(p.residence).trim();
         cities[c] = (cities[c] || 0) + 1;
       }
-      if(!p.deathDate){
+      if(!isDead){
         var a = ageOf(p.birthDate, today);
         if(a != null){
           ages.push(a);

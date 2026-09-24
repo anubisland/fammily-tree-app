@@ -25,4 +25,12 @@ ok(s.topCity && s.topCity.city === 'القاهرة' && s.topCity.count === 2, 't
 ok(s.withBirthDate === 4 && s.withPhoto === 0, 'withBirth 4 / withPhoto 0, got '+s.withBirthDate+'/'+s.withPhoto);
 ok(JSON.stringify(ftStats({}, today)).length > 0 && ftStats({}, today).total === 0, 'empty people -> total 0');
 
+// dateless "deceased" flag: counts as deceased, excluded from living/ages
+const s2 = ftStats({
+  x: { name:N('حي'),    gender:'m', birthDate:'1990-06-01' },        // living, 35
+  y: { name:N('راحل'),  gender:'m', deceased:true }                  // deceased flag, no date
+}, today);
+ok(s2.living === 1 && s2.deceased === 1, 'flag: living 1 / deceased 1, got '+s2.living+'/'+s2.deceased);
+ok(s2.oldest && s2.oldest.id === 'x', 'flag: flagged-deceased excluded from age stats');
+
 console.log(pass+' passed, '+fail+' failed'); process.exit(fail?1:0);

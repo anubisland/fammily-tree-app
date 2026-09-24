@@ -36,7 +36,9 @@
     var out = [];
     Object.keys(people || {}).forEach(function(id){
       var p = people[id]; if(!p) return;
-      var deceased = !!p.deathDate;
+      // Deceased via an explicit death date OR the dateless "deceased" flag; a
+      // flagged-but-dateless person yields no occasion (no anniversary to match).
+      var deceased = !!(p.deathDate || p.deceased);
       var srcStr = deceased ? p.deathDate : p.birthDate;
       var src = parse(srcStr); if(!src) return;
       var occ = nextOccurrence(src.m, src.d, todayMid);

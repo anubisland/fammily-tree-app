@@ -29,4 +29,8 @@ ok(occ[0].daysUntil <= occ[occ.length-1].daysUntil, 'sorted ascending by daysUnt
 const feb = ftOccasions({ g:{ name:{ar:'ز',en:'G'}, birthDate:'1988-02-29' } }, new Date(2026,1,27), 5);
 ok(feb.length === 1 && feb[0].daysUntil === 1, 'Feb 29 -> Feb 28 (1 day away in 2026), got '+JSON.stringify(feb));
 
+// A dateless "deceased" flag person with a birthday today yields NO occasion
+const flagged = ftOccasions({ z:{ name:{ar:'ر',en:'Z'}, deceased:true, birthDate:'1940-'+(new Date().toISOString().slice(5,10)) } }, new Date(), 30);
+ok(flagged.length === 0, 'flagged-deceased (no death date) produces no occasion, got '+JSON.stringify(flagged));
+
 console.log(pass+' passed, '+fail+' failed'); process.exit(fail?1:0);

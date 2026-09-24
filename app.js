@@ -1325,8 +1325,25 @@
   }
   window.__ftShowStats = showStats;
 
+  // Rank each person in family/tree order (father, then mother, then their
+  // children — same order the tree renders), so name lists read naturally.
+  function treeOrderMap(){
+    var order = {}, i = 0;
+    function visit(id){
+      if(!id || !getPerson(id) || (id in order)) return;
+      order[id] = i++;
+      (getPerson(id).spouseIds || []).forEach(function(s){ if(getPerson(s) && !(s in order)) order[s] = i++; });
+      (getPerson(id).childrenIds || []).forEach(visit);
+    }
+    if(state.rootId) visit(state.rootId);
+    Object.keys(state.people).forEach(function(id){ if(!(id in order)) order[id] = i++; }); // stragglers last
+    return order;
+  }
+  function byTreeOrder(order){ return function(a, b){ return (order[a] == null ? 1e9 : order[a]) - (order[b] == null ? 1e9 : order[b]); }; }
+
   function showPlaces(){
     if(!window.ftPlaces){ toast(t('comingSoon')); return; }
+    var order = treeOrderMap();
     var r = window.ftPlaces(state.people || {});
     var body;
     if(!r.groups.length){
@@ -1334,7 +1351,7 @@
              '<button class="occ-adddates" data-go="addres">'+t('placesAdd')+'</button></div>';
     } else {
       body = r.groups.map(function(g){
-        var members = g.ids.map(function(id){
+        var members = g.ids.slice().sort(byTreeOrder(order)).map(function(id){
           var p = getPerson(id); if(!p) return '';
           return '<div class="place-member" data-profile="'+escapeHtml(id)+'">'+escapeHtml(fullNameOf(p))+'</div>';
         }).join('');
@@ -1380,6 +1397,7 @@
   function showFilter(){
     var people = state.people || {};
     var ids = Object.keys(people);
+    var order = treeOrderMap();
     var gensSet = {}; ids.forEach(function(id){ gensSet[genOfPerson(id)] = true; });
     var genOpts = Object.keys(gensSet).map(Number).sort(function(a,b){ return a-b; });
     var citySet = {}; ids.forEach(function(id){ var c=(people[id].residence||'').trim(); if(c) citySet[c]=true; });
@@ -1416,7 +1434,7 @@
         if(city && (p.residence||'').trim() !== city) return false;
         return true;
       });
-      matches.sort(function(a,b){ return fullNameOf(people[a]).localeCompare(fullNameOf(people[b]),'ar'); });
+      matches.sort(byTreeOrder(order));
       document.getElementById('flt_count').textContent = tf('filterCount', { n: localeDigits(matches.length) });
       var res = document.getElementById('flt_results');
       if(!matches.length){ res.innerHTML = '<div class="context">'+t('filterNoResults')+'</div>'; return; }

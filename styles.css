@@ -511,3 +511,15 @@
 .flt-result{ display:flex; align-items:center; gap:8px; padding:9px 6px; border-bottom:1px solid var(--line); font-size:13.5px; color:var(--ink); cursor:pointer; }
 .flt-result:active{ background:var(--paper); }
 .flt-dead{ margin-inline-start:auto; }
+
+/* --- Compact, organized home cards (6 cards) --- */
+#tab-home .grid{ grid-template-columns: repeat(3, 1fr); gap:10px; }
+#tab-home .leaf{ padding:12px 10px; border-top-width:4px; }
+#tab-home .leaf .ic{ width:38px; height:38px; font-size:20px; margin-bottom:8px; border-radius:11px; }
+#tab-home .leaf h3{ font-size:14px; margin-bottom:0; }
+#tab-home .leaf p{ display:none; }
+#tab-home .leaf .corner{ display:none; }
+@media (max-width:520px){ #tab-home .grid{ grid-template-columns: repeat(2, 1fr); } }
+
+/* --- Larger, distinctive city headings in Places --- */
+.place-city{ font-size:18px; padding:8px 12px; margin:16px 0 2px; background:var(--paper-deep); border-radius:10px; border-inline-start:4px solid var(--gold); }

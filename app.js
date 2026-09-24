@@ -81,6 +81,9 @@
     profileEdit:{ar:'تعديل', en:'Edit'},
     profileAddChild:{ar:'إضافة ابن/ابنة', en:'Add child'},
     profileKinship:{ar:'القرابة', en:'Kinship'},
+    profileShare:{ar:'مشاركة كصورة', en:'Share as image'},
+    shareGenerating:{ar:'جارِ إنشاء الصورة…', en:'Creating image…'},
+    shareDownloaded:{ar:'تم حفظ الصورة', en:'Image saved'},
     residenceLabel:{ar:'مكان الإقامة (اختياري)', en:'Place of residence (optional)'},
     residencePh:{ar:'مثال: القاهرة، مصر', en:'e.g. Cairo, Egypt'},
     bioLabel:{ar:'نبذة (اختياري)', en:'About (optional)'},
@@ -1715,12 +1718,85 @@
       '</div>'+
       '<div class="prof-actions">'+actions+
         '<button class="primary-btn" id="prof_kin" style="background:var(--plum);">🔗 '+t('profileKinship')+'</button>'+
+        '<button class="primary-btn" id="prof_share" style="background:var(--gold);">📤 '+t('profileShare')+'</button>'+
       '</div>'
     );
     sheetBody.querySelectorAll('[data-profile]').forEach(function(b){ b.onclick = function(){ openProfile(b.getAttribute('data-profile')); }; });
     var pe = document.getElementById('prof_edit'); if(pe) pe.onclick = function(){ openPersonForm('edit', id); };
     var pa = document.getElementById('prof_addchild'); if(pa) pa.onclick = function(){ openPersonForm('child', id); };
     document.getElementById('prof_kin').onclick = function(){ closeSheet(); startKinship(); };
+    document.getElementById('prof_share').onclick = function(){ shareProfileImage(id); };
+  }
+
+  /* ---- Share a person as an elegant image (canvas — supports Arabic fonts) ---- */
+  function _roundRect(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+  function _wrap(g,text,x,y,maxW,lh){
+    var words = String(text).split(/\s+/), line = '';
+    for(var i=0;i<words.length;i++){
+      var test = line ? (line+' '+words[i]) : words[i];
+      if(g.measureText(test).width > maxW && line){ g.fillText(line,x,y); y += lh; line = words[i]; }
+      else line = test;
+    }
+    if(line){ g.fillText(line,x,y); y += lh; }
+    return y;
+  }
+  async function buildProfileCanvas(id){
+    var p = getPerson(id); if(!p) return null;
+    try { if(document.fonts && document.fonts.ready) await document.fonts.ready; } catch(e){}
+    var W = 1080, H = 1350, cx = W/2;
+    var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    var g = cv.getContext('2d');
+    var bg = g.createLinearGradient(0,0,0,H); bg.addColorStop(0,'#FBF4E2'); bg.addColorStop(1,'#EFE0C0');
+    g.fillStyle = bg; g.fillRect(0,0,W,H);
+    g.strokeStyle = 'rgba(184,134,45,0.55)'; g.lineWidth = 4; _roundRect(g,30,30,W-60,H-60,28); g.stroke();
+    g.textAlign = 'center'; g.direction = 'rtl';
+    var fam = famNameOf().trim();
+    g.fillStyle = '#8A6A2A'; g.font = "700 34px Amiri"; g.fillText(fam ? ('عائلة '+fam) : 'شجرة العائلة', cx, 112);
+    // portrait
+    var cy = 330, r = 150;
+    g.save(); g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.closePath();
+    g.fillStyle = p.gender==='f' ? '#F3E9D6' : '#E9F1EA'; g.fill();
+    if(p.photo){
+      var img = new Image();
+      await new Promise(function(res){ img.onload = res; img.onerror = res; img.src = p.photo; });
+      if(img.width){ g.clip(); g.drawImage(img, cx-r, cy-r, r*2, r*2); }
+    }
+    g.restore();
+    if(!p.photo){ g.font = "150px serif"; g.fillStyle = '#0F5B4B'; g.fillText(p.gender==='f'?'👩':'👨', cx, cy+54); }
+    g.strokeStyle = '#B8862D'; g.lineWidth = 8; g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.stroke();
+    var y = 560;
+    g.fillStyle = '#2B2118'; g.font = "700 60px Amiri"; y = _wrap(g, fullNameOf(p), cx, y, W-160, 70);
+    var en = ownName(p,'en'); if(en){ g.fillStyle = '#5C4C3B'; g.font = "400 34px Cairo"; g.fillText(en, cx, y+4); y += 54; }
+    g.fillStyle = '#8A6A2A'; g.font = "700 30px Cairo"; g.fillText(genLabel(genOfPerson(id)), cx, y+6); y += 64;
+    g.strokeStyle = 'rgba(184,134,45,0.45)'; g.lineWidth = 2; g.beginPath(); g.moveTo(190,y); g.lineTo(W-190,y); g.stroke(); y += 46;
+    g.fillStyle = '#2B2118'; g.font = "400 34px Cairo";
+    function row(txt){ if(txt){ y = _wrap(g, txt, cx, y, W-160, 46) + 14; } }
+    if(p.birthDate) row('🎂 ' + fmtDate(p.birthDate) + (!isDeceased(p) && ageYears(p.birthDate)!=null ? (' (' + ageText(ageYears(p.birthDate)) + ')') : ''));
+    if(isDeceased(p)) row('🕊 ' + (p.deathDate ? fmtDate(p.deathDate)+' · ' : '') + t('inMemory') + (lifespanText(p.birthDate,p.deathDate) ? (' (' + lifespanText(p.birthDate,p.deathDate) + ')') : ''));
+    if(p.residence) row('📍 ' + p.residence);
+    if(p.bio){ g.fillStyle = '#5C4C3B'; g.font = "400 30px Cairo"; y = _wrap(g, p.bio, cx, y+6, W-190, 42) + 14; }
+    g.fillStyle = '#0F5B4B'; g.font = "700 32px Amiri"; g.fillText('🌳 شجرة العائلة', cx, H-72);
+    return cv;
+  }
+  window.__ftBuildProfileCanvas = buildProfileCanvas;
+
+  async function shareProfileImage(id){
+    var p = getPerson(id); if(!p) return;
+    toast(t('shareGenerating'));
+    var cv = await buildProfileCanvas(id); if(!cv) return;
+    cv.toBlob(function(blob){
+      if(!blob) return;
+      var file = new File([blob], 'family-card.png', { type:'image/png' });
+      if(navigator.canShare && navigator.canShare({ files:[file] })){
+        navigator.share({ files:[file], title: fullNameOf(p) }).catch(function(){});
+        return;
+      }
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = 'family-card.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+      toast(t('shareDownloaded'));
+    }, 'image/png');
   }
 
   function openPersonForm(mode, targetId){

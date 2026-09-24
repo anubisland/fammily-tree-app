@@ -1639,6 +1639,7 @@
   function openSheet(html){ sheetBody.innerHTML = html; overlay.classList.add('open'); sheet.classList.add('open'); }
   function closeSheet(){ overlay.classList.remove('open'); sheet.classList.remove('open'); pendingPhoto = undefined; if(typeof clearKinHighlights==='function') clearKinHighlights(); }
   overlay.addEventListener('click', closeSheet);
+  (function(){ var sc = document.getElementById('sheetClose'); if(sc) sc.addEventListener('click', closeSheet); })();
 
   function photoRowHtml(existingPhoto){
     return '<div class="field"><label>'+t('photoLabel')+'</label>'+

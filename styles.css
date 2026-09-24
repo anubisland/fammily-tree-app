@@ -553,3 +553,13 @@ html.dark{ --t-stats:rgba(62,154,164,.20); --t-places:rgba(169,107,68,.22); --cl
 /* Advanced-filter bar: a bit lighter, still distinctive and calm */
 #tab-home .home-filter-btn{ background:var(--teal); }
 #tab-home .home-filter-btn:active{ background:#155a63; }
+
+/* Fix: the Moments CTA (forced inline display:flex by cloud.js on login) leaked
+   onto the slim tree banner and got clipped — hide it firmly on the tree tab. */
+#tab-tree .moments-cta{ display:none !important; }
+
+/* A clear close button on every bottom sheet, so any opened screen has an
+   obvious way back to where you were. */
+.sheet-close{ position:absolute; top:10px; inset-inline-end:14px; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--card); color:var(--ink-soft); font-size:16px; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:3; box-shadow:var(--shadow); }
+.sheet-close:active{ background:var(--paper); }
+#sheetBody{ padding-top:6px; }

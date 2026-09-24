@@ -11,4 +11,6 @@ ok(H.ageYears('2000-06-01','2020-01-01') === 19, 'age not-yet-birthday = 19');
 ok(H.ageYears('') === null, 'no birth -> null age');
 ok(H.lifespanText('1900-01-01','1980-01-01').indexOf('80') !== -1, 'lifespan 80');
 ok(H.lifespanText('1900-01-01','') === '', 'no death -> empty lifespan');
+// Regression: a stored date must display on its exact day (no UTC -1 shift).
+ok(H.gregText('1956-05-21','en').split(' ')[0] === '21', 'no UTC day shift: 21 May stays 21, got '+H.gregText('1956-05-21','en'));
 console.log(pass+' passed, '+fail+' failed'); process.exit(fail?1:0);

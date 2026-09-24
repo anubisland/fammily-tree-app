@@ -14,7 +14,7 @@
     };
     // Date helpers mirror the runtime ones below (kept in sync); exposed for scripts/dates.test.cjs.
     G.__ftDateHelpers = (function(){
-      function parseD(s){ if(!s) return null; var d=new Date(s); return isNaN(d.getTime())?null:d; }
+      function parseD(s){ if(!s) return null; var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s)); var d=m?new Date(+m[1],+m[2]-1,+m[3]):new Date(s); return isNaN(d.getTime())?null:d; }
       function greg(s,lang){ var d=parseD(s); if(!d) return ''; try{ return new Intl.DateTimeFormat(lang==='en'?'en-GB':'ar',{day:'numeric',month:'long',year:'numeric'}).format(d);}catch(e){return s;} }
       function hijri(s,lang){ var d=parseD(s); if(!d) return ''; try{ var loc=(lang==='en'?'en-US':'ar-SA')+'-u-ca-islamic-umalqura'; return new Intl.DateTimeFormat(loc,{day:'numeric',month:'long',year:'numeric',era:'short'}).format(d); }catch(e){return '';} }
       function age(b,ref){ var bd=parseD(b); if(!bd) return null; var r=ref?parseD(ref):new Date(); if(!r) return null; var a=r.getFullYear()-bd.getFullYear(); var m=r.getMonth()-bd.getMonth(); if(m<0||(m===0&&r.getDate()<bd.getDate())) a--; return a<0?null:a; }
@@ -557,8 +557,8 @@
 
   function calcAge(birthDateStr){
     if(!birthDateStr) return null;
-    var b = new Date(birthDateStr);
-    if(isNaN(b.getTime())) return null;
+    var b = parseDate(birthDateStr);   // local parse — avoids UTC day/age drift
+    if(!b) return null;
     var today = new Date();
     var age = today.getFullYear() - b.getFullYear();
     var m = today.getMonth() - b.getMonth();
@@ -569,7 +569,15 @@
   /* Date helpers: show every date in Gregorian AND Hijri (Umm al-Qura) using the
      browser's Intl — no libraries. If a runtime lacks the Islamic calendar,
      hijriText returns '' (try/catch) and only the Gregorian date shows. */
-  function parseDate(str){ if(!str) return null; var d = new Date(str); return isNaN(d.getTime()) ? null : d; }
+  // Parse a stored 'YYYY-MM-DD' as LOCAL midnight (not UTC): `new Date('1956-05-21')`
+  // is UTC midnight, which then formats as the PREVIOUS day in negative-offset
+  // zones — so "21 May" showed as "20 May". Building from components fixes that.
+  function parseDate(str){
+    if(!str) return null;
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(str));
+    var d = m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
   function gregText(str){
     var d = parseDate(str); if(!d) return '';
     try { return new Intl.DateTimeFormat(state.lang === 'en' ? 'en-GB' : 'ar', { day:'numeric', month:'long', year:'numeric' }).format(d); }

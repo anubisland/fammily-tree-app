@@ -105,6 +105,15 @@
     menuExport:{ar:'⬇ تنزيل نسخة احتياطية', en:'⬇ Download backup'},
     menuImport:{ar:'⬆ استيراد نسخة', en:'⬆ Import a backup'},
     menuReset:{ar:'↺ بدء شجرة جديدة', en:'↺ Start a new tree'},
+    menuHidden:{ar:'🧹 مراجعة الأفراد المخفيّين', en:'🧹 Review hidden people'},
+    hiddenTitle:{ar:'الأفراد المخفيّون', en:'Hidden people'},
+    hiddenDesc:{ar:'سجلات لا تظهر في الشجرة (بقايا استيراد قديم). «إظهار» تُعيدها للشجرة، و«حذف» تزيل المكرّر الفارغ نهائيًّا.', en:'Records not shown in the tree. “Show” restores one to the tree; “Delete” removes an empty duplicate permanently.'},
+    hiddenUnder:{ar:'تحت', en:'under'},
+    hiddenKids:{ar:'أبناء', en:'children'},
+    hiddenShow:{ar:'إظهار', en:'Show'},
+    hiddenDelete:{ar:'حذف', en:'Delete'},
+    hiddenNone:{ar:'لا يوجد أفراد مخفيّون — كل الأفراد ظاهرون 🎉', en:'No hidden people — everyone is shown 🎉'},
+    hiddenDelKids:{ar:'هذا السجل له أبناء سيُحذفون معه. متأكد؟', en:'This record has children who will be deleted too. Sure?'},
     toastNameRequired:{ar:'يرجى إدخال الاسم', en:'Please enter a name'},
     toastSaved:{ar:'تم الحفظ بنجاح', en:'Saved successfully'},
     toastDeleted:{ar:'تم الحذف', en:'Deleted'},
@@ -670,6 +679,96 @@
     scheduleSave(); render();
     logActivity('delete', deletedName);
   }
+
+  /* ---- Hidden-records maintenance ----
+     The tree renders by walking childrenIds from the root (spouses shown beside
+     their partner). Records whose parent link desynced during an old import have
+     no card, so they cannot be managed from the tree. This surfaces them in a
+     list so the owner can Show (relink) the real ones and Delete the duplicates. */
+  function computeVisibleMap(){
+    var vis = {};
+    function walk(id){
+      var p = getPerson(id); if(!p || vis[id]) return;
+      vis[id] = true;
+      (p.spouseIds || []).forEach(function(s){ if(getPerson(s)) vis[s] = true; });
+      (p.childrenIds || []).forEach(walk);
+    }
+    if(state.rootId) walk(state.rootId);
+    return vis;
+  }
+  function hiddenIds(){
+    var vis = computeVisibleMap();
+    return Object.keys(state.people).filter(function(id){ return !vis[id]; });
+  }
+  // Make one hidden record appear in the tree by repairing its link to a VISIBLE
+  // ancestor: link to its parent if the parent is visible; if the parent is a
+  // hidden in-law, hang it on the parent's visible spouse; else restore the
+  // parent first. Falls back to attaching under the root.
+  function restorePerson(id, guard){
+    var p = getPerson(id); if(!p) return;
+    guard = guard || 0; if(guard > 64) return;
+    var vis = computeVisibleMap();
+    var parent = p.parentId ? getPerson(p.parentId) : null;
+    if(parent){
+      if(vis[p.parentId]){
+        if(parent.childrenIds.indexOf(id) === -1) parent.childrenIds.push(id);
+      } else {
+        var bloodSpouse = (parent.spouseIds || []).filter(function(s){ return vis[s]; })[0];
+        if(bloodSpouse){
+          p.parentId = bloodSpouse;
+          var bs = getPerson(bloodSpouse);
+          if(bs.childrenIds.indexOf(id) === -1) bs.childrenIds.push(id);
+        } else {
+          restorePerson(p.parentId, guard + 1);
+          if(parent.childrenIds.indexOf(id) === -1) parent.childrenIds.push(id);
+        }
+      }
+    } else if(state.rootId && state.rootId !== id){
+      p.parentId = state.rootId;
+      var root = getPerson(state.rootId);
+      if(root.childrenIds.indexOf(id) === -1) root.childrenIds.push(id);
+    }
+    scheduleSave(); render();
+  }
+  function directChildCount(id){
+    return Object.keys(state.people).filter(function(k){ return state.people[k].parentId === id; }).length;
+  }
+  function showHiddenReview(){
+    var hidden = hiddenIds();
+    var body;
+    if(!hidden.length){
+      body = '<div class="context">' + t('hiddenNone') + '</div>';
+    } else {
+      body = hidden.map(function(id){
+        var p = getPerson(id);
+        var parent = p.parentId ? getPerson(p.parentId) : null;
+        var kids = directChildCount(id);
+        return '<div class="hidden-row">' +
+          '<div class="hidden-info"><b>' + escapeHtml(nameStr(p.name)) + '</b>' +
+          (parent ? '<span class="hidden-dim"> — ' + t('hiddenUnder') + ' ' + escapeHtml(nameStr(parent.name)) + '</span>' : '') +
+          (kids ? '<span class="hidden-dim"> · ' + kids + ' ' + t('hiddenKids') + '</span>' : '') +
+          '</div>' +
+          '<div class="hidden-btns">' +
+            '<button class="hidden-show" data-show="' + id + '">' + t('hiddenShow') + '</button>' +
+            '<button class="hidden-del" data-del="' + id + '">' + t('hiddenDelete') + '</button>' +
+          '</div></div>';
+      }).join('');
+    }
+    openSheet('<h3>' + t('hiddenTitle') + ' (' + hidden.length + ')</h3>' +
+      '<div class="context">' + t('hiddenDesc') + '</div>' +
+      '<div class="hidden-list">' + body + '</div>');
+    sheetBody.querySelectorAll('[data-show]').forEach(function(b){
+      b.onclick = function(){ restorePerson(b.getAttribute('data-show')); showHiddenReview(); };
+    });
+    sheetBody.querySelectorAll('[data-del]').forEach(function(b){
+      b.onclick = function(){
+        var id = b.getAttribute('data-del');
+        if(directChildCount(id) > 0 && !confirm(t('hiddenDelKids'))) return;
+        deletePerson(id); showHiddenReview();
+      };
+    });
+  }
+  window.__ftShowHiddenReview = showHiddenReview;
 
   function toggleCollapse(id){
     getPerson(id).collapsed = !getPerson(id).collapsed;
@@ -1573,12 +1672,14 @@
       '<div class="context">'+t('menuDesc')+'</div>'+
       '<button class="primary-btn" id="mn_export" style="margin-bottom:10px;">'+t('menuExport')+'</button>'+
       (canEditCloud ? '<button class="primary-btn" id="mn_import" style="margin-bottom:10px; background:var(--teal);">'+t('menuImport')+'</button>' : '') +
+      (canEditCloud ? '<button class="primary-btn" id="mn_hidden" style="margin-bottom:10px; background:var(--plum);">'+t('menuHidden')+'</button>' : '') +
       (canEditCloud ? '<button class="primary-btn" id="mn_reset" style="background:var(--danger);">'+t('menuReset')+'</button>' : '') +
       (canEditCloud && window.__ftCloud ? '<button class="primary-btn" id="mn_invite" style="margin-top:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '')
     );
     document.getElementById('mn_export').onclick = function(){ closeSheet(); document.getElementById('exportBtn').click(); };
     if(canEditCloud){
       document.getElementById('mn_import').onclick = function(){ closeSheet(); document.getElementById('importBtn').click(); };
+      document.getElementById('mn_hidden').onclick = function(){ showHiddenReview(); };
       document.getElementById('mn_reset').onclick = function(){ closeSheet(); document.getElementById('resetBtn').click(); };
     }
     if(canEditCloud && window.__ftCloud && window.__ftCloud.createInvite){

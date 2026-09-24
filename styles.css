@@ -543,3 +543,13 @@ html.dark{ --t-stats:rgba(62,154,164,.20); --t-places:rgba(169,107,68,.22); --cl
 /* Distinctive but calm advanced-filter bar */
 #tab-home .home-filter-btn{ background:var(--emerald); color:#F6EFDD; border:none; font-weight:700; box-shadow:var(--shadow); }
 #tab-home .home-filter-btn:active{ background:var(--emerald-deep); }
+
+/* ===== Refinements: white card icons, lighter filter bar, classical title font ===== */
+/* App title in an elegant classical Naskh (Amiri), not Ruqaa */
+#tab-home .app-title{ font-family:'Amiri', var(--f-head); font-size:32px; }
+/* Stats & Places icons: white chip background like the other cards (colored border only) */
+#tab-home .leaf.stats .ic{ background:var(--ic-chip); border-color:var(--teal); }
+#tab-home .leaf.places .ic{ background:var(--ic-chip); border-color:var(--clay); }
+/* Advanced-filter bar: a bit lighter, still distinctive and calm */
+#tab-home .home-filter-btn{ background:var(--teal); }
+#tab-home .home-filter-btn:active{ background:#155a63; }

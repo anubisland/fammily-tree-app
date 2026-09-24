@@ -26,6 +26,8 @@
   var currentRole = null;
   var unsubTree = null;
   var applyingRemote = false;
+  var remoteLoaded = false;   // true once the first cloud snapshot has arrived
+  var syncErrorAlerted = false; // latch so a persistent sync error alerts once, not every save
   var pushTimer = null;
   var MAX_DOC_BYTES = 900000; // safety margin under Firestore's 1MB document limit
 
@@ -283,6 +285,7 @@
         rootId: data.rootId || null, people: data.people || {}
       });
       applyingRemote = false;
+      remoteLoaded = true;   // safe to push local edits now that we hold the real tree
       cloudBtn.dataset.status = 'online';
     }, function(){
       cloudBtn.dataset.status = 'offline';
@@ -537,7 +540,9 @@
 
   window.__ftCloud = {
     onLocalSave: function(state){
-      if(!currentTreeId || applyingRemote) return;
+      // Never push before the first cloud snapshot: local state is still the empty
+      // default then, and updateDoc would overwrite the whole tree with {} (a wipe).
+      if(!currentTreeId || applyingRemote || !remoteLoaded) return;
       clearTimeout(pushTimer);
       cloudBtn.dataset.status = 'syncing';
       pushTimer = setTimeout(function(){ pushToCloud(state); }, 500);
@@ -563,10 +568,25 @@
       return;
     }
     try{
-      await setDoc(doc(db, 'trees', currentTreeId), payload, { merge: true });
+      // updateDoc (NOT setDoc merge): a merge deep-merges the `people` map, so
+      // deleted people were kept in the cloud and synced back -- the tree could
+      // never shrink. updateDoc replaces the `people`/`rootId`/… fields wholesale
+      // (removed IDs are truly deleted) while leaving `createdBy` untouched, which
+      // the security rules require to stay unchanged on update.
+      await updateDoc(doc(db, 'trees', currentTreeId), payload);
       cloudBtn.dataset.status = 'online';
+      syncErrorAlerted = false;   // recovered — allow a future error to alert again
     }catch(err){
       cloudBtn.dataset.status = 'offline';
+      console.error('pushToCloud failed', err && (err.code || err.message), err);
+      // A permanent error (permissions / missing doc) will never clear on its own,
+      // so tell the user their change is only local rather than leaving them to
+      // believe it synced. Alert once per error state (not on every debounced save,
+      // which would spam a downgraded editor). Transient/network errors stay a quiet dot.
+      if(err && (err.code === 'permission-denied' || err.code === 'not-found') && !syncErrorAlerted){
+        syncErrorAlerted = true;
+        alert('تعذّرت مزامنة التغيير مع السحابة (صلاحيات أو مستند مفقود) — تم الحفظ محليًا فقط. تواصل مع مالك العائلة.');
+      }
     }
   }
 

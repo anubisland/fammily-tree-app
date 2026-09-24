@@ -500,3 +500,14 @@
 .place-addbtn, .addres-input{ font-family:var(--f-body); }
 .place-addbtn{ display:block; margin:8px auto 0; border:1px solid var(--line); border-radius:10px; background:var(--emerald); color:#F6EFDD; font-size:13px; padding:7px 14px; cursor:pointer; }
 .addres-input{ flex-shrink:0; width:150px; border:1.5px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink); padding:6px 9px; font-size:13px; }
+
+/* Advanced search & filter */
+.home-filter-btn{ display:block; width:100%; margin-top:8px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--emerald); font-family:var(--f-body); font-size:13px; padding:8px; cursor:pointer; }
+.home-filter-btn:active{ background:var(--paper); }
+.filter-row{ display:flex; gap:8px; margin-top:8px; }
+.filter-row select{ flex:1; min-width:0; padding:9px 8px; border-radius:9px; border:1.5px solid var(--line); background:var(--paper); color:var(--ink); font-size:13px; font-family:var(--f-body); }
+.filter-count{ font-size:12.5px; color:var(--ink-soft); margin:10px 2px 4px; }
+.filter-results{ max-height:46vh; overflow-y:auto; }
+.flt-result{ display:flex; align-items:center; gap:8px; padding:9px 6px; border-bottom:1px solid var(--line); font-size:13.5px; color:var(--ink); cursor:pointer; }
+.flt-result:active{ background:var(--paper); }
+.flt-dead{ margin-inline-start:auto; }

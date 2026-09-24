@@ -169,6 +169,14 @@
     addResTitle:{ar:'➕ إضافة أماكن الإقامة', en:'➕ Add residences'},
     addResDesc:{ar:'أفراد بلا مكان إقامة — اكتب المدينة ليُحفظ فورًا.', en:'People with no residence — type a city to save it instantly.'},
     addResNone:{ar:'كل الأفراد لديهم مكان إقامة 🎉', en:'Everyone has a residence 🎉'},
+    filterBtn:{ar:'⚙ تصفية متقدمة', en:'⚙ Advanced filter'},
+    filterTitle:{ar:'🔍 بحث وتصفية', en:'🔍 Search & filter'},
+    filterAllGens:{ar:'كل الأجيال', en:'All generations'},
+    filterAllGenders:{ar:'كل الأنواع', en:'All genders'},
+    filterAllStatus:{ar:'الكل (أحياء وراحلون)', en:'All (living & deceased)'},
+    filterAllCities:{ar:'كل المدن', en:'All cities'},
+    filterCount:{ar:'{n} نتيجة', en:'{n} results'},
+    filterNoResults:{ar:'لا نتائج مطابقة.', en:'No matches.'},
     toastNameRequired:{ar:'يرجى إدخال الاسم', en:'Please enter a name'},
     toastSaved:{ar:'تم الحفظ بنجاح', en:'Saved successfully'},
     toastDeleted:{ar:'تم الحذف', en:'Deleted'},
@@ -1191,7 +1199,7 @@
           '<div class="leaf stats" data-go="stats"><span class="corner">۞</span><div class="ic">📊</div><h3>'+t('cardStats')+'</h3><p>'+t('cardStatsSub')+'</p></div>' +
           '<div class="leaf places" data-go="places"><span class="corner">۞</span><div class="ic">📍</div><h3>'+t('cardPlaces')+'</h3><p>'+t('cardPlacesSub')+'</p></div>' +
         '</div>' +
-        '<div class="home-search"><input type="text" id="homeSearch" placeholder="'+escapeHtml(t('searchPlaceholder'))+'"><div class="home-search-results" id="homeSearchResults"></div></div>' +
+        '<div class="home-search"><input type="text" id="homeSearch" placeholder="'+escapeHtml(t('searchPlaceholder'))+'"><button class="home-filter-btn" id="homeFilterBtn">'+t('filterBtn')+'</button><div class="home-search-results" id="homeSearchResults"></div></div>' +
         '<div class="meter-card">' +
           '<div class="meter-top"><h3>'+t('completionTitle')+'</h3><b>'+localeDigits(pct)+'%</b></div>' +
           '<div class="bar"><i style="width:'+pct+'%"></i></div>' +
@@ -1209,6 +1217,7 @@
     };
     host.querySelector('[data-go="stats"]').onclick = function(){ showStats(); };
     host.querySelector('[data-go="places"]').onclick = function(){ showPlaces(); };
+    var filterBtn = host.querySelector('#homeFilterBtn'); if(filterBtn) filterBtn.onclick = function(){ showFilter(); };
     wireOccasionsCard(host);
 
     // Live people search: type a name → matching people → tap to jump to the card.
@@ -1367,6 +1376,63 @@
     });
   }
   window.__ftShowAddResidence = showAddResidence;
+
+  function showFilter(){
+    var people = state.people || {};
+    var ids = Object.keys(people);
+    var gensSet = {}; ids.forEach(function(id){ gensSet[genOfPerson(id)] = true; });
+    var genOpts = Object.keys(gensSet).map(Number).sort(function(a,b){ return a-b; });
+    var citySet = {}; ids.forEach(function(id){ var c=(people[id].residence||'').trim(); if(c) citySet[c]=true; });
+    var cityOpts = Object.keys(citySet).sort(function(a,b){ return a.localeCompare(b,'ar'); });
+
+    openSheet(
+      '<h3>'+t('filterTitle')+'</h3>'+
+      '<div class="field"><input type="text" id="flt_q" placeholder="'+escapeHtml(t('searchPlaceholder'))+'"></div>'+
+      '<div class="filter-row">'+
+        '<select id="flt_gen"><option value="">'+t('filterAllGens')+'</option>'+genOpts.map(function(g){ return '<option value="'+g+'">'+escapeHtml(genLabel(g))+'</option>'; }).join('')+'</select>'+
+        '<select id="flt_gender"><option value="">'+t('filterAllGenders')+'</option><option value="m">'+t('statsMales')+'</option><option value="f">'+t('statsFemales')+'</option></select>'+
+      '</div>'+
+      '<div class="filter-row">'+
+        '<select id="flt_status"><option value="">'+t('filterAllStatus')+'</option><option value="living">'+t('statsLiving')+'</option><option value="deceased">'+t('statsDeceased')+'</option></select>'+
+        '<select id="flt_city"><option value="">'+t('filterAllCities')+'</option>'+cityOpts.map(function(c){ return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>'; }).join('')+'</select>'+
+      '</div>'+
+      '<div class="filter-count" id="flt_count"></div>'+
+      '<div class="filter-results" id="flt_results"></div>'
+    );
+
+    function apply(){
+      var q = document.getElementById('flt_q').value.trim().toLowerCase();
+      var gen = document.getElementById('flt_gen').value;
+      var gender = document.getElementById('flt_gender').value;
+      var status = document.getElementById('flt_status').value;
+      var city = document.getElementById('flt_city').value;
+      var matches = ids.filter(function(id){
+        var p = people[id];
+        if(q && fullNameOf(p).toLowerCase().indexOf(q) === -1) return false;
+        if(gen !== '' && genOfPerson(id) !== +gen) return false;
+        if(gender && p.gender !== gender) return false;
+        if(status === 'living' && isDeceased(p)) return false;
+        if(status === 'deceased' && !isDeceased(p)) return false;
+        if(city && (p.residence||'').trim() !== city) return false;
+        return true;
+      });
+      matches.sort(function(a,b){ return fullNameOf(people[a]).localeCompare(fullNameOf(people[b]),'ar'); });
+      document.getElementById('flt_count').textContent = tf('filterCount', { n: localeDigits(matches.length) });
+      var res = document.getElementById('flt_results');
+      if(!matches.length){ res.innerHTML = '<div class="context">'+t('filterNoResults')+'</div>'; return; }
+      res.innerHTML = matches.slice(0,100).map(function(id){
+        var p = people[id];
+        return '<div class="flt-result" data-profile="'+escapeHtml(id)+'"><span class="hs-av">'+(p.gender==='f'?'👩':'👨')+'</span>'+escapeHtml(fullNameOf(p))+(isDeceased(p)?' <span class="flt-dead">🕊</span>':'')+'</div>';
+      }).join('');
+      res.querySelectorAll('.flt-result[data-profile]').forEach(function(el){ el.onclick = function(){ openProfile(el.getAttribute('data-profile')); }; });
+    }
+    ['flt_q','flt_gen','flt_gender','flt_status','flt_city'].forEach(function(idf){
+      var el = document.getElementById(idf); if(!el) return;
+      el.addEventListener('input', apply); el.addEventListener('change', apply);
+    });
+    apply();
+  }
+  window.__ftShowFilter = showFilter;
 
   // Bulk-mark deceased without dates (for the older generations). A person already
   // deceased by a death date is shown checked & disabled (change that in their profile).

@@ -563,3 +563,11 @@ html.dark{ --t-stats:rgba(62,154,164,.20); --t-places:rgba(169,107,68,.22); --cl
 .sheet-close{ position:absolute; top:10px; inset-inline-end:14px; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--card); color:var(--ink-soft); font-size:16px; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:3; box-shadow:var(--shadow); }
 .sheet-close:active{ background:var(--paper); }
 #sheetBody{ padding-top:6px; }
+
+/* Respect the device's TOP safe area (status bar / notch) — the app uses
+   viewport-fit=cover + black-translucent, so top chrome must inset or it hides
+   under the status bar on phones. (Bottom nav already insets.) */
+#tab-home .masthead, #tab-settings .masthead{ padding-top: calc(env(safe-area-inset-top, 0px) + 18px); }
+#tab-tree .banner{ padding-top: calc(env(safe-area-inset-top, 0px) + 10px); }
+.moments-header{ padding-top: calc(env(safe-area-inset-top, 0px) + 12px); }
+#authGate{ padding-top: env(safe-area-inset-top, 0px); box-sizing:border-box; }

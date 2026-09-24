@@ -136,6 +136,25 @@
     addDatesTitle:{ar:'➕ إضافة تواريخ الميلاد', en:'➕ Add birth dates'},
     addDatesDesc:{ar:'أفراد بلا تاريخ ميلاد — أدخل التاريخ ليُحفظ فورًا وتظهر تذكيراته.', en:'People with no birth date — set one and it saves instantly.'},
     addDatesNone:{ar:'كل الأفراد لديهم تاريخ ميلاد 🎉', en:'Everyone has a birth date 🎉'},
+    cardStats:{ar:'الإحصاءات', en:'Statistics'},
+    cardStatsSub:{ar:'أرقام العائلة في لمحة', en:'Your family at a glance'},
+    statsTitle:{ar:'📊 إحصاءات العائلة', en:'📊 Family statistics'},
+    statsTotal:{ar:'إجمالي الأفراد', en:'Total members'},
+    statsMales:{ar:'ذكور', en:'Males'},
+    statsFemales:{ar:'إناث', en:'Females'},
+    statsLiving:{ar:'أحياء', en:'Living'},
+    statsDeceased:{ar:'في ذمة الله', en:'Deceased'},
+    statsGenerations:{ar:'الأجيال', en:'Generations'},
+    statsMostChildren:{ar:'الأكثر أبناءً', en:'Most children'},
+    statsOldest:{ar:'الأكبر سنًّا', en:'Oldest'},
+    statsYoungest:{ar:'الأصغر سنًّا', en:'Youngest'},
+    statsAvgAge:{ar:'متوسط الأعمار', en:'Average age'},
+    statsTopCity:{ar:'المدينة الأكثر', en:'Top city'},
+    statsWithBirth:{ar:'لديهم تاريخ ميلاد', en:'Have a birth date'},
+    statsWithPhoto:{ar:'لديهم صورة', en:'Have a photo'},
+    statsYearsVal:{ar:'{n} سنة', en:'{n} yrs'},
+    statsChildrenVal:{ar:'{n} أبناء', en:'{n} children'},
+    statsEmpty:{ar:'أضف أفرادًا لعرض الإحصاءات.', en:'Add members to see statistics.'},
     toastNameRequired:{ar:'يرجى إدخال الاسم', en:'Please enter a name'},
     toastSaved:{ar:'تم الحفظ بنجاح', en:'Saved successfully'},
     toastDeleted:{ar:'تم الحذف', en:'Deleted'},
@@ -1140,6 +1159,7 @@
           '<div class="leaf feed" data-go="moments"><span class="corner">۞</span><div class="ic">📰</div><h3>'+t('cardFeed')+'</h3><p>'+t('cardFeedSub')+'</p></div>' +
           '<div class="leaf activity" data-go="activity"><span class="corner">۞</span><div class="ic">📋</div><h3>'+t('cardActivity')+'</h3><p>'+t('cardActivitySub')+'</p></div>' +
           '<div class="leaf members" data-go="members"><span class="corner">۞</span><div class="ic">👥</div><h3>'+t('cardMembers')+'</h3><p>'+t('cardMembersSub')+'</p></div>' +
+          '<div class="leaf stats" data-go="stats"><span class="corner">۞</span><div class="ic">📊</div><h3>'+t('cardStats')+'</h3><p>'+t('cardStatsSub')+'</p></div>' +
         '</div>' +
         '<div class="home-search"><input type="text" id="homeSearch" placeholder="'+escapeHtml(t('searchPlaceholder'))+'"><div class="home-search-results" id="homeSearchResults"></div></div>' +
         '<div class="meter-card">' +
@@ -1157,6 +1177,7 @@
     host.querySelector('[data-go="members"]').onclick = function(){
       if(window.__ftCloud && window.__ftCloud.showMembers) window.__ftCloud.showMembers(); else toast(t('comingSoon'));
     };
+    host.querySelector('[data-go="stats"]').onclick = function(){ showStats(); };
     wireOccasionsCard(host);
 
     // Live people search: type a name → matching people → tap to jump to the card.
@@ -1228,6 +1249,41 @@
     });
   }
   window.__ftShowAddDates = showAddDates;
+
+  function statTile(label, value, sub){
+    return '<div class="stat-tile"><div class="stat-val">'+value+'</div>'+
+      '<div class="stat-label">'+label+'</div>'+
+      (sub ? '<div class="stat-sub">'+sub+'</div>' : '')+'</div>';
+  }
+  function showStats(){
+    if(!window.ftStats){ toast(t('comingSoon')); return; }
+    var s = window.ftStats(state.people || {}, new Date());
+    var body;
+    if(!s.total){
+      body = '<div class="context">'+t('statsEmpty')+'</div>';
+    } else {
+      var nm = function(id){ var p = getPerson(id); return p ? escapeHtml(fullNameOf(p)) : '—'; };
+      var d = localeDigits;
+      var tiles = [
+        statTile(t('statsTotal'), d(s.total)),
+        statTile(t('statsGenerations'), d(s.generations)),
+        statTile(t('statsMales'), d(s.males)),
+        statTile(t('statsFemales'), d(s.females)),
+        statTile(t('statsLiving'), d(s.living)),
+        statTile(t('statsDeceased'), d(s.deceased))
+      ];
+      if(s.avgAge != null) tiles.push(statTile(t('statsAvgAge'), tf('statsYearsVal', { n: d(s.avgAge) })));
+      if(s.oldest) tiles.push(statTile(t('statsOldest'), tf('statsYearsVal', { n: d(s.oldest.age) }), nm(s.oldest.id)));
+      if(s.youngest) tiles.push(statTile(t('statsYoungest'), tf('statsYearsVal', { n: d(s.youngest.age) }), nm(s.youngest.id)));
+      if(s.mostChildren) tiles.push(statTile(t('statsMostChildren'), tf('statsChildrenVal', { n: d(s.mostChildren.count) }), nm(s.mostChildren.id)));
+      if(s.topCity) tiles.push(statTile(t('statsTopCity'), escapeHtml(s.topCity.city), d(s.topCity.count)));
+      tiles.push(statTile(t('statsWithBirth'), d(s.withBirthDate)));
+      tiles.push(statTile(t('statsWithPhoto'), d(s.withPhoto)));
+      body = '<div class="stats-grid">'+tiles.join('')+'</div>';
+    }
+    openSheet('<h3>'+t('statsTitle')+'</h3>'+body);
+  }
+  window.__ftShowStats = showStats;
 
   /* ============== Settings tab ============== */
   function ftReadFontScale(){ try { return localStorage.getItem('ft_fontscale') || 'md'; } catch(e){ return 'md'; } }

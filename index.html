@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=16">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;500;600;700;800&family=Lora:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=17">
+<link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body>
 
@@ -181,6 +181,7 @@
     add('kinship.js')
       .then(function(){ return add('translit.js'); })
       .then(function(){ return add('occasions.js'); })
+      .then(function(){ return add('stats.js'); })
       .then(function(){ return add('app.js'); })
       .then(function(){ return add('cloud.js', 'module'); });
   })();

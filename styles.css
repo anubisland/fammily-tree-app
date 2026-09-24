@@ -523,3 +523,23 @@
 
 /* --- Larger, distinctive city headings in Places --- */
 .place-city{ font-size:18px; padding:8px 12px; margin:16px 0 2px; background:var(--paper-deep); border-radius:10px; border-inline-start:4px solid var(--gold); }
+
+/* ===== Home polish: centered title, distinct calm card colors, filter bar ===== */
+:root{ --t-stats:#CFE3E6; --t-places:#EBD6C0; --clay:#A96B44; }
+html.dark{ --t-stats:rgba(62,154,164,.20); --t-places:rgba(169,107,68,.22); --clay:#C88A5E; }
+
+/* App title centered + distinctive calligraphic font; family name beside the tree, smaller */
+#tab-home .app-title{ font-family:'Aref Ruqaa', var(--f-head); font-size:33px; font-weight:700; color:#F6EFDD; text-align:center; line-height:1.15; position:relative; z-index:1; letter-spacing:.5px; }
+#tab-home .fam-row{ display:flex; align-items:center; justify-content:center; gap:9px; margin-top:8px; position:relative; z-index:1; }
+#tab-home .fam-row .crest{ width:34px; height:34px; font-size:19px; border-radius:10px; }
+#tab-home .fam-row .family-name{ font-family:var(--f-head); font-size:22px; font-weight:700; color:#DFC998; margin:0; }
+
+/* Distinct, calm colors for the Stats and Places cards */
+#tab-home .leaf.stats{ background:var(--t-stats); border-top-color:var(--teal); }
+#tab-home .leaf.stats .ic{ border-color:var(--teal); }
+#tab-home .leaf.places{ background:var(--t-places); border-top-color:var(--clay); }
+#tab-home .leaf.places .ic{ border-color:var(--clay); background:linear-gradient(155deg, var(--clay), #7d4d2e); }
+
+/* Distinctive but calm advanced-filter bar */
+#tab-home .home-filter-btn{ background:var(--emerald); color:#F6EFDD; border:none; font-weight:700; box-shadow:var(--shadow); }
+#tab-home .home-filter-btn:active{ background:var(--emerald-deep); }

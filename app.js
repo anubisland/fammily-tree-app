@@ -1177,10 +1177,8 @@
 
     host.innerHTML =
       '<div class="masthead">' +
-        '<div class="brand-row">' +
-          '<div class="crest">🌳</div>' +
-          '<div><div class="app-name">'+t('appName')+'</div><div class="family-name">'+escapeHtml(fam)+'</div></div>' +
-        '</div>' +
+        '<div class="app-title">'+t('appName')+'</div>' +
+        '<div class="fam-row"><span class="crest">🌳</span><span class="family-name">'+escapeHtml(fam)+'</span></div>' +
         '<div class="tadhib"><span class="dia">◆</span><span class="rule"></span><span class="dia">◆</span></div>' +
         '<div class="home-stat-row">' +
           '<div class="home-stat"><b>'+localeDigits(count)+'</b><span>'+t('statMembers')+'</span></div>' +

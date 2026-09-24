@@ -160,6 +160,15 @@
     statsYearsVal:{ar:'{n} سنة', en:'{n} yrs'},
     statsChildrenVal:{ar:'{n} أبناء', en:'{n} children'},
     statsEmpty:{ar:'أضف أفرادًا لعرض الإحصاءات.', en:'Add members to see statistics.'},
+    cardPlaces:{ar:'الأماكن', en:'Places'},
+    cardPlacesSub:{ar:'العائلة حسب مدن الإقامة', en:'Family by city'},
+    placesTitle:{ar:'📍 أماكن العائلة', en:'📍 Family places'},
+    placesWithout:{ar:'بلا مكان إقامة', en:'No residence set'},
+    placesAdd:{ar:'➕ أضف أماكن الإقامة', en:'➕ Add residences'},
+    placesEmpty:{ar:'لا أماكن بعد — أضف أماكن إقامة الأفراد لتظهر هنا.', en:'No places yet — add residences to see them here.'},
+    addResTitle:{ar:'➕ إضافة أماكن الإقامة', en:'➕ Add residences'},
+    addResDesc:{ar:'أفراد بلا مكان إقامة — اكتب المدينة ليُحفظ فورًا.', en:'People with no residence — type a city to save it instantly.'},
+    addResNone:{ar:'كل الأفراد لديهم مكان إقامة 🎉', en:'Everyone has a residence 🎉'},
     toastNameRequired:{ar:'يرجى إدخال الاسم', en:'Please enter a name'},
     toastSaved:{ar:'تم الحفظ بنجاح', en:'Saved successfully'},
     toastDeleted:{ar:'تم الحذف', en:'Deleted'},
@@ -1172,6 +1181,7 @@
           '<div class="leaf activity" data-go="activity"><span class="corner">۞</span><div class="ic">📋</div><h3>'+t('cardActivity')+'</h3><p>'+t('cardActivitySub')+'</p></div>' +
           '<div class="leaf members" data-go="members"><span class="corner">۞</span><div class="ic">👥</div><h3>'+t('cardMembers')+'</h3><p>'+t('cardMembersSub')+'</p></div>' +
           '<div class="leaf stats" data-go="stats"><span class="corner">۞</span><div class="ic">📊</div><h3>'+t('cardStats')+'</h3><p>'+t('cardStatsSub')+'</p></div>' +
+          '<div class="leaf places" data-go="places"><span class="corner">۞</span><div class="ic">📍</div><h3>'+t('cardPlaces')+'</h3><p>'+t('cardPlacesSub')+'</p></div>' +
         '</div>' +
         '<div class="home-search"><input type="text" id="homeSearch" placeholder="'+escapeHtml(t('searchPlaceholder'))+'"><div class="home-search-results" id="homeSearchResults"></div></div>' +
         '<div class="meter-card">' +
@@ -1190,6 +1200,7 @@
       if(window.__ftCloud && window.__ftCloud.showMembers) window.__ftCloud.showMembers(); else toast(t('comingSoon'));
     };
     host.querySelector('[data-go="stats"]').onclick = function(){ showStats(); };
+    host.querySelector('[data-go="places"]').onclick = function(){ showPlaces(); };
     wireOccasionsCard(host);
 
     // Live people search: type a name → matching people → tap to jump to the card.
@@ -1296,6 +1307,58 @@
     openSheet('<h3>'+t('statsTitle')+'</h3>'+body);
   }
   window.__ftShowStats = showStats;
+
+  function showPlaces(){
+    if(!window.ftPlaces){ toast(t('comingSoon')); return; }
+    var r = window.ftPlaces(state.people || {});
+    var body;
+    if(!r.groups.length){
+      body = '<div class="occ-empty">'+t('placesEmpty')+
+             '<button class="occ-adddates" data-go="addres">'+t('placesAdd')+'</button></div>';
+    } else {
+      body = r.groups.map(function(g){
+        var members = g.ids.map(function(id){
+          var p = getPerson(id); if(!p) return '';
+          return '<div class="place-member" data-profile="'+escapeHtml(id)+'">'+escapeHtml(fullNameOf(p))+'</div>';
+        }).join('');
+        return '<div class="place-group"><div class="place-city">📍 '+escapeHtml(g.city)+' <span class="place-count">('+localeDigits(g.ids.length)+')</span></div>'+members+'</div>';
+      }).join('');
+      if(r.withoutCount > 0){
+        body += '<div class="place-without">'+t('placesWithout')+': '+localeDigits(r.withoutCount)+
+                ' <button class="place-addbtn" data-go="addres">'+t('placesAdd')+'</button></div>';
+      }
+    }
+    openSheet('<h3>'+t('placesTitle')+'</h3>'+body);
+    sheetBody.querySelectorAll('.place-member[data-profile]').forEach(function(el){
+      el.onclick = function(){ openProfile(el.getAttribute('data-profile')); };
+    });
+    sheetBody.querySelectorAll('[data-go="addres"]').forEach(function(b){
+      b.onclick = function(){ showAddResidence(); };
+    });
+  }
+  window.__ftShowPlaces = showPlaces;
+
+  function showAddResidence(){
+    var missing = Object.keys(state.people).filter(function(id){ return !(state.people[id].residence || '').trim(); });
+    var rows = missing.map(function(id){
+      return '<div class="adddate-row">'+
+        '<span class="adddate-name">'+escapeHtml(fullNameOf(getPerson(id)))+'</span>'+
+        '<input type="text" class="addres-input" data-id="'+escapeHtml(id)+'" placeholder="'+escapeHtml(t('residencePh'))+'">'+
+      '</div>';
+    }).join('');
+    openSheet('<h3>'+t('addResTitle')+'</h3>'+
+      '<div class="context">'+t('addResDesc')+'</div>'+
+      '<div class="adddate-list">'+(missing.length ? rows : '<div class="context">'+t('addResNone')+'</div>')+'</div>');
+    sheetBody.querySelectorAll('.addres-input').forEach(function(inp){
+      inp.onchange = function(){
+        var p = getPerson(inp.getAttribute('data-id')); if(!p) return;
+        var v = inp.value.trim(); if(!v) return;
+        p.residence = v; scheduleSave();
+        var row = inp.parentNode; if(row) row.classList.add('saved');
+      };
+    });
+  }
+  window.__ftShowAddResidence = showAddResidence;
 
   // Bulk-mark deceased without dates (for the older generations). A person already
   // deceased by a death date is shown checked & disabled (change that in their profile).

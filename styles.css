@@ -473,3 +473,7 @@
 .adddate-input{ flex-shrink:0; border:1.5px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink); padding:5px 8px; font-size:13px; }
 .adddate-row.saved{ opacity:0.55; }
 .adddate-row.saved .adddate-name::after{ content:' ✓'; color:var(--emerald); }
+
+/* Person profile — bio / about paragraph */
+.prof-bio{ font-size:13.5px; color:var(--ink); line-height:1.7; background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-top:4px; white-space:pre-wrap; }
+.field textarea#pf_bio{ width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line); background:var(--paper); font-size:14px; color:var(--ink); font-family:var(--f-body); resize:vertical; }

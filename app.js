@@ -78,6 +78,8 @@
     profileKinship:{ar:'القرابة', en:'Kinship'},
     residenceLabel:{ar:'مكان الإقامة (اختياري)', en:'Place of residence (optional)'},
     residencePh:{ar:'مثال: القاهرة، مصر', en:'e.g. Cairo, Egypt'},
+    bioLabel:{ar:'نبذة (اختياري)', en:'About (optional)'},
+    bioPh:{ar:'قصة، مهنة، ذكرى…', en:'A story, profession, memory…'},
     photoLabel:{ar:'الصورة الشخصية (اختياري)', en:'Photo (optional)'},
     photoChoose:{ar:'اختيار صورة', en:'Choose photo'},
     photoRemove:{ar:'إزالة الصورة', en:'Remove photo'},
@@ -280,13 +282,14 @@
   function newPerson(name, gender, parentId){
     return { id: uid(), name: name, gender: gender, parentId: parentId || null,
       spouseIds: [], childrenIds: [], collapsed: false,
-      birthDate: null, deathDate: null, residence: '', photo: null };
+      birthDate: null, deathDate: null, residence: '', bio: '', photo: null };
   }
 
   function migratePerson(p){
     if(p.birthDate === undefined) p.birthDate = null;
     if(p.deathDate === undefined) p.deathDate = null;
     if(p.residence === undefined) p.residence = '';
+    if(p.bio === undefined) p.bio = '';
     if(p.photo === undefined) p.photo = null;
     return p;
   }
@@ -664,12 +667,14 @@
     if((p.birthDate || null) !== (data.birthDate || null)) changed.push('تاريخ الميلاد');
     if((p.deathDate || null) !== (data.deathDate || null)) changed.push('تاريخ الوفاة');
     if((p.residence || '') !== (data.residence || '')) changed.push('مكان الإقامة');
+    if((p.bio || '') !== (data.bio || '')) changed.push('النبذة');
     if(data.photo !== undefined && p.photo !== data.photo) changed.push('الصورة');
 
     p.name = data.name; p.gender = data.gender;
     p.birthDate = data.birthDate || null;
     if(data.deathDate !== undefined) p.deathDate = data.deathDate || null;
     p.residence = data.residence || '';
+    p.bio = data.bio || '';
     if(data.photo !== undefined) p.photo = data.photo;
     scheduleSave(); render();
     if(changed.length){ logActivity('edit', nameStr(data.name), changed.join('، ')); }
@@ -1443,6 +1448,7 @@
     if(deceased) lines += '<div class="prof-line">🕊 <b>'+t('profileDeath')+':</b> '+escapeHtml(fmtDate(p.deathDate))+' · '+t('inMemory')+
       (lifespanText(p.birthDate,p.deathDate) ? ' <span class="prof-dim">('+escapeHtml(lifespanText(p.birthDate,p.deathDate))+')</span>' : '')+'</div>';
     if(p.residence) lines += '<div class="prof-line">📍 '+escapeHtml(p.residence)+'</div>';
+    if(p.bio) lines += '<div class="prof-bio">'+escapeHtml(p.bio)+'</div>';
     var spouses = (p.spouseIds||[]).map(getPerson);
     var children = (p.childrenIds||[]).map(getPerson);
     var actions = canEditCloud
@@ -1494,6 +1500,7 @@
       (isEdit ? '<div class="field"><label>'+t('birthLabel')+'</label><input type="date" id="pf_birth" value="'+escapeHtml(target.birthDate||'')+'"></div>' : '') +
       (isEdit ? '<div class="field"><label>'+t('deathLabel')+'</label><input type="date" id="pf_death" value="'+escapeHtml(target.deathDate||'')+'"></div>' : '') +
       (isEdit ? '<div class="field"><label>'+t('residenceLabel')+'</label><input type="text" id="pf_residence" placeholder="'+t('residencePh')+'" value="'+escapeHtml(target.residence||'')+'"></div>' : '') +
+      (isEdit ? '<div class="field"><label>'+t('bioLabel')+'</label><textarea id="pf_bio" rows="3" placeholder="'+t('bioPh')+'">'+escapeHtml(target.bio||'')+'</textarea></div>' : '') +
       (mode === 'child' ? '<div class="keep-open-row"><input type="checkbox" id="pf_keep" checked><label for="pf_keep">'+t('keepAdding')+'</label></div>' : '') +
       '<button class="primary-btn" id="pf_save">'+t('saveBtn')+'</button>'
     );
@@ -1546,6 +1553,7 @@
           birthDate: document.getElementById('pf_birth').value || null,
           deathDate: document.getElementById('pf_death').value || null,
           residence: document.getElementById('pf_residence').value.trim(),
+          bio: document.getElementById('pf_bio').value.trim(),
           photo: pendingPhoto
         });
       }

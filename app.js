@@ -252,6 +252,13 @@
     dupNone:{ar:'لا تكرارات — شجرتك نظيفة', en:'No duplicates — your tree is clean'},
     dupCtaLabel:{ar:'كشف التكرارات', en:'Find duplicates'},
     dupNoneShort:{ar:'لا شيء', en:'None'},
+    timelineTitle:{ar:'الخط الزمني للعائلة', en:'Family timeline'},
+    timelineCtaLabel:{ar:'الخط الزمني للعائلة', en:'Family timeline'},
+    timelineEmpty:{ar:'أضف تواريخ الميلاد والوفاة لتظهر قصة العائلة عبر الزمن.', en:'Add birth and death dates to see the family story across the years.'},
+    tlBorn:{ar:'وُلد', en:'born'},
+    tlBornF:{ar:'وُلدت', en:'born'},
+    tlDied:{ar:'في ذمة الله', en:'passed away'},
+    tlDiedF:{ar:'في ذمة الله', en:'passed away'},
     comingSoon:{ar:'قريباً', en:'Coming soon'},
     settingsTitle:{ar:'الإعدادات', en:'Settings'},
     setAppearance:{ar:'المظهر واللغة', en:'Appearance & language'},
@@ -1405,11 +1412,16 @@
       body = '<div class="stats-grid">'+tiles.join('')+'</div>';
       // Maintenance nudge: surface a duplicate-review entry with a live count.
       var dupN = window.ftDuplicates ? window.ftDuplicates(state.people || {}).length : 0;
+      body += '<button class="dup-cta" id="statsTimelineBtn">' +
+              '<span>📜 '+t('timelineCtaLabel')+'</span>' +
+              '<b>›</b></button>';
       body += '<button class="dup-cta'+(dupN?' has':'')+'" id="statsDupBtn">' +
               '<span>🔍 '+t('dupCtaLabel')+'</span>' +
               '<b>'+(dupN ? localeDigits(dupN) : t('dupNoneShort'))+'</b></button>';
     }
     openSheet('<h3>'+t('statsTitle')+'</h3>'+body);
+    var tlBtn = document.getElementById('statsTimelineBtn');
+    if(tlBtn) tlBtn.onclick = function(){ showTimeline(); };
     var dupBtn = document.getElementById('statsDupBtn');
     if(dupBtn) dupBtn.onclick = function(){ showDuplicates(); };
   }
@@ -1497,6 +1509,38 @@
     });
   }
   window.__ftShowDuplicates = showDuplicates;
+
+  // Family timeline: the family's story across the years — births and deaths in
+  // one chronological stream, grouped by decade. Each row jumps to the person.
+  function showTimeline(){
+    if(!window.ftTimeline){ toast(t('comingSoon')); return; }
+    var events = window.ftTimeline(state.people || {});
+    var head = '<h3>'+t('timelineTitle')+'</h3>';
+    if(!events.length){ openSheet(head + '<div class="context">'+t('timelineEmpty')+'</div>'); return; }
+    var html = '', lastDecade = null;
+    events.forEach(function(e){
+      var p = getPerson(e.id); if(!p) return;
+      var decade = Math.floor(e.year / 10) * 10;
+      if(decade !== lastDecade){
+        html += '<div class="tl-decade">'+localeDigits(decade)+'</div>';
+        lastDecade = decade;
+      }
+      var female = p.gender === 'f';
+      var verb = e.type === 'death' ? t(female ? 'tlDiedF' : 'tlDied') : t(female ? 'tlBornF' : 'tlBorn');
+      var icon = e.type === 'death' ? '🕊' : '🎂';
+      html += '<button class="tl-row tl-'+e.type+'" data-id="'+escapeHtml(e.id)+'">' +
+                '<span class="tl-year">'+localeDigits(e.year)+'</span>' +
+                '<span class="tl-dot">'+icon+'</span>' +
+                '<span class="tl-text"><b>'+escapeHtml(fullNameOf(p))+'</b> · '+verb+'</span>' +
+              '</button>';
+    });
+    openSheet(head + '<div class="tl-list">'+html+'</div>');
+    var sheet = document.getElementById('sheet');
+    if(sheet) sheet.querySelectorAll('.tl-row').forEach(function(r){
+      r.onclick = function(){ var id = r.getAttribute('data-id'); closeSheet(); focusPerson(id); };
+    });
+  }
+  window.__ftShowTimeline = showTimeline;
 
   // Rank each person in family/tree order (father, then mother, then their
   // children — same order the tree renders), so name lists read naturally.

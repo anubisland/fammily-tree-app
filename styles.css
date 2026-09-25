@@ -569,6 +569,17 @@
 .dup-cta.has{ border-color:var(--gold); background:#FBF1DC; }
 .dup-cta.has b{ color:#9A6B12; }
 
+/* Family timeline sheet */
+.tl-list{ margin-top:10px; position:relative; }
+.tl-decade{ font-family:var(--f-head); font-size:15px; font-weight:800; color:var(--emerald); margin:16px 0 8px; padding-bottom:4px; border-bottom:1.5px solid var(--line); }
+.tl-row{ display:flex; align-items:center; gap:10px; width:100%; text-align:start; background:var(--card); border:1px solid var(--line); border-radius:11px; padding:9px 11px; margin-bottom:8px; cursor:pointer; font-family:var(--f-body); transition:background .12s ease; }
+.tl-row:active{ background:var(--paper); }
+.tl-year{ font-family:var(--f-head); font-size:13px; font-weight:700; color:var(--ink-soft); flex-shrink:0; min-width:46px; }
+.tl-dot{ font-size:15px; flex-shrink:0; }
+.tl-text{ flex:1; font-size:13.5px; color:var(--ink); line-height:1.5; }
+.tl-row.tl-death{ background:var(--paper); }
+.tl-row.tl-death .tl-text{ color:var(--ink-soft); }
+
 /* Mark-deceased list checkbox */
 .deceased-check{ width:22px; height:22px; flex-shrink:0; accent-color:var(--emerald); }
 

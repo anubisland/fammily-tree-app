@@ -252,6 +252,15 @@
     dupNone:{ar:'لا تكرارات — شجرتك نظيفة', en:'No duplicates — your tree is clean'},
     dupCtaLabel:{ar:'كشف التكرارات', en:'Find duplicates'},
     dupNoneShort:{ar:'لا شيء', en:'None'},
+    chartGender:{ar:'الذكور والإناث', en:'Male / Female'},
+    chartGenerations:{ar:'توزيع الأجيال', en:'By generation'},
+    chartAges:{ar:'الأعمار (الأحياء)', en:'Ages (living)'},
+    chartCities:{ar:'أكثر المدن', en:'Top cities'},
+    ageB012:{ar:'أطفال', en:'Children'},
+    ageB1319:{ar:'مراهقون', en:'Teens'},
+    ageB2039:{ar:'شباب', en:'20–39'},
+    ageB4059:{ar:'كهول', en:'40–59'},
+    ageB60:{ar:'كبار السن', en:'60+'},
     timelineTitle:{ar:'الخط الزمني للعائلة', en:'Family timeline'},
     timelineCtaLabel:{ar:'الخط الزمني للعائلة', en:'Family timeline'},
     timelineEmpty:{ar:'أضف تواريخ الميلاد والوفاة لتظهر قصة العائلة عبر الزمن.', en:'Add birth and death dates to see the family story across the years.'},
@@ -1385,6 +1394,57 @@
       '<div class="stat-label">'+label+'</div>'+
       (sub ? '<div class="stat-sub">'+sub+'</div>' : '')+'</div>';
   }
+
+  // Horizontal bar chart (RTL-native, accessible: every bar carries its label and
+  // value, so identity never rests on colour). Single emerald hue = sequential
+  // magnitude, no CVD adjacency. items: [{label, count}].
+  function chartBars(items){
+    var max = items.reduce(function(m, it){ return it.count > m ? it.count : m; }, 0) || 1;
+    return '<div class="chart-bars">' + items.map(function(it){
+      var pct = Math.round((it.count / max) * 100);
+      return '<div class="cbar-row">' +
+               '<span class="cbar-label">'+escapeHtml(it.label)+'</span>' +
+               '<span class="cbar-track"><i style="width:'+pct+'%"></i></span>' +
+               '<span class="cbar-val">'+localeDigits(it.count)+'</span>' +
+             '</div>';
+    }).join('') + '</div>';
+  }
+  // Gender: two labelled categories (emerald ♂ / gold ♀), validated ΔE 27; the
+  // ♂/♀ glyphs + counts are the secondary encoding so it's never colour-alone.
+  function genderSplitHtml(m, f){
+    var total = (m + f) || 1;
+    var mp = Math.round(m / total * 100), fp = 100 - mp;
+    return '<div class="gender-split">' +
+      '<div class="gs-bar">' +
+        (m ? '<span class="gs-m" style="width:'+mp+'%"></span>' : '') +
+        (f ? '<span class="gs-f" style="width:'+fp+'%"></span>' : '') +
+      '</div>' +
+      '<div class="gs-legend">' +
+        '<span class="gs-key"><span class="gs-dot gs-dot-m"></span>♂ '+t('statsMales')+' ('+localeDigits(m)+')</span>' +
+        '<span class="gs-key"><span class="gs-dot gs-dot-f"></span>♀ '+t('statsFemales')+' ('+localeDigits(f)+')</span>' +
+      '</div>' +
+    '</div>';
+  }
+  var AGE_LABELS = { '0-12':'ageB012', '13-19':'ageB1319', '20-39':'ageB2039', '40-59':'ageB4059', '60+':'ageB60' };
+  function statsChartsHtml(){
+    if(!window.ftStatsBreakdown) return '';
+    var bd = window.ftStatsBreakdown(state.people || {}, new Date());
+    var out = '';
+    out += '<div class="chart-block"><div class="chart-title">'+t('chartGender')+'</div>'+genderSplitHtml(bd.gender.m, bd.gender.f)+'</div>';
+    if(bd.generations.length){
+      var genItems = bd.generations.map(function(g){ return { label: genLabel(g.gen), count: g.count }; });
+      out += '<div class="chart-block"><div class="chart-title">'+t('chartGenerations')+'</div>'+chartBars(genItems)+'</div>';
+    }
+    var ageItems = bd.ageBuckets.filter(function(a){ return a.count > 0; }).map(function(a){ return { label: t(AGE_LABELS[a.key]), count: a.count }; });
+    if(ageItems.length){
+      out += '<div class="chart-block"><div class="chart-title">'+t('chartAges')+'</div>'+chartBars(ageItems)+'</div>';
+    }
+    if(bd.topCities.length){
+      var cityItems = bd.topCities.map(function(c){ return { label: c.city, count: c.count }; });
+      out += '<div class="chart-block"><div class="chart-title">'+t('chartCities')+'</div>'+chartBars(cityItems)+'</div>';
+    }
+    return '<div class="charts-wrap">'+out+'</div>';
+  }
   function showStats(){
     if(!window.ftStats){ toast(t('comingSoon')); return; }
     var s = window.ftStats(state.people || {}, new Date());
@@ -1409,7 +1469,7 @@
       if(s.topCity) tiles.push(statTile(t('statsTopCity'), escapeHtml(s.topCity.city), d(s.topCity.count)));
       tiles.push(statTile(t('statsWithBirth'), d(s.withBirthDate)));
       tiles.push(statTile(t('statsWithPhoto'), d(s.withPhoto)));
-      body = '<div class="stats-grid">'+tiles.join('')+'</div>';
+      body = statsChartsHtml() + '<div class="stats-grid">'+tiles.join('')+'</div>';
       // Maintenance nudge: surface a duplicate-review entry with a live count.
       var dupN = window.ftDuplicates ? window.ftDuplicates(state.people || {}).length : 0;
       body += '<button class="dup-cta" id="statsTimelineBtn">' +

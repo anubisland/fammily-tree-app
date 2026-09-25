@@ -86,6 +86,60 @@
     };
   }
 
-  if(typeof module !== 'undefined' && module.exports) module.exports = ftStats;
+  // Chart-ready breakdowns for the stats visualisations. Kept separate from
+  // ftStats so its 13 existing tests stay untouched. Returns plain count arrays;
+  // the caller supplies labels/colours (repo convention: engine = data only).
+  var AGE_BUCKETS = [
+    { key: '0-12',  min: 0,  max: 12 },
+    { key: '13-19', min: 13, max: 19 },
+    { key: '20-39', min: 20, max: 39 },
+    { key: '40-59', min: 40, max: 59 },
+    { key: '60+',   min: 60, max: Infinity }
+  ];
+
+  function ftStatsBreakdown(people, today){
+    people = people || {};
+    today = today || new Date();
+    var ids = Object.keys(people);
+
+    var males = 0, females = 0;
+    var cities = {};
+    var ageCounts = AGE_BUCKETS.map(function(){ return 0; });
+    var memo = {}, genCounts = [];
+
+    ids.forEach(function(id){
+      var p = people[id];
+      if(p.gender === 'f') females++; else males++;
+      var g = depth(id, people, memo);
+      genCounts[g] = (genCounts[g] || 0) + 1;
+      var isDead = !!(p.deathDate || p.deceased);
+      if(p.residence && String(p.residence).trim()){
+        var c = String(p.residence).trim();
+        cities[c] = (cities[c] || 0) + 1;
+      }
+      if(!isDead){
+        var a = ageOf(p.birthDate, today);
+        if(a != null){
+          for(var i=0;i<AGE_BUCKETS.length;i++){ if(a >= AGE_BUCKETS[i].min && a <= AGE_BUCKETS[i].max){ ageCounts[i]++; break; } }
+        }
+      }
+    });
+
+    var generations = [];
+    for(var gi=0; gi<genCounts.length; gi++) generations.push({ gen: gi, count: genCounts[gi] || 0 });
+
+    var ageBuckets = AGE_BUCKETS.map(function(b, i){ return { key: b.key, count: ageCounts[i] }; });
+
+    var topCities = Object.keys(cities).map(function(c){ return { city: c, count: cities[c] }; })
+      .sort(function(a, b){ return b.count - a.count; }).slice(0, 6);
+
+    return { gender: { m: males, f: females }, generations: generations, ageBuckets: ageBuckets, topCities: topCities };
+  }
+
+  if(typeof module !== 'undefined' && module.exports){
+    module.exports = ftStats;
+    module.exports.breakdown = ftStatsBreakdown;
+  }
   global.ftStats = ftStats;
+  global.ftStatsBreakdown = ftStatsBreakdown;
 })(typeof window !== 'undefined' ? window : globalThis);

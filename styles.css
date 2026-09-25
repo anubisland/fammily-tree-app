@@ -540,6 +540,26 @@
 .field textarea#pf_bio{ width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line); background:var(--paper); font-size:14px; color:var(--ink); font-family:var(--f-body); resize:vertical; }
 
 /* Family statistics screen */
+/* Stats charts — HTML bars, RTL-native, label+value on every bar */
+.charts-wrap{ margin-top:12px; display:flex; flex-direction:column; gap:16px; }
+.chart-block{ }
+.chart-title{ font-family:var(--f-head); font-size:14px; font-weight:700; color:var(--ink); margin-bottom:9px; }
+.chart-bars{ display:flex; flex-direction:column; gap:7px; }
+.cbar-row{ display:flex; align-items:center; gap:9px; }
+.cbar-label{ font-size:12.5px; color:var(--ink-soft); flex:0 0 82px; text-align:start; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cbar-track{ flex:1; height:12px; background:var(--paper-deep); border-radius:6px; overflow:hidden; }
+.cbar-track i{ display:block; height:100%; background:linear-gradient(90deg, var(--emerald-deep), var(--emerald)); border-radius:6px; min-width:3px; }
+.cbar-val{ font-family:var(--f-head); font-size:13px; font-weight:700; color:var(--emerald); flex:0 0 28px; text-align:end; }
+.gender-split{ }
+.gs-bar{ display:flex; height:16px; border-radius:8px; overflow:hidden; gap:2px; background:var(--paper-deep); }
+.gs-bar .gs-m{ background:var(--emerald); height:100%; }
+.gs-bar .gs-f{ background:var(--gold); height:100%; }
+.gs-legend{ display:flex; gap:16px; margin-top:8px; flex-wrap:wrap; }
+.gs-key{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); font-weight:600; }
+.gs-dot{ width:11px; height:11px; border-radius:3px; display:inline-block; }
+.gs-dot-m{ background:var(--emerald); }
+.gs-dot-f{ background:var(--gold); }
+
 .stats-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
 .stat-tile{ background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:12px 10px; text-align:center; }
 .stat-val{ font-family:var(--f-head); font-size:22px; font-weight:700; color:var(--emerald); line-height:1.1; }

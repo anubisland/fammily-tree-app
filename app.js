@@ -696,9 +696,10 @@
         canvas.width = cw; canvas.height = ch;
         var ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, cw, ch);
-        cb(canvas.toDataURL('image/jpeg', 0.72));
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.72);   // instant preview
+        canvas.toBlob(function(blob){ cb(blob, dataUrl); }, 'image/jpeg', 0.72);
       };
-      img.onerror = function(){ cb(null); };
+      img.onerror = function(){ cb(null, null); };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
@@ -2000,14 +2001,14 @@
   }
 
   function wirePhotoRow(existingPhoto){
-    pendingPhoto = existingPhoto || null;
+    pendingPhoto = existingPhoto ? { dataUrl: existingPhoto, blob: null, existing: true } : null;
     document.getElementById('pf_choosePhoto').onclick = function(){ document.getElementById('pf_photoFile').click(); };
     document.getElementById('pf_photoFile').onchange = function(e){
       var file = e.target.files[0];
       if(!file) return;
-      resizeImage(file, 220, function(dataUrl){
-        if(!dataUrl) return;
-        pendingPhoto = dataUrl;
+      resizeImage(file, 220, function(blob, dataUrl){
+        if(!blob) return;
+        pendingPhoto = { blob: blob, dataUrl: dataUrl };   // was: pendingPhoto = dataUrl
         document.getElementById('pf_photoPreview').innerHTML = '<img src="'+dataUrl+'">';
         document.getElementById('pf_removePhoto').style.display = '';
       });

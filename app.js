@@ -244,6 +244,11 @@
     completionFieldNameEn:{ar:'بلا اسم إنجليزي', en:'Missing English name'},
     completionFieldBirthDate:{ar:'بلا تاريخ ميلاد', en:'Missing birth date'},
     completionFieldPhoto:{ar:'بلا صورة', en:'Missing photo'},
+    dupTitle:{ar:'تكرارات محتملة', en:'Possible duplicates'},
+    dupIntro:{ar:'أشخاص يحملون نفس الاسم وسلسلة النسب — قد يكونون مُدخَلين مرتين. اضغط على أي اسم لمراجعته وحذف الزائد يدوياً.', en:'People sharing the same name and lineage — possibly entered twice. Tap a name to review and delete the extra manually.'},
+    dupNone:{ar:'لا تكرارات — شجرتك نظيفة', en:'No duplicates — your tree is clean'},
+    dupCtaLabel:{ar:'كشف التكرارات', en:'Find duplicates'},
+    dupNoneShort:{ar:'لا شيء', en:'None'},
     comingSoon:{ar:'قريباً', en:'Coming soon'},
     settingsTitle:{ar:'الإعدادات', en:'Settings'},
     setAppearance:{ar:'المظهر واللغة', en:'Appearance & language'},
@@ -1389,8 +1394,15 @@
       tiles.push(statTile(t('statsWithBirth'), d(s.withBirthDate)));
       tiles.push(statTile(t('statsWithPhoto'), d(s.withPhoto)));
       body = '<div class="stats-grid">'+tiles.join('')+'</div>';
+      // Maintenance nudge: surface a duplicate-review entry with a live count.
+      var dupN = window.ftDuplicates ? window.ftDuplicates(state.people || {}).length : 0;
+      body += '<button class="dup-cta'+(dupN?' has':'')+'" id="statsDupBtn">' +
+              '<span>🔍 '+t('dupCtaLabel')+'</span>' +
+              '<b>'+(dupN ? localeDigits(dupN) : t('dupNoneShort'))+'</b></button>';
     }
     openSheet('<h3>'+t('statsTitle')+'</h3>'+body);
+    var dupBtn = document.getElementById('statsDupBtn');
+    if(dupBtn) dupBtn.onclick = function(){ showDuplicates(); };
   }
   window.__ftShowStats = showStats;
 
@@ -1439,6 +1451,43 @@
     });
   }
   window.__ftShowCompleteness = showCompleteness;
+
+  // Duplicate review: list clusters of people who share a full nasab key (same
+  // person entered twice). Each row jumps to that person's card so the owner can
+  // compare and delete the extra manually — we never auto-merge (personId is
+  // eternal, and cross-tree links point at ids).
+  function showDuplicates(){
+    if(!window.ftDuplicates){ toast(t('comingSoon')); return; }
+    var clusters = window.ftDuplicates(state.people || {});
+    var head = '<h3>'+t('dupTitle')+'</h3>';
+    if(!clusters.length){
+      openSheet(head + '<div class="comp-done">✅ '+t('dupNone')+'</div>');
+      return;
+    }
+    var body = '<div class="comp-intro context">'+t('dupIntro')+'</div>';
+    body += clusters.map(function(c){
+      var rows = c.ids.map(function(id){
+        var p = getPerson(id); if(!p) return '';
+        var gen = genLabel(genOfPerson(id));
+        return '<button class="comp-row" data-id="'+escapeHtml(id)+'">' +
+                 '<span class="comp-av">'+(p.gender==='f'?'👩':'👨')+'</span>' +
+                 '<span class="comp-name">'+escapeHtml(fullNameOf(p))+'</span>' +
+                 '<span class="dup-gen">'+escapeHtml(gen)+'</span>' +
+                 '<span class="comp-go">›</span>' +
+               '</button>';
+      }).join('');
+      return '<div class="comp-section">' +
+               '<div class="comp-section-head"><span>«'+escapeHtml(c.name)+'»</span><b>'+localeDigits(c.ids.length)+'</b></div>' +
+               rows +
+             '</div>';
+    }).join('');
+    openSheet(head + body);
+    var sheet = document.getElementById('sheet');
+    if(sheet) sheet.querySelectorAll('.comp-row').forEach(function(r){
+      r.onclick = function(){ var id = r.getAttribute('data-id'); closeSheet(); focusPerson(id); };
+    });
+  }
+  window.__ftShowDuplicates = showDuplicates;
 
   // Rank each person in family/tree order (father, then mother, then their
   // children — same order the tree renders), so name lists read naturally.

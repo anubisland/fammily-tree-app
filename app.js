@@ -84,7 +84,9 @@
     profileShare:{ar:'مشاركة كصورة', en:'Share as image'},
     profileCenter:{ar:'شجرتي من هنا', en:'Center on this person'},
     meViewFull:{ar:'الشجرة كاملة', en:'Full tree'},
-    nasabCopyTitle:{ar:'نسخ الاسم', en:'Copy name'},
+    nasabCopyTitle:{ar:'نسخ سلسلة النسب', en:'Copy full lineage'},
+    nasabIbn:{ar:'بن', en:'ibn'},
+    nasabBint:{ar:'بنت', en:'bint'},
     nasabCopied:{ar:'تم نسخ الاسم ✓', en:'Name copied ✓'},
     nasabCopyFail:{ar:'تعذّر النسخ', en:'Copy failed'},
     shareGenerating:{ar:'جارِ إنشاء الصورة…', en:'Creating image…'},
@@ -1399,53 +1401,52 @@
       (sub ? '<div class="stat-sub">'+sub+'</div>' : '')+'</div>';
   }
 
-  // Horizontal bar chart (RTL-native, accessible: every bar carries its label and
-  // value, so identity never rests on colour). Single emerald hue = sequential
-  // magnitude, no CVD adjacency. items: [{label, count}].
-  function chartBars(items){
+  // A calm, earthy categorical set (from the brand palette + two harmonising
+  // tones). Columns cycle through it so a chart is multi-coloured, per the owner's
+  // preference; every column still carries its label + value, so identity never
+  // rests on colour alone.
+  // Calm, earthy per-CHART colours. Each chart (group) gets ONE distinct colour
+  // across all its columns — different charts differ, columns within a chart
+  // match. Every column still carries its label + value, so identity is clear.
+  var CHART_COLORS = ['var(--emerald)', 'var(--gold)', 'var(--teal)', 'var(--plum)', '#A85532', '#3B6EA5'];
+  // Vertical column chart: value on top, column grows from a shared baseline,
+  // label below. All columns use `color`. items: [{label, count}].
+  function chartBars(items, color){
+    color = color || 'var(--emerald)';
     var max = items.reduce(function(m, it){ return it.count > m ? it.count : m; }, 0) || 1;
-    return '<div class="chart-bars">' + items.map(function(it){
-      var pct = Math.round((it.count / max) * 100);
-      return '<div class="cbar-row">' +
-               '<span class="cbar-label">'+escapeHtml(it.label)+'</span>' +
-               '<span class="cbar-track"><i style="width:'+pct+'%"></i></span>' +
-               '<span class="cbar-val">'+localeDigits(it.count)+'</span>' +
+    return '<div class="chart-cols">' + items.map(function(it){
+      var h = Math.round((it.count / max) * 100);
+      return '<div class="ccol">' +
+               '<div class="ccol-plot">' +
+                 '<span class="ccol-val">'+localeDigits(it.count)+'</span>' +
+                 '<span class="ccol-bar" style="height:'+h+'%;background:'+color+'"></span>' +
+               '</div>' +
+               '<div class="ccol-label">'+escapeHtml(it.label)+'</div>' +
              '</div>';
     }).join('') + '</div>';
-  }
-  // Gender: two labelled categories (emerald ♂ / gold ♀), validated ΔE 27; the
-  // ♂/♀ glyphs + counts are the secondary encoding so it's never colour-alone.
-  function genderSplitHtml(m, f){
-    var total = (m + f) || 1;
-    var mp = Math.round(m / total * 100), fp = 100 - mp;
-    return '<div class="gender-split">' +
-      '<div class="gs-bar">' +
-        (m ? '<span class="gs-m" style="width:'+mp+'%"></span>' : '') +
-        (f ? '<span class="gs-f" style="width:'+fp+'%"></span>' : '') +
-      '</div>' +
-      '<div class="gs-legend">' +
-        '<span class="gs-key"><span class="gs-dot gs-dot-m"></span>♂ '+t('statsMales')+' ('+localeDigits(m)+')</span>' +
-        '<span class="gs-key"><span class="gs-dot gs-dot-f"></span>♀ '+t('statsFemales')+' ('+localeDigits(f)+')</span>' +
-      '</div>' +
-    '</div>';
   }
   var AGE_LABELS = { '0-12':'ageB012', '13-19':'ageB1319', '20-39':'ageB2039', '40-59':'ageB4059', '60+':'ageB60' };
   function statsChartsHtml(){
     if(!window.ftStatsBreakdown) return '';
     var bd = window.ftStatsBreakdown(state.people || {}, new Date());
     var out = '';
-    out += '<div class="chart-block"><div class="chart-title">'+t('chartGender')+'</div>'+genderSplitHtml(bd.gender.m, bd.gender.f)+'</div>';
+    // One distinct colour per chart (group), assigned in order from the palette.
+    var genderItems = [
+      { label: '♂ '+t('statsMales'),   count: bd.gender.m },
+      { label: '♀ '+t('statsFemales'), count: bd.gender.f }
+    ];
+    out += '<div class="chart-block"><div class="chart-title">'+t('chartGender')+'</div>'+chartBars(genderItems, CHART_COLORS[0])+'</div>';
     if(bd.generations.length){
       var genItems = bd.generations.map(function(g){ return { label: genLabel(g.gen), count: g.count }; });
-      out += '<div class="chart-block"><div class="chart-title">'+t('chartGenerations')+'</div>'+chartBars(genItems)+'</div>';
+      out += '<div class="chart-block"><div class="chart-title">'+t('chartGenerations')+'</div>'+chartBars(genItems, CHART_COLORS[1])+'</div>';
     }
     var ageItems = bd.ageBuckets.filter(function(a){ return a.count > 0; }).map(function(a){ return { label: t(AGE_LABELS[a.key]), count: a.count }; });
     if(ageItems.length){
-      out += '<div class="chart-block"><div class="chart-title">'+t('chartAges')+'</div>'+chartBars(ageItems)+'</div>';
+      out += '<div class="chart-block"><div class="chart-title">'+t('chartAges')+'</div>'+chartBars(ageItems, CHART_COLORS[2])+'</div>';
     }
     if(bd.topCities.length){
       var cityItems = bd.topCities.map(function(c){ return { label: c.city, count: c.count }; });
-      out += '<div class="chart-block"><div class="chart-title">'+t('chartCities')+'</div>'+chartBars(cityItems)+'</div>';
+      out += '<div class="chart-block"><div class="chart-title">'+t('chartCities')+'</div>'+chartBars(cityItems, CHART_COLORS[3])+'</div>';
     }
     return '<div class="charts-wrap">'+out+'</div>';
   }
@@ -2053,11 +2054,29 @@
   // Copy a person's full name (already the nasab as typed) + family name for
   // sharing (e.g. in WhatsApp). Clipboard API with a hidden-textarea fallback for
   // older in-app webviews where navigator.clipboard is unavailable.
+  // Build a classical nasab chain by climbing the PATERNAL line and taking each
+  // ancestor's given (first) name, joined with بن/بنت — e.g. «محمد بن أمين بن أحمد
+  // الوزير». We take the first token of each name because the stored name already
+  // carries the full nasab; concatenating whole names would duplicate it.
+  function givenName(p){ return (ownName(p, state.lang) || '').trim().split(/\s+/)[0] || ''; }
+  function nasabChain(id){
+    var p = getPerson(id); if(!p) return '';
+    var chain = givenName(p);
+    var linkFirst = (p.gender === 'f') ? t('nasabBint') : t('nasabIbn');
+    var cur = fatherOfPerson(p), guard = 0, first = true;
+    while(cur && guard++ < 20){
+      var g = givenName(cur);
+      if(g){ chain += ' ' + (first ? linkFirst : t('nasabIbn')) + ' ' + g; first = false; }
+      cur = fatherOfPerson(cur);
+    }
+    var fam = famNameOf().trim();
+    // Append the family name unless the chain already ends with it.
+    if(fam && chain.indexOf(fam) === -1) chain += ' ' + fam;
+    return chain;
+  }
   function copyNasab(id){
     var p = getPerson(id); if(!p) return;
-    var txt = fullNameOf(p);
-    var fam = famNameOf().trim();
-    if(fam && txt.indexOf(fam) === -1) txt = txt + ' — ' + fam;
+    var txt = nasabChain(id) || fullNameOf(p);
     function done(){ toast(t('nasabCopied')); }
     function fallback(){
       try{
@@ -2518,8 +2537,12 @@
     var prevZoom = zoom; zoom = 1; applyZoom(); drawLinks();
     await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); });
     try{
-      // Cap resolution on very wide trees so we don't blow past canvas memory limits.
-      var sc = canvasEl.scrollWidth > 3000 ? 1 : 2;
+      // Keep detail readable: scale up small trees (crisp), but cap the LONGEST
+      // side near 12000px so a huge/wide tree stays within canvas memory limits
+      // while still being sharp enough to zoom into. (The old flat downgrade to
+      // scale 1 on wide trees is what made big posters an unreadable strip.)
+      var maxDim = Math.max(canvasEl.scrollWidth, canvasEl.scrollHeight) || 1;
+      var sc = Math.max(1, Math.min(3, 12000 / maxDim));
       var bg = (getComputedStyle(document.body).getPropertyValue('--paper') || '#F2E9D8').trim() || '#F2E9D8';
       var out = await window.html2canvas(canvasEl, { backgroundColor: bg, scale: sc, logging: false, useCORS: true });
       var a = document.createElement('a');

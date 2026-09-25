@@ -92,6 +92,27 @@ service cloud.firestore {
         allow delete: if signedIn() &&
                       (resource.data.byUid == uid() || isOwner(treeId));
         allow update: if false;
+
+        // A reaction is one document per member, keyed by the reactor's uid, so
+        // a member can only ever write or remove their OWN reaction — no way to
+        // forge or clear someone else's. Any member may read all reactions.
+        match /reactions/{reactorUid} {
+          allow read:          if isMember(treeId);
+          allow create, update: if isMember(treeId) && reactorUid == uid()
+                               && request.resource.data.byUid == uid();
+          allow delete:        if isMember(treeId) && reactorUid == uid();
+        }
+
+        // Comments: any member may add one carrying their own byUid; the author
+        // or the tree owner may delete; never editable (same integrity stance as
+        // moments themselves — history is not silently rewritten).
+        match /comments/{commentId} {
+          allow read:   if isMember(treeId);
+          allow create: if isMember(treeId) && request.resource.data.byUid == uid();
+          allow delete: if signedIn() &&
+                        (resource.data.byUid == uid() || isOwner(treeId));
+          allow update: if false;
+        }
       }
     }
   }

@@ -50,6 +50,10 @@ async function seed(ctx) {
   await setDoc(doc(db, 'users', OWNER), { email: 'o@x.com', treeId: TREE });
   await setDoc(doc(db, 'users', OUTSIDER), { email: 'out@x.com', treeId: '' });
   await setDoc(doc(db, 'trees', TREE, 'moments', 'm1'), { byUid: OWNER, text: 'hi' });
+  // A reaction + a comment on m1 by OWNER, so delete/ownership clauses can be
+  // exercised directly against pre-existing docs.
+  await setDoc(doc(db, 'trees', TREE, 'moments', 'm1', 'reactions', OWNER), { byUid: OWNER, emoji: '❤️' });
+  await setDoc(doc(db, 'trees', TREE, 'moments', 'm1', 'comments', 'c1'), { byUid: OWNER, byEmail: 'o@x.com', text: 'nice' });
   await setDoc(doc(db, 'trees', TREE, 'activity', 'a1'), { byUid: OWNER, kind: 'created' });
 
   // A legacy tree from the pre-createdBy era: no `createdBy` field at all.
@@ -290,6 +294,84 @@ await check('member can create a moment with their own byUid', () =>
 
 await check('member cannot create a moment with a foreign byUid', () =>
   assertFails(setDoc(doc(editorDb, 'trees', TREE, 'moments', 'm3'), { byUid: OWNER, text: 'forged' })));
+
+// ── Moment reactions (one-doc-per-member, keyed by reactor uid) ──────────
+await check('member can read reactions', () =>
+  assertSucceeds(getDocs(collection(editorDb, 'trees', TREE, 'moments', 'm1', 'reactions'))));
+
+await check('member can add their OWN reaction (uid-keyed)', () =>
+  assertSucceeds(setDoc(doc(editorDb, 'trees', TREE, 'moments', 'm1', 'reactions', EDITOR),
+    { byUid: EDITOR, emoji: '👍' })));
+
+await check('member cannot write a reaction under someone else\'s uid', () =>
+  assertFails(setDoc(doc(editorDb, 'trees', TREE, 'moments', 'm1', 'reactions', OWNER),
+    { byUid: EDITOR, emoji: '👍' })));
+
+await check('member cannot forge a reaction with a foreign byUid', () =>
+  assertFails(setDoc(doc(editorDb, 'trees', TREE, 'moments', 'm1', 'reactions', EDITOR),
+    { byUid: OWNER, emoji: '👍' })));
+
+await check('outsider cannot react', () =>
+  assertFails(setDoc(doc(outsiderDb, 'trees', TREE, 'moments', 'm1', 'reactions', OUTSIDER),
+    { byUid: OUTSIDER, emoji: '👍' })));
+
+await check('outsider cannot read reactions', () =>
+  assertFails(getDocs(collection(outsiderDb, 'trees', TREE, 'moments', 'm1', 'reactions'))));
+
+await check('member can remove their OWN reaction', () =>
+  assertSucceeds((async () => {
+    await setDoc(doc(editorDb, 'trees', TREE, 'moments', 'm1', 'reactions', EDITOR), { byUid: EDITOR, emoji: '👍' });
+    await deleteDoc(doc(editorDb, 'trees', TREE, 'moments', 'm1', 'reactions', EDITOR));
+  })()));
+
+await check('member cannot delete another member\'s reaction', () =>
+  assertFails(deleteDoc(doc(editorDb, 'trees', TREE, 'moments', 'm1', 'reactions', OWNER))));
+
+// ── Moment comments (member-authored, author/owner-deletable, immutable) ──
+await check('member can read comments', () =>
+  assertSucceeds(getDocs(collection(editorDb, 'trees', TREE, 'moments', 'm1', 'comments'))));
+
+await check('member can add a comment with their own byUid', () =>
+  assertSucceeds(setDoc(doc(editorDb, 'trees', TREE, 'moments', 'm1', 'comments', 'c2'),
+    { byUid: EDITOR, byEmail: 'e@x.com', text: 'agreed' })));
+
+await check('member cannot add a comment with a foreign byUid', () =>
+  assertFails(setDoc(doc(editorDb, 'trees', TREE, 'moments', 'm1', 'comments', 'c3'),
+    { byUid: OWNER, byEmail: 'o@x.com', text: 'forged' })));
+
+await check('outsider cannot read comments', () =>
+  assertFails(getDocs(collection(outsiderDb, 'trees', TREE, 'moments', 'm1', 'comments'))));
+
+await check('outsider cannot create a comment', () =>
+  assertFails(setDoc(doc(outsiderDb, 'trees', TREE, 'moments', 'm1', 'comments', 'c4'),
+    { byUid: OUTSIDER, text: 'spam' })));
+
+await check('a comment cannot be edited', () =>
+  assertFails(updateDoc(doc(ownerDb, 'trees', TREE, 'moments', 'm1', 'comments', 'c1'), { text: 'tampered' })));
+
+await check('comment author can delete their own comment', () =>
+  assertSucceeds(deleteDoc(doc(ownerDb, 'trees', TREE, 'moments', 'm1', 'comments', 'c1'))));
+
+await check('owner can delete another member\'s comment (moderation)', () =>
+  assertSucceeds((async () => {
+    await setDoc(doc(editorDb, 'trees', TREE, 'moments', 'm1', 'comments', 'c5'),
+      { byUid: EDITOR, byEmail: 'e@x.com', text: 'mine' });
+    await deleteDoc(doc(ownerDb, 'trees', TREE, 'moments', 'm1', 'comments', 'c5'));
+  })()));
+
+await check('non-author non-owner member cannot delete a comment', () =>
+  assertFails(deleteDoc(doc(editorDb, 'trees', TREE, 'moments', 'm1', 'comments', 'c1'))));
+
+// Reactions/comments gate on isMember (a shared family feed), NOT canEdit — so
+// a viewer CAN react and comment, mirroring moments `create`. These lock that
+// intent so a future isMember→canEdit slip fails loudly here.
+await check('viewer can react (shared feed, isMember not canEdit)', () =>
+  assertSucceeds(setDoc(doc(viewerDb, 'trees', TREE, 'moments', 'm1', 'reactions', VIEWER),
+    { byUid: VIEWER, emoji: '👍' })));
+
+await check('viewer can comment (shared feed, isMember not canEdit)', () =>
+  assertSucceeds(setDoc(doc(viewerDb, 'trees', TREE, 'moments', 'm1', 'comments', 'cv'),
+    { byUid: VIEWER, byEmail: 'v@x.com', text: 'مبارك' })));
 
 await testEnv.cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);

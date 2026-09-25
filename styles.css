@@ -290,7 +290,25 @@
   .moment-card .moment-time{font-size:10.5px; color:var(--ink-soft);}
   .moment-card .moment-text{font-size:13.5px; line-height:1.7; white-space:pre-wrap; word-break:break-word;}
   .moment-card .moment-photo{width:100%; border-radius:10px; margin-top:8px; display:block;}
-  .moment-card .moment-del{ float:inline-start; background:none; border:none; color:var(--danger); font-size:12px; margin-top:6px; padding:0; }
+  /* Reactions + comments footer */
+  .moment-card .moment-actions{ display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:9px; border-top:1px solid var(--line); }
+  .moment-card .react-btn, .moment-card .comment-btn{ display:inline-flex; align-items:center; gap:5px; background:var(--paper); border:1px solid var(--line); color:var(--ink-soft); font-size:12.5px; font-weight:600; font-family:var(--f-body); border-radius:20px; padding:5px 12px; cursor:pointer; transition:background .12s ease, border-color .12s ease; }
+  .moment-card .react-btn:active, .moment-card .comment-btn:active{ background:var(--paper-deep); }
+  .moment-card .react-btn.reacted{ background:#FCE9EC; border-color:#F3C6CE; color:#B23A48; }
+  .moment-card .moment-del{ margin-inline-start:auto; background:none; border:none; color:var(--danger); font-size:14px; padding:4px 6px; cursor:pointer; }
+  .moment-card .moment-comments{ margin-top:10px; }
+  .comment-row{ background:var(--paper); border-radius:10px; padding:7px 10px; margin-bottom:7px; }
+  .comment-row .comment-meta{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px; }
+  .comment-row .comment-author{ font-size:11.5px; font-weight:700; color:var(--emerald-deep); }
+  .comment-row .comment-time{ font-size:10px; color:var(--ink-soft); }
+  .comment-row .comment-text{ font-size:13px; line-height:1.6; white-space:pre-wrap; word-break:break-word; color:var(--ink); }
+  .comment-row .comment-del{ background:none; border:none; color:var(--danger); font-size:11px; padding:2px 0 0; cursor:pointer; }
+  .comment-compose{ display:flex; gap:6px; margin-top:8px; }
+  .comment-compose .comment-input{ flex:1; border:1px solid var(--line); border-radius:20px; padding:8px 12px; font-size:13px; font-family:var(--f-body); background:var(--card); color:var(--ink); }
+  .comment-compose .comment-input:focus{ outline:none; border-color:var(--emerald); }
+  .comment-compose .comment-send{ background:var(--emerald); color:#F6EFDD; border:none; border-radius:20px; padding:8px 14px; font-size:12.5px; font-weight:700; font-family:var(--f-body); cursor:pointer; flex-shrink:0; }
+  .comment-compose .comment-send:active{ opacity:.85; }
+  .comments-empty{ font-size:12px; color:var(--ink-soft); padding:6px 2px; }
   .moments-empty{ text-align:center; color:var(--ink-soft); font-size:13px; padding:40px 20px; }
   .moments-compose{
     flex-shrink:0; background:var(--card); border-top:1px solid var(--paper-deep); padding:10px 12px 12px;

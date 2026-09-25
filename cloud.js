@@ -423,26 +423,65 @@
   /* ---------- Family moments feed ---------- */
   var unsubMoments = null;
   var pendingMomentPhoto = null;
+  // Per-moment live listeners (reactions + comments) and which comment panels
+  // the user has opened. Torn down and rebuilt on every feed re-render, and
+  // fully released when the feed closes, so listeners never leak.
+  var momentSubs = {};
+  var openComments = {};
+
+  function esc(s){
+    return (window.__ftEscapeHtml || function(x){ return String(x == null ? '' : x).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); })(s);
+  }
+  function teardownMomentSubs(){
+    Object.keys(momentSubs).forEach(function(mid){
+      (momentSubs[mid] || []).forEach(function(u){ try{ u(); }catch(e){} });
+    });
+    momentSubs = {};
+  }
+  // A write's failure message must match its cause — blaming the security rules
+  // for a dropped connection sends a non-technical family member chasing the
+  // wrong fix. permission-denied is the rules case; unavailable is the network.
+  function writeErrMsg(e, base){
+    if(e && e.code === 'permission-denied') return base + ' — تأكد من تحديث قواعد الأمان (Firestore Rules).';
+    if(e && e.code === 'unavailable')       return 'تعذّر الاتصال — تحقّق من الإنترنت وحاول مجدداً.';
+    return base + '، حاول مرة أخرى.';
+  }
 
   function renderMoments(docs){
     var list = document.getElementById('momentsList');
+    teardownMomentSubs();
+    // Drop open-comment flags for moments no longer in the feed, so the map
+    // can't grow without bound or re-open a panel on a recycled id.
+    var liveIds = {}; docs.forEach(function(d){ liveIds[d.id] = 1; });
+    Object.keys(openComments).forEach(function(k){ if(!liveIds[k]) delete openComments[k]; });
     if(!docs.length){
       list.innerHTML = '<div class="moments-empty">لا توجد لحظات بعد — كن أول من يشارك خبرًا مع العائلة!</div>';
       return;
     }
-    var esc = window.__ftEscapeHtml || function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
     var timeAgoFn = window.__ftTimeAgo || function(){ return ''; };
     var html = '';
     docs.forEach(function(d){
       var v = d.data();
       var when = v.at && v.at.toDate ? timeAgoFn(v.at.toDate()) : 'الآن';
       var canDelete = v.byUid === currentUid || currentRole === 'owner';
+      var open = !!openComments[d.id];
       html += '<div class="moment-card">' +
         '<div class="moment-head"><span class="moment-author">' + esc(v.byEmail || '؟') + '</span>' +
         '<span class="moment-time">' + when + '</span></div>' +
         (v.text ? '<div class="moment-text">' + esc(v.text) + '</div>' : '') +
         (v.photo ? '<img class="moment-photo" src="' + esc(v.photo) + '">' : '') +
-        (canDelete ? '<button class="moment-del" data-id="' + d.id + '">🗑 حذف</button>' : '') +
+        '<div class="moment-actions">' +
+          '<button class="react-btn" data-mid="' + d.id + '">🤍 <span class="react-count">0</span></button>' +
+          '<button class="comment-btn" data-mid="' + d.id + '">💬 <span class="comment-count">0</span></button>' +
+          (canDelete ? '<button class="moment-del" data-id="' + d.id + '">🗑</button>' : '') +
+        '</div>' +
+        '<div class="moment-comments" id="comments-' + d.id + '"' + (open ? '' : ' style="display:none;"') + '>' +
+          '<div class="comments-list" id="comments-list-' + d.id + '"></div>' +
+          '<div class="comment-compose">' +
+            '<input class="comment-input" id="comment-input-' + d.id + '" placeholder="أضف تعليقًا…" maxlength="500">' +
+            '<button class="comment-send" data-mid="' + d.id + '">إرسال</button>' +
+          '</div>' +
+        '</div>' +
       '</div>';
     });
     list.innerHTML = html;
@@ -453,6 +492,120 @@
         catch(e){ alert('تعذّر الحذف.'); }
       };
     });
+    docs.forEach(function(d){ wireMomentSocial(d.id); });
+  }
+
+  // Attach live reaction + comment listeners for one moment card and wire its
+  // controls. Writes are gated by the reactions/comments subcollection rules,
+  // so a viewer with a stale UI still can't forge anything server-side.
+  function wireMomentSocial(mid){
+    var reactBtn   = document.querySelector('.react-btn[data-mid="' + mid + '"]');
+    var commentBtn = document.querySelector('.comment-btn[data-mid="' + mid + '"]');
+    var panel      = document.getElementById('comments-' + mid);
+    var input      = document.getElementById('comment-input-' + mid);
+    var sendBtn    = panel ? panel.querySelector('.comment-send') : null;
+
+    // Reactions: one doc per member; count them and mark whether I reacted.
+    var rUnsub = onSnapshot(collection(db, 'trees', currentTreeId, 'moments', mid, 'reactions'), function(snap){
+      var count = 0, mine = false;
+      snap.forEach(function(r){ count++; if(r.id === currentUid) mine = true; });
+      if(reactBtn){
+        reactBtn.classList.toggle('reacted', mine);
+        reactBtn.firstChild.textContent = (mine ? '❤️ ' : '🤍 ');
+        var rc = reactBtn.querySelector('.react-count'); if(rc) rc.textContent = count;
+      }
+    }, function(err){
+      // Firestore drops a listener after its error callback fires (no retry), so
+      // a denied/expired read must NOT masquerade as "0 reactions" — show an
+      // unknown marker instead, and log for diagnosis (permission/index/quota).
+      console.error('reactions listener failed', mid, err && err.code, err);
+      if(reactBtn){
+        var rcx = reactBtn.querySelector('.react-count'); if(rcx) rcx.textContent = '—';
+        reactBtn.title = 'تعذّر تحميل التفاعلات';
+      }
+    });
+
+    // Comments: ordered oldest→newest so a thread reads top to bottom.
+    var cUnsub = onSnapshot(query(collection(db, 'trees', currentTreeId, 'moments', mid, 'comments'), orderBy('at', 'asc')), function(snap){
+      var items = [];
+      snap.forEach(function(c){ items.push({ id: c.id, data: c.data() }); });
+      if(commentBtn){ var cc = commentBtn.querySelector('.comment-count'); if(cc) cc.textContent = items.length; }
+      renderCommentList(mid, items);
+    }, function(err){
+      // Same reasoning as reactions: a denied read (or a missing index for the
+      // orderBy query) surfaces ONLY here — never let it look like "no comments".
+      console.error('comments listener failed', mid, err && err.code, err);
+      if(commentBtn){ var ccx = commentBtn.querySelector('.comment-count'); if(ccx) ccx.textContent = '—'; }
+      var listErr = document.getElementById('comments-list-' + mid);
+      if(listErr) listErr.innerHTML = '<div class="comments-empty">تعذّر تحميل التعليقات.</div>';
+    });
+
+    momentSubs[mid] = [rUnsub, cUnsub];
+
+    if(reactBtn) reactBtn.onclick = function(){ toggleReaction(mid, reactBtn.classList.contains('reacted')); };
+    if(commentBtn) commentBtn.onclick = function(){
+      openComments[mid] = !openComments[mid];
+      if(panel) panel.style.display = openComments[mid] ? 'block' : 'none';
+      if(openComments[mid] && input) input.focus();
+    };
+    if(sendBtn) sendBtn.onclick = function(){ postComment(mid, input); };
+    if(input) input.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); postComment(mid, input); } });
+  }
+
+  function renderCommentList(mid, items){
+    var listEl = document.getElementById('comments-list-' + mid);
+    if(!listEl) return;
+    var timeAgoFn = window.__ftTimeAgo || function(){ return ''; };
+    listEl.innerHTML = items.map(function(it){
+      var v = it.data;
+      var when = v.at && v.at.toDate ? timeAgoFn(v.at.toDate()) : '';
+      var canDel = v.byUid === currentUid || currentRole === 'owner';
+      return '<div class="comment-row">' +
+        '<div class="comment-meta"><span class="comment-author">' + esc(v.byEmail || '؟') + '</span>' +
+        (when ? '<span class="comment-time">' + esc(when) + '</span>' : '') + '</div>' +
+        '<div class="comment-text">' + esc(v.text || '') + '</div>' +
+        (canDel ? '<button class="comment-del" data-mid="' + mid + '" data-cid="' + it.id + '">حذف</button>' : '') +
+      '</div>';
+    }).join('');
+    listEl.querySelectorAll('.comment-del').forEach(function(btn){
+      btn.onclick = async function(){
+        try{ await deleteDoc(doc(db, 'trees', currentTreeId, 'moments', btn.dataset.mid, 'comments', btn.dataset.cid)); }
+        catch(e){ console.error('comment delete failed', e && e.code, e); alert(writeErrMsg(e, 'تعذّر حذف التعليق')); }
+      };
+    });
+  }
+
+  async function toggleReaction(mid, currentlyReacted){
+    if(!currentTreeId || !currentUid){ alert('يجب تسجيل الدخول أولاً'); return; }
+    var ref = doc(db, 'trees', currentTreeId, 'moments', mid, 'reactions', currentUid);
+    try{
+      if(currentlyReacted) await deleteDoc(ref);
+      else await setDoc(ref, { byUid: currentUid, emoji: '❤️', at: serverTimestamp() });
+    }catch(e){
+      console.error('toggleReaction failed', mid, e && e.code, e);
+      alert(writeErrMsg(e, 'تعذّر تسجيل التفاعل'));
+    }
+  }
+
+  async function postComment(mid, input){
+    if(!input) return;
+    var text = input.value.trim();
+    if(!text) return;
+    if(!currentTreeId || !currentUid){ alert('يجب تسجيل الدخول أولاً'); return; }
+    input.disabled = true;
+    try{
+      await addDoc(collection(db, 'trees', currentTreeId, 'moments', mid, 'comments'), {
+        text: text, byUid: currentUid,
+        byEmail: (auth.currentUser && auth.currentUser.email) || '',
+        at: serverTimestamp()
+      });
+      input.value = '';
+    }catch(e){
+      console.error('postComment failed', mid, e && e.code, e);
+      alert(writeErrMsg(e, 'تعذّر إضافة التعليق'));
+    }
+    input.disabled = false;
+    input.focus();
   }
 
   function subscribeMoments(){
@@ -463,6 +616,9 @@
       snap.forEach(function(d){ docs.push(d); });
       renderMoments(docs);
     }, function(){
+      // Feed read failed: release any per-moment listeners from a prior good
+      // render so they don't keep running against DOM that's about to vanish.
+      teardownMomentSubs();
       document.getElementById('momentsList').innerHTML = '<div class="moments-empty">تعذّر تحميل اللحظات.</div>';
     });
   }
@@ -475,6 +631,7 @@
   function closeMoments(){
     document.getElementById('momentsScreen').classList.remove('open');
     if(unsubMoments){ unsubMoments(); unsubMoments = null; }
+    teardownMomentSubs();
   }
   document.getElementById('momentsOpenBtn').addEventListener('click', openMoments);
   document.getElementById('momentsBack').addEventListener('click', closeMoments);

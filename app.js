@@ -84,6 +84,9 @@
     profileShare:{ar:'مشاركة كصورة', en:'Share as image'},
     profileCenter:{ar:'شجرتي من هنا', en:'Center on this person'},
     meViewFull:{ar:'الشجرة كاملة', en:'Full tree'},
+    nasabCopyTitle:{ar:'نسخ الاسم', en:'Copy name'},
+    nasabCopied:{ar:'تم نسخ الاسم ✓', en:'Name copied ✓'},
+    nasabCopyFail:{ar:'تعذّر النسخ', en:'Copy failed'},
     shareGenerating:{ar:'جارِ إنشاء الصورة…', en:'Creating image…'},
     shareDownloaded:{ar:'تم حفظ الصورة', en:'Image saved'},
     residenceLabel:{ar:'مكان الإقامة (اختياري)', en:'Place of residence (optional)'},
@@ -1914,7 +1917,8 @@
       : '';
     openSheet(
       '<div class="prof-head"><div class="prof-av">'+av+'</div>'+
-        '<div><div class="prof-name">'+escapeHtml(fullNameOf(p))+'</div>'+
+        '<div class="prof-head-main"><div class="prof-name-row"><div class="prof-name">'+escapeHtml(fullNameOf(p))+'</div>'+
+        '<button class="prof-copy" id="prof_copy" title="'+t('nasabCopyTitle')+'" aria-label="'+t('nasabCopyTitle')+'">📋</button></div>'+
         (other ? '<div class="prof-name-alt">'+escapeHtml(other)+'</div>' : '')+
         '<div class="gen-badge">'+genLabel(genOfPerson(id))+'</div></div></div>'+
       '<div class="prof-body">'+ (lines||'') +
@@ -1932,9 +1936,33 @@
     sheetBody.querySelectorAll('[data-profile]').forEach(function(b){ b.onclick = function(){ openProfile(b.getAttribute('data-profile')); }; });
     var pe = document.getElementById('prof_edit'); if(pe) pe.onclick = function(){ openPersonForm('edit', id); };
     var pa = document.getElementById('prof_addchild'); if(pa) pa.onclick = function(){ openPersonForm('child', id); };
+    var pcopy = document.getElementById('prof_copy'); if(pcopy) pcopy.onclick = function(){ copyNasab(id); };
     var pc = document.getElementById('prof_center'); if(pc) pc.onclick = function(){ centerTreeOn(id); };
     document.getElementById('prof_kin').onclick = function(){ closeSheet(); startKinship(); };
     document.getElementById('prof_share').onclick = function(){ shareProfileImage(id); };
+  }
+
+  // Copy a person's full name (already the nasab as typed) + family name for
+  // sharing (e.g. in WhatsApp). Clipboard API with a hidden-textarea fallback for
+  // older in-app webviews where navigator.clipboard is unavailable.
+  function copyNasab(id){
+    var p = getPerson(id); if(!p) return;
+    var txt = fullNameOf(p);
+    var fam = famNameOf().trim();
+    if(fam && txt.indexOf(fam) === -1) txt = txt + ' — ' + fam;
+    function done(){ toast(t('nasabCopied')); }
+    function fallback(){
+      try{
+        var ta = document.createElement('textarea');
+        ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        done();
+      }catch(e){ toast(t('nasabCopyFail')); }
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(done, fallback);
+    } else { fallback(); }
   }
 
   /* ---- Share a person as an elegant image (canvas — supports Arabic fonts) ---- */

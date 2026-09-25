@@ -84,6 +84,7 @@
     profileShare:{ar:'مشاركة كصورة', en:'Share as image'},
     profileCenter:{ar:'شجرتي من هنا', en:'Center on this person'},
     meViewFull:{ar:'الشجرة كاملة', en:'Full tree'},
+    meViewExport:{ar:'صورة', en:'Image'},
     nasabLabel:{ar:'سلسلة النسب', en:'Full lineage'},
     nasabCopyBtn:{ar:'نسخ', en:'Copy'},
     nasabIbn:{ar:'بن', en:'ibn'},
@@ -1033,9 +1034,11 @@
     }).join('<span class="mv-sep">›</span>');
     bar.innerHTML =
       '<button class="mv-full" data-mv-full="1">🌳 '+t('meViewFull')+'</button>' +
+      '<button class="mv-export" data-mv-export="1">📷 '+t('meViewExport')+'</button>' +
       '<div class="mv-crumbs">'+crumbs+'</div>';
     bar.style.display = 'flex';
     bar.querySelector('[data-mv-full]').onclick = clearMeView;
+    bar.querySelector('[data-mv-export]').onclick = function(){ exportTreeImage(); };
     bar.querySelectorAll('[data-mv]').forEach(function(b){
       b.onclick = function(){ centerTreeOn(b.getAttribute('data-mv')); };
     });

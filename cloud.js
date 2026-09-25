@@ -7,6 +7,8 @@
     getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp,
     collection, addDoc, getDocs, query, orderBy, limit, deleteDoc, updateDoc
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+  import { getStorage } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js";
+  import { makePhotoApi } from "./photos.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCU4IJudvRs8PTElMNtbP8WsKhzly5MnNA",
@@ -20,6 +22,8 @@
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
+  const storage = getStorage(app);
+  window.__ftPhotos = makePhotoApi(storage);
 
   var currentUid = null;
   var currentTreeId = null;

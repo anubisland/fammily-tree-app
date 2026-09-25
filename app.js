@@ -82,6 +82,8 @@
     profileAddChild:{ar:'إضافة ابن/ابنة', en:'Add child'},
     profileKinship:{ar:'القرابة', en:'Kinship'},
     profileShare:{ar:'مشاركة كصورة', en:'Share as image'},
+    profileCenter:{ar:'شجرتي من هنا', en:'Center on this person'},
+    meViewFull:{ar:'الشجرة كاملة', en:'Full tree'},
     shareGenerating:{ar:'جارِ إنشاء الصورة…', en:'Creating image…'},
     shareDownloaded:{ar:'تم حفظ الصورة', en:'Image saved'},
     residenceLabel:{ar:'مكان الإقامة (اختياري)', en:'Place of residence (optional)'},
@@ -968,6 +970,45 @@
     return unit;
   }
 
+  // "My tree" (me-centred) view: when set, the tree renders starting at this
+  // person instead of the family root, with an ancestor breadcrumb to climb back
+  // up. It is a VIEW-only override — never persisted, never touches cloud data.
+  var viewRootId = null;
+  function centerTreeOn(id){
+    if(!getPerson(id)) return;
+    viewRootId = id;
+    var cur = getPerson(id);
+    if(cur && cur.collapsed) cur.collapsed = false; // ensure descendants show
+    closeSheet();
+    showTab('tree');
+    render();
+  }
+  function clearMeView(){ viewRootId = null; render(); }
+  function ancestorIds(id){
+    var chain = [], cur = id, guard = 0;
+    while(cur && getPerson(cur) && guard++ < 128){ chain.unshift(cur); cur = getPerson(cur).parentId; }
+    return chain; // [realRoot, ..., id]
+  }
+  function renderMeViewBar(displayRoot){
+    var bar = document.getElementById('meViewBar');
+    if(!bar) return;
+    if(!viewRootId || displayRoot === state.rootId){ bar.style.display = 'none'; bar.innerHTML = ''; return; }
+    var chain = ancestorIds(displayRoot);
+    var crumbs = chain.map(function(cid, i){
+      var nm = escapeHtml(ownName(getPerson(cid), state.lang) || fullNameOf(getPerson(cid)));
+      var isCurrent = (i === chain.length - 1);
+      return '<button class="mv-crumb'+(isCurrent?' current':'')+'" data-mv="'+escapeHtml(cid)+'">'+nm+'</button>';
+    }).join('<span class="mv-sep">›</span>');
+    bar.innerHTML =
+      '<button class="mv-full" data-mv-full="1">🌳 '+t('meViewFull')+'</button>' +
+      '<div class="mv-crumbs">'+crumbs+'</div>';
+    bar.style.display = 'flex';
+    bar.querySelector('[data-mv-full]').onclick = clearMeView;
+    bar.querySelectorAll('[data-mv]').forEach(function(b){
+      b.onclick = function(){ centerTreeOn(b.getAttribute('data-mv')); };
+    });
+  }
+
   function render(){
     renderStats();
     var emptyWrap = document.getElementById('emptyWrap');
@@ -982,6 +1023,7 @@
 
     if(!state.rootId || !getPerson(state.rootId)){
       emptyWrap.style.display = 'flex'; canvas.style.display = 'none'; toolbar.style.display = 'none';
+      var mvb = document.getElementById('meViewBar'); if(mvb){ mvb.style.display = 'none'; }
       var svgEmpty = document.getElementById('linksSvg');
       svgEmpty.innerHTML = '';
       svgEmpty.style.width = '0px'; svgEmpty.style.height = '0px';
@@ -993,17 +1035,30 @@
     }
     emptyWrap.style.display = 'none'; canvas.style.display = 'block'; toolbar.style.display = 'flex';
 
+    // Me-centred view renders from the chosen person; otherwise from the real
+    // family root. viewRootId is validated here so a deleted person can't strand
+    // the view on a missing node.
+    if(viewRootId && !getPerson(viewRootId)) viewRootId = null;
+    var displayRoot = viewRootId || state.rootId;
+
     var treeRoot = document.getElementById('treeRoot');
     treeRoot.innerHTML = '';
-    treeRoot.appendChild(renderUnit(state.rootId));
+    treeRoot.appendChild(renderUnit(displayRoot));
+    renderMeViewBar(displayRoot);
     document.getElementById('familyTitle').textContent = famNameOf() || t('appName');
     /* Title centered above the root couple, inside the canvas — so it scales and
        stays above the grandparents as the tree is zoomed. */
     var treeTitle = document.getElementById('treeTitle');
     if(treeTitle){
-      var famName = famNameOf().trim();
-      // Always show the word "tree" so the screen reads clearly as a family TREE.
-      treeTitle.textContent = famName ? (state.lang === 'en' ? (famName + ' Tree') : ('شجرة ' + famName)) : '';
+      if(viewRootId){
+        // In me-view the heading names the person the tree is centred on.
+        var who = ownName(getPerson(viewRootId), state.lang) || fullNameOf(getPerson(viewRootId));
+        treeTitle.textContent = state.lang === 'en' ? (who + '’s line') : ('فرع ' + who);
+      } else {
+        var famName = famNameOf().trim();
+        // Always show the word "tree" so the screen reads clearly as a family TREE.
+        treeTitle.textContent = famName ? (state.lang === 'en' ? (famName + ' Tree') : ('شجرة ' + famName)) : '';
+      }
     }
 
     requestAnimationFrame(drawLinks);
@@ -1776,6 +1831,7 @@
         relRow('relChildren', children) +
       '</div>'+
       '<div class="prof-actions">'+actions+
+        '<button class="primary-btn" id="prof_center" style="background:var(--emerald);">🎯 '+t('profileCenter')+'</button>'+
         '<button class="primary-btn" id="prof_kin" style="background:var(--plum);">🔗 '+t('profileKinship')+'</button>'+
         '<button class="primary-btn" id="prof_share" style="background:var(--gold);">📤 '+t('profileShare')+'</button>'+
       '</div>'
@@ -1783,6 +1839,7 @@
     sheetBody.querySelectorAll('[data-profile]').forEach(function(b){ b.onclick = function(){ openProfile(b.getAttribute('data-profile')); }; });
     var pe = document.getElementById('prof_edit'); if(pe) pe.onclick = function(){ openPersonForm('edit', id); };
     var pa = document.getElementById('prof_addchild'); if(pa) pa.onclick = function(){ openPersonForm('child', id); };
+    var pc = document.getElementById('prof_center'); if(pc) pc.onclick = function(){ centerTreeOn(id); };
     document.getElementById('prof_kin').onclick = function(){ closeSheet(); startKinship(); };
     document.getElementById('prof_share').onclick = function(){ shareProfileImage(id); };
   }

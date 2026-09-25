@@ -564,6 +564,12 @@ html.dark{ --t-stats:rgba(62,154,164,.20); --t-places:rgba(169,107,68,.22); --cl
 .sheet-close:active{ background:var(--paper); }
 #sheetBody{ padding-top:6px; }
 
-/* Top safe area is handled by removing viewport-fit=cover from the viewport meta:
-   the system now keeps the whole webview below the status bar / notch, so the
-   base header padding is enough and no env()/min-inset hacks are needed. */
+/* Top chrome on phones/tablets: reserve the status-bar/notch zone at the very top
+   (max of the real inset and a 30px floor, since Android reports 0 without a
+   notch), then VERTICALLY CENTER the header content in a band below it — so the
+   title/buttons sit centred in the visible bar, not jammed against the top. */
+@media (max-width: 820px){
+  #tab-home .masthead, #tab-settings .masthead{ padding-top: max(env(safe-area-inset-top, 0px), 38px); }
+  #tab-tree .banner{ padding-top: calc(max(env(safe-area-inset-top, 0px), 30px) + 10px); padding-bottom: 10px; }
+  .moments-header{ padding-top: calc(max(env(safe-area-inset-top, 0px), 30px) + 10px); padding-bottom: 10px; }
+}

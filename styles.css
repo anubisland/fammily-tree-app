@@ -569,7 +569,27 @@ html.dark{ --t-stats:rgba(62,154,164,.20); --t-places:rgba(169,107,68,.22); --cl
    when they don't support those functions, leaving the header clipped. A flat
    pixel value always applies. */
 @media (max-width: 820px){
-  #tab-home .masthead, #tab-settings .masthead{ padding-top: 50px; }
-  #tab-tree .banner{ padding-top: 46px; padding-bottom: 10px; }
-  .moments-header{ padding-top: 46px; padding-bottom: 10px; }
+  /* Status-bar clearance done RIGHT. Two rules per element: a flat fallback that
+     every browser applies, then a safe-area version that browsers which grok
+     env() upgrade to. In a plain browser tab env()=0, so this collapses to the
+     flat value (snug, centred header — no dead space). In the installed PWA
+     env()=status-bar height, so the header clears the bar without a big gap. */
+  #tab-home .masthead, #tab-settings .masthead{
+    padding-top: 16px;
+    padding-top: calc(env(safe-area-inset-top) + 16px);
+  }
+  #tab-tree .banner{
+    /* flex-shrink:0 is the real anti-clip fix: the tree tab is a fixed-height
+       flex column, and without this the banner gets squeezed below its own
+       content on short viewports and overflow:hidden slices off the bottom of
+       the title + icons. Symmetric padding keeps the text vertically centred. */
+    flex-shrink: 0;
+    padding-top: 12px;
+    padding-top: calc(env(safe-area-inset-top) + 12px);
+    padding-bottom: 12px;
+  }
+  .moments-header{
+    padding-top: 16px;
+    padding-top: calc(env(safe-area-inset-top) + 16px);
+  }
 }

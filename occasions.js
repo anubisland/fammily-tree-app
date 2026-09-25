@@ -56,6 +56,32 @@
     return out;
   }
 
-  if(typeof module !== 'undefined' && module.exports) module.exports = ftOccasions;
+  // Today's calendar date IN a given IANA timezone, as a local-midnight Date so
+  // ftOccasions (which reads local Y/M/D) treats it as "today there". Empty/invalid
+  // tz, or an environment without Intl tz support, falls back to the device date —
+  // so a diaspora family can pin occasions to the home timezone, or leave it local.
+  function todayInZone(tz, now){
+    now = now || new Date();
+    if(!tz) return now;
+    try{
+      var parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(now);
+      var y, mo, d;
+      parts.forEach(function(p){
+        if(p.type === 'year') y = +p.value;
+        else if(p.type === 'month') mo = +p.value;
+        else if(p.type === 'day') d = +p.value;
+      });
+      if(!y || !mo || !d) return now;
+      return new Date(y, mo - 1, d);
+    }catch(e){ return now; }
+  }
+
+  if(typeof module !== 'undefined' && module.exports){
+    module.exports = ftOccasions;
+    module.exports.todayInZone = todayInZone;
+  }
   global.ftOccasions = ftOccasions;
+  global.ftTodayInZone = todayInZone;
 })(typeof window !== 'undefined' ? window : globalThis);

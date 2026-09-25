@@ -262,6 +262,7 @@
     fontSm:{ar:'صغير', en:'Small'},
     fontMd:{ar:'متوسط', en:'Medium'},
     fontLg:{ar:'كبير', en:'Large'},
+    setOccTz:{ar:'توقيت المناسبات', en:'Occasions timezone'},
     setFamilyName:{ar:'اسم العائلة', en:'Family name'},
     setInvite:{ar:'دعوة فرد للعائلة', en:'Invite a family member'},
     setMembers:{ar:'أفراد العائلة', en:'Family members'},
@@ -1194,7 +1195,11 @@
   }
 
   function occasionsCardHtml(){
-    var occ = (window.ftOccasions ? window.ftOccasions(state.people || {}, new Date(), 30) : []);
+    // Compute "today" in the viewer's chosen occasions timezone (device by default)
+    // so a relative abroad can align reminders to the family's home timezone.
+    var tz = occTz();
+    var today = window.ftTodayInZone ? window.ftTodayInZone(tz) : new Date();
+    var occ = (window.ftOccasions ? window.ftOccasions(state.people || {}, today, 30) : []);
     var body;
     if(!occ.length){
       body = '<div class="occ-empty">'+t('todayEmpty')+
@@ -1206,7 +1211,8 @@
       if(todayItems.length) body += '<div class="occ-sub">'+t('todaySectionToday')+'</div>' + todayItems.map(occasionRowHtml).join('');
       if(soonItems.length)  body += '<div class="occ-sub">'+t('todaySectionSoon')+'</div>' + soonItems.map(occasionRowHtml).join('');
     }
-    return '<div class="occ-card"><div class="occ-head">'+t('todayTitle')+'</div>'+body+'</div>';
+    var head = t('todayTitle') + (tz ? ' <span class="occ-tz">('+escapeHtml(occTzLabel(tz))+')</span>' : '');
+    return '<div class="occ-card"><div class="occ-head">'+head+'</div>'+body+'</div>';
   }
 
   function wireOccasionsCard(host){
@@ -1695,6 +1701,37 @@
     );
   }
 
+  // Occasions timezone: a personal viewing preference (localStorage, never the
+  // shared tree doc) letting a diaspora member pin birthday/memorial reminders to
+  // the family's home timezone instead of their device's. '' = device default.
+  var OCC_ZONES = [
+    { v: '',                 ar: 'توقيت جهازي',      en: 'Device timezone' },
+    { v: 'Africa/Cairo',     ar: 'القاهرة',          en: 'Cairo' },
+    { v: 'Asia/Riyadh',      ar: 'الرياض',           en: 'Riyadh' },
+    { v: 'Asia/Dubai',       ar: 'الإمارات',         en: 'UAE' },
+    { v: 'Asia/Amman',       ar: 'عمّان',            en: 'Amman' },
+    { v: 'Asia/Baghdad',     ar: 'بغداد',            en: 'Baghdad' },
+    { v: 'Africa/Khartoum',  ar: 'الخرطوم',          en: 'Khartoum' },
+    { v: 'Europe/London',    ar: 'لندن',             en: 'London' },
+    { v: 'Europe/Berlin',    ar: 'أوروبا الوسطى',    en: 'Central Europe' },
+    { v: 'America/New_York', ar: 'نيويورك',          en: 'New York' },
+    { v: 'America/Toronto',  ar: 'تورونتو',          en: 'Toronto' },
+    { v: 'Australia/Sydney', ar: 'سيدني',            en: 'Sydney' }
+  ];
+  function occTz(){ try{ return localStorage.getItem('ft_occ_tz') || ''; }catch(e){ return ''; } }
+  function setOccTz(v){ try{ if(v) localStorage.setItem('ft_occ_tz', v); else localStorage.removeItem('ft_occ_tz'); }catch(e){} }
+  function occTzLabel(v){
+    for(var i=0;i<OCC_ZONES.length;i++){ if(OCC_ZONES[i].v === v) return OCC_ZONES[i][state.lang === 'en' ? 'en' : 'ar']; }
+    return v;
+  }
+  function occTzSelectHtml(){
+    var cur = occTz();
+    return '<select class="set-select" id="setOccTzSel">' + OCC_ZONES.map(function(z){
+      var lbl = z[state.lang === 'en' ? 'en' : 'ar'];
+      return '<option value="'+escapeHtml(z.v)+'"'+(z.v === cur ? ' selected' : '')+'>'+escapeHtml(lbl)+'</option>';
+    }).join('') + '</select>';
+  }
+
   function renderSettings(){
     var host = document.getElementById('tab-settings');
     if(!host) return;
@@ -1733,6 +1770,10 @@
               {val:'lg', label:t('fontLg')}
             ], curFont) +
           '</div>' +
+          '<div class="set-row">' +
+            '<span>🌍 '+t('setOccTz')+'</span>' +
+            occTzSelectHtml() +
+          '</div>' +
         '</div>' +
         installSectionHtml() +
         '<div class="section-eyebrow" style="margin-top:18px;"><span class="dia">◆</span><span>'+t('setFamily')+'</span></div>' +
@@ -1767,6 +1808,8 @@
     host.querySelectorAll('#setFontSeg button').forEach(function(btn){
       btn.onclick = function(){ ftSetFontScale(btn.dataset.val); renderSettings(); };
     });
+    var tzSel = document.getElementById('setOccTzSel');
+    if(tzSel) tzSel.onchange = function(){ setOccTz(tzSel.value); if(window.__ftRenderHome) window.__ftRenderHome(); };
     var installRow = document.getElementById('setInstallRow');
     if(installRow && !ftIsStandalone()) installRow.onclick = ftTriggerInstall;
     if(canEditCloud){

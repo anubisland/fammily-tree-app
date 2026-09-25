@@ -1,6 +1,18 @@
 (function(){
   "use strict";
 
+  // Decide how to render a person/moment photo, backward-compatibly: a Storage
+  // path wins; else a legacy embedded base64 data URL; else nothing. Pure, so it
+  // is unit-tested in node. The async URL for a path is resolved by the caller
+  // via window.__ftPhotos.resolveURL. Declared here (function declaration, hoisted)
+  // so both the node-guard branch below and the browser branch (near resizeImage)
+  // can expose the same function on their respective globals.
+  function ftPhotoSource(rec){
+    if(rec && typeof rec.photoPath === 'string' && rec.photoPath) return { kind:'path', value: rec.photoPath };
+    if(rec && typeof rec.photo === 'string' && rec.photo) return { kind:'base64', value: rec.photo };
+    return { kind:'none', value:'' };
+  }
+
   // Node test hook: a self-contained pure nasab computer over a people map.
   // Runs before any DOM access so `require('./app.js')` works under node
   // (see scripts/names.test.cjs).
@@ -26,6 +38,7 @@
         lifespanText:function(b,d,l){var n=age(b,d); if(n===null||!d) return ''; return (l==='en')?('lived '+n+' years'):('عاش '+n+' سنة');}
       };
     })();
+    G.ftPhotoSource = ftPhotoSource;
     return;   // don't run the DOM app under node
   }
 
@@ -669,6 +682,8 @@
   }
 
   /* ============== Photo handling ============== */
+  window.ftPhotoSource = ftPhotoSource;
+
   function resizeImage(file, maxSize, cb){
     var reader = new FileReader();
     reader.onload = function(e){

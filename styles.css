@@ -564,12 +564,12 @@ html.dark{ --t-stats:rgba(62,154,164,.20); --t-places:rgba(169,107,68,.22); --cl
 .sheet-close:active{ background:var(--paper); }
 #sheetBody{ padding-top:6px; }
 
-/* Top chrome (phones/tablets, edge-to-edge via viewport-fit=cover): clear the
-   status bar/notch (max of the real inset and a fixed floor), then a small 8px
-   below — so the header content sits just below the status bar, centred and snug,
-   between the two failure extremes (too much padding vs. clipped). */
+/* Top chrome (phones/tablets): PLAIN fixed clearance for the status bar — no
+   env()/max()/calc(), because some Android browsers drop the whole declaration
+   when they don't support those functions, leaving the header clipped. A flat
+   pixel value always applies. */
 @media (max-width: 820px){
-  #tab-home .masthead, #tab-settings .masthead{ padding-top: max(env(safe-area-inset-top, 0px), 40px); }
-  #tab-tree .banner{ padding-top: max(env(safe-area-inset-top, 0px), 38px); padding-bottom: 8px; }
-  .moments-header{ padding-top: max(env(safe-area-inset-top, 0px), 38px); padding-bottom: 8px; }
+  #tab-home .masthead, #tab-settings .masthead{ padding-top: 50px; }
+  #tab-tree .banner{ padding-top: 46px; padding-bottom: 10px; }
+  .moments-header{ padding-top: 46px; padding-bottom: 10px; }
 }

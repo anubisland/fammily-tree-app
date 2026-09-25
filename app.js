@@ -117,6 +117,10 @@
     resetConfirm:{ar:'حذف والبدء من جديد', en:'Delete and start over'},
     menuTitle:{ar:'خيارات', en:'Options'},
     menuDesc:{ar:'إدارة بيانات الشجرة', en:'Manage tree data'},
+    menuImage:{ar:'📷 تصدير الشجرة كصورة', en:'📷 Export tree as image'},
+    imgExporting:{ar:'جارِ تجهيز الصورة…', en:'Preparing image…'},
+    imgExportDone:{ar:'تم حفظ صورة الشجرة ✓', en:'Tree image saved ✓'},
+    imgExportFail:{ar:'تعذّر تصدير الصورة — تحقّق من الاتصال', en:'Image export failed — check your connection'},
     menuExport:{ar:'⬇ تنزيل نسخة احتياطية', en:'⬇ Download backup'},
     menuImport:{ar:'⬆ استيراد نسخة', en:'⬆ Import a backup'},
     menuReset:{ar:'↺ بدء شجرة جديدة', en:'↺ Start a new tree'},
@@ -2453,6 +2457,7 @@
     openSheet(
       '<h3>'+t('menuTitle')+'</h3>'+
       '<div class="context">'+t('menuDesc')+'</div>'+
+      '<button class="primary-btn" id="mn_image" style="margin-bottom:10px; background:var(--gold);">'+t('menuImage')+'</button>'+
       '<button class="primary-btn" id="mn_export" style="margin-bottom:10px;">'+t('menuExport')+'</button>'+
       (canEditCloud ? '<button class="primary-btn" id="mn_import" style="margin-bottom:10px; background:var(--teal);">'+t('menuImport')+'</button>' : '') +
       (canEditCloud ? '<button class="primary-btn" id="mn_hidden" style="margin-bottom:10px; background:var(--plum);">'+t('menuHidden')+'</button>' : '') +
@@ -2460,6 +2465,7 @@
       (canEditCloud ? '<button class="primary-btn" id="mn_reset" style="background:var(--danger);">'+t('menuReset')+'</button>' : '') +
       (canEditCloud && window.__ftCloud ? '<button class="primary-btn" id="mn_invite" style="margin-top:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '')
     );
+    document.getElementById('mn_image').onclick = function(){ exportTreeImage(); };
     document.getElementById('mn_export').onclick = function(){ closeSheet(); document.getElementById('exportBtn').click(); };
     if(canEditCloud){
       document.getElementById('mn_import').onclick = function(){ closeSheet(); document.getElementById('importBtn').click(); };
@@ -2477,6 +2483,47 @@
     document.getElementById('canvas').style.transform = 'scale('+zoom+')';
     document.getElementById('zoomLabel').textContent = Math.round(zoom*100)+'%';
   }
+
+  // Lazy-load a script once (used for the on-demand image exporter so html2canvas
+  // — a sizable lib — never loads until the user actually asks for a poster).
+  function loadScriptOnce(src){
+    return new Promise(function(resolve, reject){
+      if(window.html2canvas) return resolve();
+      var s = document.createElement('script');
+      s.src = src; s.onload = function(){ resolve(); }; s.onerror = function(){ reject(new Error('load failed')); };
+      document.head.appendChild(s);
+    });
+  }
+  // Export the whole tree as a PNG poster. Photos are data: URLs so the canvas is
+  // never tainted; the image is downloaded locally and never sent anywhere.
+  var exportingImage = false;
+  async function exportTreeImage(){
+    if(exportingImage) return;
+    if(!state.rootId){ toast(t('emptyTitle')); return; }
+    exportingImage = true;
+    closeSheet();
+    toast(t('imgExporting'));
+    try{
+      await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    }catch(e){ toast(t('imgExportFail')); exportingImage = false; return; }
+    var canvasEl = document.getElementById('canvas');
+    var prevZoom = zoom; zoom = 1; applyZoom(); drawLinks();
+    await new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); });
+    try{
+      // Cap resolution on very wide trees so we don't blow past canvas memory limits.
+      var sc = canvasEl.scrollWidth > 3000 ? 1 : 2;
+      var bg = (getComputedStyle(document.body).getPropertyValue('--paper') || '#F2E9D8').trim() || '#F2E9D8';
+      var out = await window.html2canvas(canvasEl, { backgroundColor: bg, scale: sc, logging: false, useCORS: true });
+      var a = document.createElement('a');
+      a.href = out.toDataURL('image/png');
+      a.download = 'شجرة-' + (famNameOf().trim() || 'العائلة') + '.png';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      toast(t('imgExportDone'));
+    }catch(e){ toast(t('imgExportFail')); }
+    zoom = prevZoom; applyZoom(); drawLinks();
+    exportingImage = false;
+  }
+  window.__ftExportTreeImage = exportTreeImage;
   document.getElementById('zoomIn').addEventListener('click', function(){ zoom = Math.min(1.6, zoom + 0.1); applyZoom(); requestAnimationFrame(drawLinks); });
   document.getElementById('zoomOut').addEventListener('click', function(){ zoom = Math.max(0.4, zoom - 0.1); applyZoom(); requestAnimationFrame(drawLinks); });
 

@@ -84,7 +84,8 @@
     profileShare:{ar:'مشاركة كصورة', en:'Share as image'},
     profileCenter:{ar:'شجرتي من هنا', en:'Center on this person'},
     meViewFull:{ar:'الشجرة كاملة', en:'Full tree'},
-    nasabCopyTitle:{ar:'نسخ سلسلة النسب', en:'Copy full lineage'},
+    nasabLabel:{ar:'سلسلة النسب', en:'Full lineage'},
+    nasabCopyBtn:{ar:'نسخ', en:'Copy'},
     nasabIbn:{ar:'بن', en:'ibn'},
     nasabBint:{ar:'بنت', en:'bint'},
     nasabCopied:{ar:'تم نسخ الاسم ✓', en:'Name copied ✓'},
@@ -2026,10 +2027,14 @@
       : '';
     openSheet(
       '<div class="prof-head"><div class="prof-av">'+av+'</div>'+
-        '<div class="prof-head-main"><div class="prof-name-row"><div class="prof-name">'+escapeHtml(fullNameOf(p))+'</div>'+
-        '<button class="prof-copy" id="prof_copy" title="'+t('nasabCopyTitle')+'" aria-label="'+t('nasabCopyTitle')+'">📋</button></div>'+
+        '<div class="prof-head-main"><div class="prof-name">'+escapeHtml(fullNameOf(p))+'</div>'+
         (other ? '<div class="prof-name-alt">'+escapeHtml(other)+'</div>' : '')+
         '<div class="gen-badge">'+genLabel(genOfPerson(id))+'</div></div></div>'+
+      '<div class="prof-nasab">'+
+        '<div class="prof-nasab-head"><span class="prof-nasab-label">🧬 '+t('nasabLabel')+'</span>'+
+          '<button class="prof-nasab-copy" id="prof_copy">📋 '+t('nasabCopyBtn')+'</button></div>'+
+        '<div class="prof-nasab-text" id="prof_nasab_text">'+escapeHtml(nasabChain(id))+'</div>'+
+      '</div>'+
       '<div class="prof-body">'+ (lines||'') +
         relRow('relFather', [fatherOfPerson(p)]) +
         relRow('relMother', [motherOfPerson(p)]) +

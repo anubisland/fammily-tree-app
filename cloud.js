@@ -694,9 +694,9 @@
   document.getElementById('momentPhotoFile').addEventListener('change', function(e){
     var file = e.target.files[0];
     if(!file || !window.__ftResizeImage) return;
-    window.__ftResizeImage(file, 640, function(dataUrl){
-      if(!dataUrl) return;
-      pendingMomentPhoto = dataUrl;
+    window.__ftResizeImage(file, 640, function(blob, dataUrl){
+      if(!blob) return;
+      pendingMomentPhoto = { blob: blob, dataUrl: dataUrl };
       var prev = document.getElementById('momentPhotoPreview');
       prev.style.display = 'block';
       prev.innerHTML = '<img src="'+dataUrl+'"><button type="button" class="remove-photo-x" id="momentRemovePhoto">✕</button>';
@@ -714,8 +714,16 @@
     var btn = document.getElementById('momentPostBtn');
     btn.disabled = true;
     try{
-      await addDoc(collection(db, 'trees', currentTreeId, 'moments'), {
-        text: text, photo: pendingMomentPhoto || null,
+      // The doc ref is created up front so the moment's Storage path (keyed by
+      // its own id) is known before the doc is written.
+      var mref = doc(collection(db, 'trees', currentTreeId, 'moments'));
+      var photoPath = null;
+      if(pendingMomentPhoto && pendingMomentPhoto.blob){
+        photoPath = window.ftPhotoPaths.moment(currentTreeId, mref.id);
+        await window.__ftPhotos.uploadPhoto(photoPath, pendingMomentPhoto.blob);
+      }
+      await setDoc(mref, {
+        text: text, photoPath: photoPath,
         type: selectedMomentType || 'news',
         byEmail: (auth.currentUser && auth.currentUser.email) || '', byUid: currentUid,
         at: serverTimestamp()
@@ -757,7 +765,8 @@
     showActivityLog: showActivityLog,
     createInvite: createInvite,
     showMembers: showMembers,
-    signOut: function(){ signOut(auth); }
+    signOut: function(){ signOut(auth); },
+    getTreeId: function(){ return currentTreeId; }
   };
 
   async function pushToCloud(state){

@@ -113,6 +113,8 @@
     photoLabel:{ar:'الصورة الشخصية (اختياري)', en:'Photo (optional)'},
     photoChoose:{ar:'اختيار صورة', en:'Choose photo'},
     photoRemove:{ar:'إزالة الصورة', en:'Remove photo'},
+    photoUploading:{ar:'جارِ رفع الصورة…', en:'Uploading photo…'},
+    photoUploadFail:{ar:'تعذّر رفع الصورة — تحقّق من الاتصال', en:'Photo upload failed — check your connection'},
     keepAdding:{ar:'إضافة المزيد من الأبناء بعد الحفظ', en:'Keep adding more children after saving'},
     saveBtn:{ar:'حفظ', en:'Save'},
     addChildTitle:{ar:'إضافة ابن / ابنة', en:'Add child'},
@@ -779,7 +781,8 @@
     if((p.residence || '') !== (data.residence || '')) changed.push('مكان الإقامة');
     if((p.bio || '') !== (data.bio || '')) changed.push('النبذة');
     if(!!p.deceased !== !!data.deceased) changed.push('الحالة');
-    if(data.photo !== undefined && p.photo !== data.photo) changed.push('الصورة');
+    if((data.photo !== undefined || data.photoPath !== undefined) &&
+       (p.photo !== data.photo || p.photoPath !== data.photoPath)) changed.push('الصورة');
 
     p.name = data.name; p.gender = data.gender;
     p.birthDate = data.birthDate || null;
@@ -788,6 +791,7 @@
     p.bio = data.bio || '';
     if(data.deceased !== undefined) p.deceased = !!data.deceased;
     if(data.photo !== undefined) p.photo = data.photo;
+    if(data.photoPath !== undefined) p.photoPath = data.photoPath;
     scheduleSave(); render();
     if(changed.length){ logActivity('edit', nameStr(data.name), changed.join('، ')); }
   }
@@ -2192,6 +2196,13 @@
     }, 'image/png');
   }
 
+  // The active tree's id lives in cloud.js module scope; it exposes a getter
+  // on window.__ftCloud rather than a global, since only the cloud module
+  // knows it (local-only mode has no tree id at all).
+  function currentTreeIdForSave(){
+    return (window.__ftCloud && window.__ftCloud.getTreeId && window.__ftCloud.getTreeId()) || null;
+  }
+
   function openPersonForm(mode, targetId){
     var isEdit = mode === 'edit';
     var target = getPerson(targetId);
@@ -2249,7 +2260,7 @@
     refreshName();
     arIn.focus();
 
-    document.getElementById('pf_save').onclick = function(){
+    document.getElementById('pf_save').onclick = async function(){
       var ar = document.getElementById('pf_name_ar').value.trim();
       var en = document.getElementById('pf_name_en').value.trim();
       if(!ar || !en){ toast(t('toastNameRequired')); return; }
@@ -2265,15 +2276,33 @@
       }
       else if(mode === 'spouse') addSpouse(targetId, nm, gender);
       else {
-        updatePerson(targetId, {
+        // Resolve the photo to store: a freshly-picked blob is uploaded to Storage
+        // and stored as a path; an unchanged existing photo keeps whatever it had.
+        var photoUpdate = {};
+        if(pendingPhoto === null){
+          photoUpdate = { photoPath: null, photo: null };   // removed
+        } else if(pendingPhoto && pendingPhoto.blob){        // newly picked
+          var treeIdForSave = currentTreeIdForSave();
+          toast(t('photoUploading'));
+          try{
+            var path = window.ftPhotoPaths.person(treeIdForSave, targetId);
+            await window.__ftPhotos.uploadPhoto(path, pendingPhoto.blob);
+            photoUpdate = { photoPath: path, photo: null };
+          }catch(err){
+            toast(t('photoUploadFail'));
+            return;   // do not save the person if the upload failed
+          }
+        }
+        // else: existing unchanged -> leave photoPath/photo out of the update entirely
+
+        updatePerson(targetId, Object.assign({
           name: nm, gender: gender,
           birthDate: document.getElementById('pf_birth').value || null,
           deathDate: document.getElementById('pf_death').value || null,
           residence: document.getElementById('pf_residence').value.trim(),
           bio: document.getElementById('pf_bio').value.trim(),
-          deceased: document.getElementById('pf_deceased').checked,
-          photo: pendingPhoto
-        });
+          deceased: document.getElementById('pf_deceased').checked
+        }, photoUpdate));
       }
       toast(t('toastSaved'));
       var keepOpen = mode === 'child' && document.getElementById('pf_keep') && document.getElementById('pf_keep').checked;

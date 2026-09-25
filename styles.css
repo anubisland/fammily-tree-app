@@ -310,6 +310,30 @@
   .comment-compose .comment-send:active{ opacity:.85; }
   .comments-empty{ font-size:12px; color:var(--ink-soft); padding:6px 2px; }
   .moments-empty{ text-align:center; color:var(--ink-soft); font-size:13px; padding:40px 20px; }
+
+  /* Structured moment types — compose chips + per-type card accent */
+  .moment-types{ display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:2px; -webkit-overflow-scrolling:touch; }
+  .mtype-chip{ flex-shrink:0; background:var(--paper); border:1px solid var(--line); color:var(--ink-soft); font-size:12px; font-family:var(--f-body); border-radius:20px; padding:5px 11px; cursor:pointer; white-space:nowrap; transition:background .12s ease, border-color .12s ease; }
+  .mtype-chip.active{ background:var(--emerald); border-color:var(--emerald); color:#F6EFDD; font-weight:700; }
+  .moment-card .moment-head{ gap:8px; }
+  .moment-card .moment-time{ margin-inline-start:auto; }
+  .moment-type-badge{ font-size:11px; font-weight:700; border-radius:20px; padding:2px 9px; background:var(--paper-deep); color:var(--ink-soft); white-space:nowrap; }
+  /* Per-type accent: a start-edge stripe on the card + a tinted badge. Calm,
+     distinct hues drawn from the earthy palette. */
+  .moment-card{ border-inline-start:3px solid transparent; }
+  .moment-card.mtype-news{ border-inline-start-color:var(--emerald); }
+  .moment-card.mtype-birth{ border-inline-start-color:var(--gold); }
+  .moment-card.mtype-birth .moment-type-badge{ background:#FBF1DC; color:#9A6B12; }
+  .moment-card.mtype-marriage{ border-inline-start-color:#B23A6B; }
+  .moment-card.mtype-marriage .moment-type-badge{ background:#F7E3EC; color:#8E2C54; }
+  .moment-card.mtype-graduation{ border-inline-start-color:var(--teal); }
+  .moment-card.mtype-graduation .moment-type-badge{ background:#DDEFEF; color:#14545c; }
+  .moment-card.mtype-travel{ border-inline-start-color:#3B6EA5; }
+  .moment-card.mtype-travel .moment-type-badge{ background:#E3ECF6; color:#2C5583; }
+  .moment-card.mtype-achievement{ border-inline-start-color:#C79A2E; }
+  .moment-card.mtype-achievement .moment-type-badge{ background:#FBF1DC; color:#9A6B12; }
+  .moment-card.mtype-memorial{ border-inline-start-color:#8A8378; }
+  .moment-card.mtype-memorial .moment-type-badge{ background:#ECEAE5; color:#5A544A; }
   .moments-compose{
     flex-shrink:0; background:var(--card); border-top:1px solid var(--paper-deep); padding:10px 12px 12px;
     padding-bottom: max(12px, env(safe-area-inset-bottom));

@@ -429,6 +429,37 @@
   var momentSubs = {};
   var openComments = {};
 
+  // Structured moment types: turn a free-text feed into a legible one. Each type
+  // has an icon, an Arabic label (this feed is inline-Arabic like the rest of the
+  // moments UI), and a CSS accent class. 'news' is the neutral default.
+  var MOMENT_TYPES = [
+    { id: 'news',        icon: '📰', label: 'خبر' },
+    { id: 'birth',       icon: '👶', label: 'مولود' },
+    { id: 'marriage',    icon: '💍', label: 'زواج' },
+    { id: 'graduation',  icon: '🎓', label: 'تخرّج' },
+    { id: 'travel',      icon: '✈️', label: 'سفر' },
+    { id: 'achievement', icon: '🏆', label: 'إنجاز' },
+    { id: 'memorial',    icon: '🕊', label: 'في ذمة الله' }
+  ];
+  var MOMENT_TYPE_BY_ID = {};
+  MOMENT_TYPES.forEach(function(tp){ MOMENT_TYPE_BY_ID[tp.id] = tp; });
+  var selectedMomentType = 'news';
+
+  function renderMomentTypeChips(){
+    var host = document.getElementById('momentTypes');
+    if(!host) return;
+    host.innerHTML = MOMENT_TYPES.map(function(tp){
+      return '<button type="button" class="mtype-chip mtype-' + tp.id + (tp.id === selectedMomentType ? ' active' : '') +
+             '" data-type="' + tp.id + '">' + tp.icon + ' ' + tp.label + '</button>';
+    }).join('');
+    host.querySelectorAll('.mtype-chip').forEach(function(chip){
+      chip.onclick = function(){
+        selectedMomentType = chip.dataset.type;
+        host.querySelectorAll('.mtype-chip').forEach(function(c){ c.classList.toggle('active', c === chip); });
+      };
+    });
+  }
+
   function esc(s){
     return (window.__ftEscapeHtml || function(x){ return String(x == null ? '' : x).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); })(s);
   }
@@ -465,9 +496,13 @@
       var when = v.at && v.at.toDate ? timeAgoFn(v.at.toDate()) : 'الآن';
       var canDelete = v.byUid === currentUid || currentRole === 'owner';
       var open = !!openComments[d.id];
-      html += '<div class="moment-card">' +
-        '<div class="moment-head"><span class="moment-author">' + esc(v.byEmail || '؟') + '</span>' +
-        '<span class="moment-time">' + when + '</span></div>' +
+      // A moment without a stored type is a legacy 'news' post — default cleanly.
+      var tp = MOMENT_TYPE_BY_ID[v.type] || MOMENT_TYPE_BY_ID.news;
+      html += '<div class="moment-card mtype-' + tp.id + '">' +
+        '<div class="moment-head">' +
+          '<span class="moment-author">' + esc(v.byEmail || '؟') + '</span>' +
+          '<span class="moment-type-badge">' + tp.icon + ' ' + tp.label + '</span>' +
+          '<span class="moment-time">' + when + '</span></div>' +
         (v.text ? '<div class="moment-text">' + esc(v.text) + '</div>' : '') +
         (v.photo ? '<img class="moment-photo" src="' + esc(v.photo) + '">' : '') +
         '<div class="moment-actions">' +
@@ -626,6 +661,7 @@
   function openMoments(){
     document.getElementById('momentsScreen').classList.add('open');
     document.getElementById('momentsList').innerHTML = '<div class="moments-empty">جارِ التحميل…</div>';
+    renderMomentTypeChips();
     subscribeMoments();
   }
   function closeMoments(){
@@ -676,11 +712,14 @@
     try{
       await addDoc(collection(db, 'trees', currentTreeId, 'moments'), {
         text: text, photo: pendingMomentPhoto || null,
+        type: selectedMomentType || 'news',
         byEmail: (auth.currentUser && auth.currentUser.email) || '', byUid: currentUid,
         at: serverTimestamp()
       });
       textEl.value = '';
       pendingMomentPhoto = null;
+      selectedMomentType = 'news';
+      renderMomentTypeChips();
       var prev = document.getElementById('momentPhotoPreview');
       prev.style.display = 'none'; prev.innerHTML = '';
     }catch(e){

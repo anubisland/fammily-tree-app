@@ -2486,11 +2486,16 @@
 
   // Lazy-load a script once (used for the on-demand image exporter so html2canvas
   // — a sizable lib — never loads until the user actually asks for a poster).
-  function loadScriptOnce(src){
+  function loadScriptOnce(src, integrity){
     return new Promise(function(resolve, reject){
       if(window.html2canvas) return resolve();
       var s = document.createElement('script');
-      s.src = src; s.onload = function(){ resolve(); }; s.onerror = function(){ reject(new Error('load failed')); };
+      s.src = src;
+      // Subresource Integrity: the browser refuses to run the file unless its
+      // bytes match this hash, so a compromised CDN can't inject code into an app
+      // that holds family data + Firebase auth. crossOrigin is required for SRI.
+      if(integrity){ s.integrity = integrity; s.crossOrigin = 'anonymous'; }
+      s.onload = function(){ resolve(); }; s.onerror = function(){ reject(new Error('load failed')); };
       document.head.appendChild(s);
     });
   }
@@ -2504,7 +2509,10 @@
     closeSheet();
     toast(t('imgExporting'));
     try{
-      await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+      await loadScriptOnce(
+        'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+        'sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H'
+      );
     }catch(e){ toast(t('imgExportFail')); exportingImage = false; return; }
     var canvasEl = document.getElementById('canvas');
     var prevZoom = zoom; zoom = 1; applyZoom(); drawLinks();

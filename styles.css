@@ -564,19 +564,6 @@ html.dark{ --t-stats:rgba(62,154,164,.20); --t-places:rgba(169,107,68,.22); --cl
 .sheet-close:active{ background:var(--paper); }
 #sheetBody{ padding-top:6px; }
 
-/* Respect the device's TOP safe area (status bar / notch) — the app uses
-   viewport-fit=cover + black-translucent, so top chrome must inset or it hides
-   under the status bar on phones. (Bottom nav already insets.) */
-#tab-home .masthead, #tab-settings .masthead{ padding-top: calc(env(safe-area-inset-top, 0px) + 18px); }
-#tab-tree .banner{ padding-top: calc(env(safe-area-inset-top, 0px) + 10px); }
-.moments-header{ padding-top: calc(env(safe-area-inset-top, 0px) + 12px); }
-#authGate{ padding-top: env(safe-area-inset-top, 0px); box-sizing:border-box; }
-
-/* Android often reports env(safe-area-inset-top)=0 even with an overlapping
-   status bar (no notch), so add a minimum clearance on phones/tablets that still
-   respects a larger real inset (iOS notch) via max(). */
-@media (max-width: 820px){
-  #tab-home .masthead, #tab-settings .masthead{ padding-top: calc(max(env(safe-area-inset-top, 0px), 26px) + 12px); }
-  #tab-tree .banner{ padding-top: calc(max(env(safe-area-inset-top, 0px), 26px) + 6px); }
-  .moments-header{ padding-top: calc(max(env(safe-area-inset-top, 0px), 26px) + 8px); }
-}
+/* Top safe area is handled by removing viewport-fit=cover from the viewport meta:
+   the system now keeps the whole webview below the status bar / notch, so the
+   base header padding is enough and no env()/min-inset hacks are needed. */

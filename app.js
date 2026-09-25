@@ -1714,9 +1714,10 @@
     { v: 'Africa/Khartoum',  ar: 'الخرطوم',          en: 'Khartoum' },
     { v: 'Europe/London',    ar: 'لندن',             en: 'London' },
     { v: 'Europe/Berlin',    ar: 'أوروبا الوسطى',    en: 'Central Europe' },
-    { v: 'America/New_York', ar: 'نيويورك',          en: 'New York' },
-    { v: 'America/Toronto',  ar: 'تورونتو',          en: 'Toronto' },
-    { v: 'Australia/Sydney', ar: 'سيدني',            en: 'Sydney' }
+    { v: 'America/New_York',    ar: 'نيويورك',       en: 'New York' },
+    { v: 'America/Toronto',     ar: 'تورونتو',       en: 'Toronto' },
+    { v: 'America/Los_Angeles', ar: 'لوس أنجلوس',    en: 'Los Angeles' },
+    { v: 'Australia/Sydney',    ar: 'سيدني',         en: 'Sydney' }
   ];
   function occTz(){ try{ return localStorage.getItem('ft_occ_tz') || ''; }catch(e){ return ''; } }
   function setOccTz(v){ try{ if(v) localStorage.setItem('ft_occ_tz', v); else localStorage.removeItem('ft_occ_tz'); }catch(e){} }

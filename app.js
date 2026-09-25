@@ -1420,10 +1420,13 @@
     var max = items.reduce(function(m, it){ return it.count > m ? it.count : m; }, 0) || 1;
     return '<div class="chart-cols">' + items.map(function(it){
       var h = Math.round((it.count / max) * 100);
+      // Per-item colour wins (used by the gender chart to mirror the card colours:
+      // male green, female brown); otherwise the whole chart shares `color`.
+      var c = it.color || color;
       return '<div class="ccol">' +
                '<div class="ccol-plot">' +
                  '<span class="ccol-val">'+localeDigits(it.count)+'</span>' +
-                 '<span class="ccol-bar" style="height:'+h+'%;background:'+color+'"></span>' +
+                 '<span class="ccol-bar" style="height:'+h+'%;background:'+c+'"></span>' +
                '</div>' +
                '<div class="ccol-label">'+escapeHtml(it.label)+'</div>' +
              '</div>';
@@ -1435,11 +1438,13 @@
     var bd = window.ftStatsBreakdown(state.people || {}, new Date());
     var out = '';
     // One distinct colour per chart (group), assigned in order from the palette.
+    // Gender mirrors the card colours: male green (--emerald), female brown (the
+    // female avatar's tone), so the chart reads the same as the tree.
     var genderItems = [
-      { label: '♂ '+t('statsMales'),   count: bd.gender.m },
-      { label: '♀ '+t('statsFemales'), count: bd.gender.f }
+      { label: '♂ '+t('statsMales'),   count: bd.gender.m, color: 'var(--emerald)' },
+      { label: '♀ '+t('statsFemales'), count: bd.gender.f, color: '#8f6620' }
     ];
-    out += '<div class="chart-block"><div class="chart-title">'+t('chartGender')+'</div>'+chartBars(genderItems, CHART_COLORS[0])+'</div>';
+    out += '<div class="chart-block"><div class="chart-title">'+t('chartGender')+'</div>'+chartBars(genderItems)+'</div>';
     if(bd.generations.length){
       var genItems = bd.generations.map(function(g){ return { label: genLabel(g.gen), count: g.count }; });
       out += '<div class="chart-block"><div class="chart-title">'+t('chartGenerations')+'</div>'+chartBars(genItems, CHART_COLORS[1])+'</div>';

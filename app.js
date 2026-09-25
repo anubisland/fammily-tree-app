@@ -2283,14 +2283,19 @@
           photoUpdate = { photoPath: null, photo: null };   // removed
         } else if(pendingPhoto && pendingPhoto.blob){        // newly picked
           var treeIdForSave = currentTreeIdForSave();
-          toast(t('photoUploading'));
-          try{
-            var path = window.ftPhotoPaths.person(treeIdForSave, targetId);
-            await window.__ftPhotos.uploadPhoto(path, pendingPhoto.blob);
-            photoUpdate = { photoPath: path, photo: null };
-          }catch(err){
-            toast(t('photoUploadFail'));
-            return;   // do not save the person if the upload failed
+          if(treeIdForSave && window.__ftPhotos){
+            toast(t('photoUploading'));
+            try{
+              var path = window.ftPhotoPaths.person(treeIdForSave, targetId);
+              await window.__ftPhotos.uploadPhoto(path, pendingPhoto.blob);
+              photoUpdate = { photoPath: path, photo: null };
+            }catch(err){
+              toast(t('photoUploadFail'));
+              return;   // do not save the person if the upload failed
+            }
+          } else {
+            // No cloud tree (local-only): keep base64 so the save still works offline.
+            photoUpdate = { photo: pendingPhoto.dataUrl, photoPath: null };
           }
         }
         // else: existing unchanged -> leave photoPath/photo out of the update entirely

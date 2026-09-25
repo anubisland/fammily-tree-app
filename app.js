@@ -236,6 +236,12 @@
     completionHintMissingBirth:{ar:'«{name}» بلا تاريخ ميلاد', en:'"{name}" has no birth date'},
     completionHintDone:{ar:'أحسنت! جميع البيانات مكتملة', en:'Great! All info is complete'},
     completionHintEmpty:{ar:'أضف أول فرد لتبدأ رحلة اكتمال الشجرة', en:'Add your first person to start tracking completeness'},
+    completionOpen:{ar:'عرض ما ينقص', en:'See what\'s missing'},
+    completionIntro:{ar:'اضغط على أي اسم للانتقال إليه وإكمال بياناته.', en:'Tap any name to jump to them and fill in their details.'},
+    completionAllDone:{ar:'ما شاء الله — كل البيانات مكتملة!', en:'All done — every profile is complete!'},
+    completionFieldNameEn:{ar:'بلا اسم إنجليزي', en:'Missing English name'},
+    completionFieldBirthDate:{ar:'بلا تاريخ ميلاد', en:'Missing birth date'},
+    completionFieldPhoto:{ar:'بلا صورة', en:'Missing photo'},
     comingSoon:{ar:'قريباً', en:'Coming soon'},
     settingsTitle:{ar:'الإعدادات', en:'Settings'},
     setAppearance:{ar:'المظهر واللغة', en:'Appearance & language'},
@@ -1173,8 +1179,10 @@
     var count = ids.length;
     var gens = count ? maxGeneration() : 0;
     var photos = ids.filter(function(id){ return ppl[id].photo; }).length;
-    var complete = ids.filter(function(id){ return ppl[id].photo && ppl[id].birthDate; }).length;
-    var pct = count ? Math.round((complete / count) * 100) : 0;
+    // Completeness now spans English names + dates + photos (via the shared
+    // engine), so the meter reflects the bilingual requirement, not just photos.
+    var comp = window.ftCompleteness ? window.ftCompleteness(ppl) : { percent: 0 };
+    var pct = comp.percent;
     var fam = famNameOf().trim() ? famNameOf() : t('unnamedFamily');
     var hint = homeCompletionHint(ppl, ids);
 
@@ -1201,10 +1209,10 @@
           '<div class="leaf places" data-go="places"><span class="corner">۞</span><div class="ic">📍</div><h3>'+t('cardPlaces')+'</h3><p>'+t('cardPlacesSub')+'</p></div>' +
         '</div>' +
         '<div class="home-search"><input type="text" id="homeSearch" placeholder="'+escapeHtml(t('searchPlaceholder'))+'"><button class="home-filter-btn" id="homeFilterBtn">'+t('filterBtn')+'</button><div class="home-search-results" id="homeSearchResults"></div></div>' +
-        '<div class="meter-card">' +
+        '<div class="meter-card tappable" id="meterCard" role="button" tabindex="0">' +
           '<div class="meter-top"><h3>'+t('completionTitle')+'</h3><b>'+localeDigits(pct)+'%</b></div>' +
           '<div class="bar"><i style="width:'+pct+'%"></i></div>' +
-          '<div class="meter-hint"><span class="dot">◆</span><span>'+hint+'</span></div>' +
+          '<div class="meter-hint"><span class="dot">◆</span><span>'+hint+'</span><span class="meter-cta">'+t('completionOpen')+' ›</span></div>' +
         '</div>' +
       '</div>';
 
@@ -1219,6 +1227,11 @@
     host.querySelector('[data-go="stats"]').onclick = function(){ showStats(); };
     host.querySelector('[data-go="places"]').onclick = function(){ showPlaces(); };
     var filterBtn = host.querySelector('#homeFilterBtn'); if(filterBtn) filterBtn.onclick = function(){ showFilter(); };
+    var meterCard = host.querySelector('#meterCard');
+    if(meterCard){
+      meterCard.onclick = function(){ showCompleteness(); };
+      meterCard.onkeydown = function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); showCompleteness(); } };
+    }
     wireOccasionsCard(host);
 
     // Live people search: type a name → matching people → tap to jump to the card.
@@ -1325,6 +1338,52 @@
     openSheet('<h3>'+t('statsTitle')+'</h3>'+body);
   }
   window.__ftShowStats = showStats;
+
+  // Completeness detail: turn each data gap into a tap-to-fix invitation. Lists,
+  // per field, exactly who is missing it (in tree order), and jumps to their
+  // card on tap so the owner can fill it in.
+  function showCompleteness(){
+    if(!window.ftCompleteness){ toast(t('comingSoon')); return; }
+    var comp = window.ftCompleteness(state.people || {});
+    var head =
+      '<h3>'+t('completionTitle')+'</h3>' +
+      '<div class="comp-head">' +
+        '<div class="comp-pct">'+localeDigits(comp.percent)+'%</div>' +
+        '<div class="bar comp-bar"><i style="width:'+comp.percent+'%"></i></div>' +
+      '</div>';
+
+    if(!comp.total){ openSheet(head + '<div class="context">'+t('statsEmpty')+'</div>'); return; }
+    if(comp.percent === 100){ openSheet(head + '<div class="comp-done">🎉 '+t('completionAllDone')+'</div>'); return; }
+
+    var order = treeOrderMap();
+    var byOrder = function(a, b){ return (order[a] == null ? 1e9 : order[a]) - (order[b] == null ? 1e9 : order[b]); };
+    var labelKey = { nameEn: 'completionFieldNameEn', birthDate: 'completionFieldBirthDate', photo: 'completionFieldPhoto' };
+
+    var sections = comp.fieldOrder.map(function(key){
+      var miss = (comp.fields[key].missing || []).slice().sort(byOrder);
+      if(!miss.length) return '';
+      var rows = miss.map(function(id){
+        var p = getPerson(id); if(!p) return '';
+        return '<button class="comp-row" data-id="'+escapeHtml(id)+'">' +
+                 '<span class="comp-av">'+(p.gender==='f'?'👩':'👨')+'</span>' +
+                 '<span class="comp-name">'+escapeHtml(fullNameOf(p))+'</span>' +
+                 '<span class="comp-go">›</span>' +
+               '</button>';
+      }).join('');
+      return '<div class="comp-section">' +
+               '<div class="comp-section-head"><span>'+t(labelKey[key])+'</span><b>'+localeDigits(miss.length)+'</b></div>' +
+               rows +
+             '</div>';
+    }).join('');
+
+    openSheet(head + '<div class="comp-intro context">'+t('completionIntro')+'</div>' + sections);
+
+    var sheet = document.getElementById('sheet');
+    if(sheet) sheet.querySelectorAll('.comp-row').forEach(function(r){
+      r.onclick = function(){ var id = r.getAttribute('data-id'); closeSheet(); focusPerson(id); };
+    });
+  }
+  window.__ftShowCompleteness = showCompleteness;
 
   // Rank each person in family/tree order (father, then mother, then their
   // children — same order the tree renders), so name lists read naturally.

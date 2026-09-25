@@ -634,7 +634,13 @@
     teardownMomentSubs();
   }
   document.getElementById('momentsOpenBtn').addEventListener('click', openMoments);
-  document.getElementById('momentsBack').addEventListener('click', closeMoments);
+  /* The back arrow must switch tabs, not just hide the inner screen — moments is
+     a real tab now, so merely removing `.open` left #tab-moments active and blank.
+     Route through the app's tab switcher (which also unsubscribes the feed). */
+  document.getElementById('momentsBack').addEventListener('click', function(){
+    if(window.__ftShowTab) window.__ftShowTab('home');
+    else closeMoments();
+  });
   /* Moments is now a regular tab (bottom nav + home card), not just a
      slide-over reached via momentsOpenBtn. app.js's tab router calls these
      on every switch into/out of the moments tab so the live feed subscribes

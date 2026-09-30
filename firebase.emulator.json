@@ -1,10 +1,5 @@
 {
-  "_comment": "Emulator-only config for `npm run test:rules` and `npm run test:storage`.",
+  "_comment": "Emulator-only config for `npm run test:rules`.",
   "firestore": { "rules": "firestore.rules" },
-  "storage": { "rules": "storage.rules" },
-  "emulators": {
-    "firestore": { "port": 8080 },
-    "storage": { "port": 9199 },
-    "ui": { "enabled": false }
-  }
+  "emulators": { "firestore": { "port": 8080 }, "ui": { "enabled": false } }
 }

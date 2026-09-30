@@ -3,8 +3,8 @@ const P = global.ftPhotoPaths;
 let pass=0, fail=0; function ok(c,l){ if(c) pass++; else { fail++; console.error('✗', l); } }
 
 ok(!!P, 'ftPhotoPaths exposed');
-ok(P.person('t1','p1') === 'trees/t1/people/p1.jpg', 'person path');
-ok(P.moment('t1','m1') === 'trees/t1/moments/m1.jpg', 'moment path');
+ok(P.person('t1','p1') === 'trees/t1/photos/p_p1', 'person photo doc path');
+ok(P.moment('t1','m1') === 'trees/t1/photos/m_m1', 'moment photo doc path');
 
 // ftPhotoSource is defined in app.js; load the node-guard globals it exposes.
 require('../app.js');

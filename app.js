@@ -712,10 +712,9 @@
       var id = ids[i], p = state.people[id];
       if(!p) continue;
       try{
-        var resp = await fetch(p.photo);
-        var blob = await resp.blob();
+        // p.photo is already a base64 data URL — store it as its own photo doc.
         var path = window.ftPhotoPaths.person(treeId, id);
-        await window.__ftPhotos.uploadPhoto(path, blob);
+        await window.__ftPhotos.uploadPhoto(path, p.photo);
         p.photoPath = path; p.photo = null; changed = true;   // clear base64 ONLY after upload OK
       }catch(e){ try{ console.error('[photo-migrate] failed for', id, e && e.code); }catch(_){}; break; }
     }
@@ -1011,10 +1010,7 @@
       var path = img.getAttribute('data-photo-path'); img.removeAttribute('data-photo-path');
       if(!(window.__ftPhotos && window.__ftPhotos.resolveURL)) return;  // no cloud: leave placeholder for next render
       window.__ftPhotos.resolveURL(path).then(function(u){
-        // crossOrigin BEFORE src: keeps the SW-cached response CORS-clean so the
-        // share canvas can reuse the same cached image without tainting.
-        img.crossOrigin = 'anonymous';
-        img.src = u;
+        img.src = u;   // u is a base64 data URL (same-origin, canvas-safe)
       }, function(err){
         try{ console.warn('photo resolve failed', path, err && err.code); }catch(e){}
         var fb = img.getAttribute('data-fallback');
@@ -2233,8 +2229,7 @@
                  : null;
     var drewPhoto = false;
     if(photoSrc){
-      var img = new Image();
-      img.crossOrigin = 'anonymous';   // Storage URLs are CORS-enabled; prevents canvas taint so toDataURL works
+      var img = new Image();   // photoSrc is a base64 data URL (same-origin, no canvas taint)
       await new Promise(function(res){ img.onload = res; img.onerror = res; img.src = photoSrc; });
       if(img.width){ g.clip(); g.drawImage(img, cx-r, cy-r, r*2, r*2); drewPhoto = true; }
     }
@@ -2375,7 +2370,7 @@
             toast(t('photoUploading'));
             try{
               var path = window.ftPhotoPaths.person(treeIdForSave, targetId);
-              await window.__ftPhotos.uploadPhoto(path, pendingPhoto.blob);
+              await window.__ftPhotos.uploadPhoto(path, pendingPhoto.dataUrl);
               photoUpdate = { photoPath: path, photo: null };
             }catch(err){
               toast(t('photoUploadFail'));

@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:rules": "firebase emulators:exec --only firestore --config firebase.emulator.json --project family-tree-rules-test \"node scripts/verify-rules.mjs\"",
-    "test:storage": "firebase emulators:exec --only firestore,storage --config firebase.emulator.json --project family-tree-rules-test \"node scripts/verify-storage-rules.mjs\""
+    "test:rules": "firebase emulators:exec --only firestore --config firebase.emulator.json --project family-tree-rules-test \"node scripts/verify-rules.mjs\""
   },
   "devDependencies": {
     "firebase": "^12.0.0",

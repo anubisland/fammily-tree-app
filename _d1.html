@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" id="htmlRoot">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>شجرة العائلة</title>
+<!-- PWA: installable web + mobile app from one source -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F5B4B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="شجرة العائلة">
+<link rel="apple-touch-icon" href="icon-512.png?v=16">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=16">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;500;600;700;800&family=Lora:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=50">
+</head>
+<body>
+
+  <div id="authGate">
+    <div class="auth-card">
+      <div class="glyph">🌳</div>
+      <h2 id="authTitle">شجرة العائلة</h2>
+      <div class="auth-sub" id="authSub">سجّل الدخول لمزامنة شجرتك مع أفراد عائلتك</div>
+
+      <div class="auth-tabs">
+        <button type="button" id="tabLogin" class="active">تسجيل الدخول</button>
+        <button type="button" id="tabSignup">حساب جديد</button>
+      </div>
+
+      <div id="authErr" class="auth-error"></div>
+
+      <div class="field"><label>البريد الإلكتروني</label><input type="email" id="authEmail" autocomplete="email"></div>
+      <div class="field"><label>كلمة المرور</label><input type="password" id="authPass" autocomplete="current-password"></div>
+
+      <div id="signupModeBox" style="display:none;">
+        <div class="auth-mode-toggle">
+          <button type="button" id="modeCreate" class="active">إنشاء عائلة جديدة</button>
+          <button type="button" id="modeJoin">الانضمام لعائلة</button>
+        </div>
+        <div class="field" id="joinCodeField" style="display:none;">
+          <label>رابط الدعوة</label>
+          <input type="text" id="joinCode" placeholder="الصق رابط الدعوة هنا">
+        </div>
+      </div>
+
+      <button class="primary-btn" id="authSubmitBtn">دخول</button>
+      <div class="auth-loading" id="authLoading">جارِ التحقق…</div>
+    </div>
+  </div>
+
+  <section id="tab-home" class="tab-panel"></section>
+
+  <section id="tab-tree" class="tab-panel">
+    <button class="immersive-btn" id="immersiveBtn" title="ملء الشاشة">⤢</button>
+    <div class="banner">
+      <div class="banner-row">
+        <div>
+          <h1 class="family-title" id="familyTitle" contenteditable="true" spellcheck="false">شجرة العائلة</h1>
+          <div class="family-sub" id="editHint">اضغط على الاسم لتعديله</div>
+        </div>
+        <div class="banner-actions">
+          <button class="icon-btn" id="langBtn" title="Language">EN</button>
+          <button class="icon-btn" id="printBtn" title="Print">🖨</button>
+          <button class="icon-btn" id="menuBtn" title="Menu">⋮</button>
+        </div>
+      </div>
+      <div class="stat-row" id="statRow"></div>
+      <button class="moments-cta" id="momentsOpenBtn" style="display:none; width:100%; cursor:pointer;">📰 لحظات العائلة — شارك واطّلع على آخر الأخبار</button>
+    </div>
+
+    <div class="storage-warn" id="storageWarn"></div>
+
+    <div class="meview-bar" id="meViewBar" style="display:none;"></div>
+
+    <div class="toolbar" id="toolbar" style="display:none;">
+      <div class="zoom-group">
+        <button id="zoomOut">−</button>
+        <span id="zoomLabel">100%</span>
+        <button id="zoomIn">+</button>
+      </div>
+      <button id="exportBtn"></button>
+      <button id="importBtn"></button>
+      <input type="file" id="importFile" accept=".json,application/json,text/plain" style="display:none;">
+      <button id="resetBtn"></button>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="empty-wrap" id="emptyWrap">
+        <div class="empty-card">
+          <div class="glyph">🌳</div>
+          <h2 id="emptyTitle"></h2>
+          <p id="emptyDesc"></p>
+          <div class="field">
+            <label id="rootNameLabel"></label>
+            <input type="text" id="rootName">
+          </div>
+          <div class="field">
+            <label id="rootSpouseLabel"></label>
+            <input type="text" id="rootSpouseName">
+          </div>
+          <button class="primary-btn" id="createRootBtn"></button>
+          <button class="primary-btn" id="restoreBtnEmpty" style="background:var(--teal); margin-top:10px;"></button>
+        </div>
+      </div>
+      <div class="canvas" id="canvas" style="display:none;">
+        <svg class="links" id="linksSvg"></svg>
+        <div class="tree-title" id="treeTitle"></div>
+        <div id="treeRoot"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-moments" class="tab-panel">
+    <div id="momentsScreen">
+      <div class="moments-header">
+        <button class="icon-btn" id="momentsBack" title="رجوع">→</button>
+        <h2>📰 لحظات العائلة</h2>
+        <div style="width:36px;"></div>
+      </div>
+      <div class="moments-list" id="momentsList"></div>
+      <div class="moments-compose">
+        <div class="moment-types" id="momentTypes"></div>
+        <div class="moments-photo-preview" id="momentPhotoPreview" style="display:none;"></div>
+        <textarea id="momentText" placeholder="شارك خبرًا أو لحظة مع العائلة…" rows="2"></textarea>
+        <div class="moments-compose-actions">
+          <button id="momentPhotoBtn" type="button">📷 صورة</button>
+          <input type="file" id="momentPhotoFile" accept="image/*" style="display:none;">
+          <button id="momentPostBtn" class="primary-btn" style="flex:1;">نشر</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-settings" class="tab-panel"></section>
+
+  <nav class="bottom-nav" id="bottomNav" style="display:none;">
+    <button class="nav-item" data-tab="home"><span class="ni">⌂</span><span id="nav_home"></span></button>
+    <button class="nav-item" data-tab="tree"><span class="ni">🌳</span><span id="nav_tree"></span></button>
+    <button class="nav-item" data-action="kinship"><span class="ni">🔗</span><span id="nav_kinship"></span></button>
+    <button class="nav-item" data-action="activity"><span class="ni">📋</span><span id="nav_activity"></span></button>
+    <button class="nav-item" data-tab="moments"><span class="ni">📰</span><span id="nav_moments"></span></button>
+    <button class="nav-item" data-tab="settings"><span class="ni">⚙</span><span id="nav_settings"></span></button>
+  </nav>
+
+  <div class="overlay" id="overlay"></div>
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <button class="sheet-close" id="sheetClose" title="إغلاق" aria-label="إغلاق">✕</button>
+    <div id="sheetBody"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+  /* Capture the install prompt as early as possible — the browser fires
+     `beforeinstallprompt` once, and if we are not listening yet it is lost.
+     app.js reads window.__ftDeferredInstall when rendering the settings row. */
+  window.__ftDeferredInstall = null;
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    window.__ftDeferredInstall = e;
+    if(window.__ftRenderSettings) window.__ftRenderSettings();
+  });
+  window.addEventListener('appinstalled', function(){
+    window.__ftDeferredInstall = null;
+    if(window.__ftRenderSettings) window.__ftRenderSettings();
+  });
+</script>
+<script>
+  /* Cache-buster: load the logic files fresh on every visit so fixes reach
+     everyone immediately (GitHub Pages caches assets for ~10 min, which made
+     updates look like they "didn't work"). Order is preserved by chaining on
+     load: kinship -> app (sets window.__ft*) -> cloud (module, uses them). */
+  (function(){
+    var bust = '?t=' + Date.now();
+    function add(src, type){
+      return new Promise(function(resolve){
+        var s = document.createElement('script');
+        s.src = src + bust; if(type) s.type = type;
+        s.onload = resolve; s.onerror = resolve;
+        document.body.appendChild(s);
+      });
+    }
+    add('kinship.js')
+      .then(function(){ return add('translit.js'); })
+      .then(function(){ return add('occasions.js'); })
+      .then(function(){ return add('stats.js'); })
+      .then(function(){ return add('places.js'); })
+      .then(function(){ return add('completeness.js'); })
+      .then(function(){ return add('duplicates.js'); })
+      .then(function(){ return add('timeline.js'); })
+      .then(function(){ return add('photo-paths.js'); })
+      .then(function(){ return add('app.js'); });
+  })();
+
+  /* PWA service worker — registered without the cache-buster. It is
+     network-first (see sw.js), so it never serves stale code online; it only
+     gives us offline support and the installable-app experience. */
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(){ /* offline/unsupported: app still works online */ });
+    });
+  }
+</script>
+</body>
+</html>

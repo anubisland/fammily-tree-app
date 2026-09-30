@@ -4,10 +4,10 @@
     createUserWithEmailAndPassword, signOut
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
   import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp,
+    getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+    doc, getDoc, setDoc, onSnapshot, serverTimestamp,
     collection, addDoc, getDocs, query, orderBy, limit, deleteDoc, updateDoc
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
-  import { getStorage } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js";
   import { makePhotoApi } from "./photos.js";
 
   const firebaseConfig = {
@@ -21,9 +21,17 @@
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
-  const db = getFirestore(app);
-  const storage = getStorage(app);
-  window.__ftPhotos = makePhotoApi(storage);
+  // Persistent (IndexedDB) cache so the tree AND its photo docs work offline
+  // across reloads. Fall back to the default in-memory Firestore if persistence
+  // can't initialise (e.g. private mode / unsupported browser).
+  let db;
+  try{
+    db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+  }catch(e){
+    try{ console.warn('Firestore persistence unavailable, using memory cache:', e && e.code); }catch(_){}
+    db = getFirestore(app);
+  }
+  window.__ftPhotos = makePhotoApi(db);
 
   var currentUid = null;
   var currentTreeId = null;
@@ -752,7 +760,7 @@
       if(pendingMomentPhoto && pendingMomentPhoto.blob){
         photoPath = window.ftPhotoPaths.moment(currentTreeId, mref.id);
         try{
-          await window.__ftPhotos.uploadPhoto(photoPath, pendingMomentPhoto.blob);
+          await window.__ftPhotos.uploadPhoto(photoPath, pendingMomentPhoto.dataUrl);
         }catch(upErr){
           console.error('moment photo upload failed', upErr && upErr.code, upErr);
           alert(writeErrMsg(upErr, 'تعذّر رفع صورة اللحظة'));

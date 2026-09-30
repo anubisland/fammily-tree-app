@@ -46,7 +46,7 @@
       if(p.gender === 'f') females++; else males++;
       if(isDead) deceased++; else living++;
       if(p.birthDate) withBirthDate++;
-      if(p.photo) withPhoto++;
+      if(p.photo || p.photoPath) withPhoto++;
       if(p.residence && String(p.residence).trim()){
         var c = String(p.residence).trim();
         cities[c] = (cities[c] || 0) + 1;

@@ -26,4 +26,8 @@ ok(ftCompleteness().total === 0, 'no-arg -> 0 total (no throw)');
 // whitespace-only English name counts as missing
 ok(ftCompleteness({ z:{ name:{ar:'ز', en:'   '} } }).fields.nameEn.have === 0, 'blank en name = missing');
 
+// A Storage photoPath counts as having a photo (backward-compat with base64).
+ok(ftCompleteness({ z:{ name:{ar:'ز', en:'Z'}, photoPath:'trees/t/people/z.jpg' } }).fields.photo.have === 1, 'photoPath counts as a photo');
+ok(ftCompleteness({ z:{ name:{ar:'ز', en:'Z'} } }).fields.photo.have === 0, 'no photo/photoPath -> not counted');
+
 console.log(pass+' passed, '+fail+' failed'); process.exit(fail?1:0);

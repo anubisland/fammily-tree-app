@@ -508,7 +508,12 @@
           '<span class="moment-type-badge">' + tp.icon + ' ' + tp.label + '</span>' +
           '<span class="moment-time">' + when + '</span></div>' +
         (v.text ? '<div class="moment-text">' + esc(v.text) + '</div>' : '') +
-        (v.photo ? '<img class="moment-photo" src="' + esc(v.photo) + '">' : '') +
+        (function(){
+          var s = window.ftPhotoSource ? window.ftPhotoSource({ photoPath: v.photoPath, photo: v.photo }) : { kind:'none' };
+          if(s.kind === 'base64') return '<img class="moment-photo" src="' + esc(s.value) + '">';
+          if(s.kind === 'path')   return '<img class="moment-photo" data-photo-path="' + esc(s.value) + '">';
+          return '';
+        })() +
         '<div class="moment-actions">' +
           '<button class="react-btn" data-mid="' + d.id + '">🤍 <span class="react-count">0</span></button>' +
           '<button class="comment-btn" data-mid="' + d.id + '">💬 <span class="comment-count">0</span></button>' +
@@ -524,6 +529,7 @@
       '</div>';
     });
     list.innerHTML = html;
+    if(window.__ftFillPhotoRefs) window.__ftFillPhotoRefs(list);   // resolve Storage moment photos
     list.querySelectorAll('.moment-del').forEach(function(btn){
       btn.onclick = async function(){
         if(!confirm('حذف هذه اللحظة؟')) return;

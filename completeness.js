@@ -16,7 +16,7 @@
   var FIELDS = [
     { key: 'nameEn',    test: hasEn },
     { key: 'birthDate', test: function(p){ return has(p && p.birthDate); } },
-    { key: 'photo',     test: function(p){ return has(p && p.photo); } }
+    { key: 'photo',     test: function(p){ return has(p && p.photo) || has(p && p.photoPath); } }
   ];
 
   function ftCompleteness(people){

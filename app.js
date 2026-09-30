@@ -954,6 +954,27 @@
   // (lets the first/older generations be marked رحمه الله before dates are known).
   function isDeceased(p){ return !!(p && (p.deathDate || p.deceased)); }
 
+  // Returns avatar inner HTML immediately (emoji or base64 <img>), and for a
+  // Storage path inserts a placeholder <img data-photo-path> that fillPhotoRefs()
+  // resolves to a real URL after the node is in the DOM.
+  function avatarInnerHtml(rec, fallbackEmoji){
+    var s = ftPhotoSource(rec);
+    if(s.kind === 'base64') return '<img src="'+escapeHtml(s.value)+'" alt="">';
+    if(s.kind === 'path')   return '<img data-photo-path="'+escapeHtml(s.value)+'" alt="">';
+    return fallbackEmoji;
+  }
+  // Resolve any <img data-photo-path> under `root` to a real Storage URL. Offline
+  // or denied reads leave the img blank rather than throwing.
+  function fillPhotoRefs(root){
+    (root || document).querySelectorAll('img[data-photo-path]').forEach(function(img){
+      var path = img.getAttribute('data-photo-path'); img.removeAttribute('data-photo-path');
+      if(window.__ftPhotos && window.__ftPhotos.resolveURL){
+        window.__ftPhotos.resolveURL(path).then(function(u){ img.src = u; }, function(){ /* offline/denied: stays blank */ });
+      }
+    });
+  }
+  window.__ftFillPhotoRefs = fillPhotoRefs;
+
   function personCard(id){
     var p = getPerson(id);
     var depth = genOfPerson(id);
@@ -966,7 +987,7 @@
     var childCount = p.childrenIds.length;
     var age = calcAge(p.birthDate);
     var lifespan = deceased ? lifespanText(p.birthDate, p.deathDate) : '';
-    var avatarInner = p.photo ? '<img src="'+escapeHtml(p.photo)+'" alt="">' : (p.gender==='f' ? '👩' : '👨');
+    var avatarInner = avatarInnerHtml(p, (p.gender==='f' ? '👩' : '👨'));
     var siblingInfo = null;
     if(p.parentId){
       var parentP = getPerson(p.parentId);
@@ -1099,6 +1120,7 @@
     var treeRoot = document.getElementById('treeRoot');
     treeRoot.innerHTML = '';
     treeRoot.appendChild(renderUnit(displayRoot));
+    fillPhotoRefs(treeRoot);   // resolve any Storage photo paths to URLs
     renderMeViewBar(displayRoot);
     document.getElementById('familyTitle').textContent = famNameOf() || t('appName');
     /* Title centered above the root couple, inside the canvas — so it scales and
@@ -1212,7 +1234,7 @@
     if(!ids.length) return t('completionHintEmpty');
     for(var i=0;i<ids.length;i++){
       var p = ppl[ids[i]];
-      if(!p.photo) return tf('completionHintMissingPhoto', {name: escapeHtml(fullNameOf(p))});
+      if(!p.photo && !p.photoPath) return tf('completionHintMissingPhoto', {name: escapeHtml(fullNameOf(p))});
       if(!p.birthDate) return tf('completionHintMissingBirth', {name: escapeHtml(fullNameOf(p))});
     }
     return t('completionHintDone');
@@ -1293,7 +1315,7 @@
     var ids = Object.keys(ppl);
     var count = ids.length;
     var gens = count ? maxGeneration() : 0;
-    var photos = ids.filter(function(id){ return ppl[id].photo; }).length;
+    var photos = ids.filter(function(id){ return ppl[id].photo || ppl[id].photoPath; }).length;
     // Completeness now spans English names + dates + photos (via the shared
     // engine), so the meter reflects the bilingual requirement, not just photos.
     var comp = window.ftCompleteness ? window.ftCompleteness(ppl) : { percent: 0 };
@@ -2038,7 +2060,7 @@
     var p = getPerson(id); if(!p) return;
     var other = ownName(p, state.lang === 'ar' ? 'en' : 'ar');
     var deceased = isDeceased(p);
-    var av = p.photo ? '<img src="'+escapeHtml(p.photo)+'" alt="">' : (p.gender==='f' ? '👩' : '👨');
+    var av = avatarInnerHtml(p, (p.gender==='f' ? '👩' : '👨'));
     var lines = '';
     if(p.birthDate) lines += '<div class="prof-line">🎂 <b>'+t('profileBirth')+':</b> '+escapeHtml(fmtDate(p.birthDate))+
       (!deceased && ageYears(p.birthDate)!==null ? ' <span class="prof-dim">('+t('profileAge')+' '+escapeHtml(ageText(ageYears(p.birthDate)))+')</span>' : '')+'</div>';
@@ -2075,6 +2097,7 @@
         '<button class="primary-btn" id="prof_share" style="background:var(--gold);">📤 '+t('profileShare')+'</button>'+
       '</div>'
     );
+    fillPhotoRefs(document.getElementById('sheet'));   // resolve profile avatar + relatives' Storage photos
     sheetBody.querySelectorAll('[data-profile]').forEach(function(b){ b.onclick = function(){ openProfile(b.getAttribute('data-profile')); }; });
     var pe = document.getElementById('prof_edit'); if(pe) pe.onclick = function(){ openPersonForm('edit', id); };
     var pa = document.getElementById('prof_addchild'); if(pa) pa.onclick = function(){ openPersonForm('child', id); };
@@ -2153,13 +2176,19 @@
     var cy = 330, r = 150;
     g.save(); g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.closePath();
     g.fillStyle = p.gender==='f' ? '#F3E9D6' : '#E9F1EA'; g.fill();
-    if(p.photo){
+    // Resolve the photo source: legacy base64 directly, or a Storage path via URL.
+    var ps = ftPhotoSource(p);
+    var photoSrc = ps.kind === 'base64' ? ps.value
+                 : ps.kind === 'path' && window.__ftPhotos ? await window.__ftPhotos.resolveURL(ps.value).catch(function(){ return null; })
+                 : null;
+    if(photoSrc){
       var img = new Image();
-      await new Promise(function(res){ img.onload = res; img.onerror = res; img.src = p.photo; });
+      img.crossOrigin = 'anonymous';   // Storage URLs are CORS-enabled; prevents canvas taint so toDataURL works
+      await new Promise(function(res){ img.onload = res; img.onerror = res; img.src = photoSrc; });
       if(img.width){ g.clip(); g.drawImage(img, cx-r, cy-r, r*2, r*2); }
     }
     g.restore();
-    if(!p.photo){ g.font = "150px serif"; g.fillStyle = '#0F5B4B'; g.fillText(p.gender==='f'?'👩':'👨', cx, cy+54); }
+    if(!photoSrc){ g.font = "150px serif"; g.fillStyle = '#0F5B4B'; g.fillText(p.gender==='f'?'👩':'👨', cx, cy+54); }
     g.strokeStyle = '#B8862D'; g.lineWidth = 8; g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.stroke();
     var y = 560;
     g.fillStyle = '#2B2118'; g.font = "700 60px Amiri"; y = _wrap(g, fullNameOf(p), cx, y, W-160, 70);

@@ -11,7 +11,7 @@
    ============================================================ */
 'use strict';
 
-var CACHE = 'family-tree-v24';
+var CACHE = 'family-tree-v25';
 // Firebase Storage photos live in their own long-lived cache (survives shell
 // version bumps) so photos seen once keep working offline.
 var IMG_CACHE = 'family-tree-img-v1';
@@ -27,6 +27,16 @@ var SHELL = [
   './icon-192.png',
   './icon-512.png'
 ];
+
+// Cap the photo cache so it can't grow without bound. Cache API keys() returns
+// requests in insertion order, so the oldest entries are trimmed first.
+var IMG_CACHE_MAX = 300;
+function trimImgCache(c){
+  c.keys().then(function(keys){
+    var over = keys.length - IMG_CACHE_MAX;
+    for(var i = 0; i < over; i++){ c.delete(keys[i]); }
+  }).catch(function(){});
+}
 
 // Normalise a request URL to a stable cache key: same-origin only, query
 // (?t=…/?v=…) removed so the buster does not fragment the cache.
@@ -56,21 +66,25 @@ self.addEventListener('fetch', function(e){
   if(req.method !== 'GET') return;                 // never touch writes
   var url = new URL(req.url);
 
-  // Firebase Storage photos: cache-first so a photo seen once shows offline. The
-  // download URL carries a token query, so cache/match by the FULL request.
+  // Firebase Storage photos: cache-first for the actual image BYTES (alt=media)
+  // so a photo seen once shows offline. We must NOT cache the getDownloadURL
+  // METADATA lookup (same host, no alt=media) — caching it would pin a stale
+  // download token after a photo is replaced, so that always hits the network.
   if(url.hostname.indexOf('firebasestorage') !== -1){
-    e.respondWith(
-      caches.open(IMG_CACHE).then(function(c){
-        return c.match(req).then(function(hit){
-          if(hit) return hit;
-          return fetch(req).then(function(res){
-            if(res && res.status === 200){ c.put(req, res.clone()).catch(function(){}); }
-            return res;
+    if(url.searchParams.get('alt') === 'media'){
+      e.respondWith(
+        caches.open(IMG_CACHE).then(function(c){
+          return c.match(req).then(function(hit){
+            if(hit) return hit;
+            return fetch(req).then(function(res){
+              if(res && res.status === 200){ c.put(req, res.clone()).then(function(){ trimImgCache(c); }).catch(function(){}); }
+              return res;
+            });
           });
-        });
-      })
-    );
-    return;
+        })
+      );
+    }
+    return;   // metadata / other Storage GETs: straight to network (fresh token)
   }
 
   if(url.origin !== self.location.origin) return;  // let Firebase/fonts hit network directly

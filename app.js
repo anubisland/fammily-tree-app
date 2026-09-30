@@ -1010,10 +1010,16 @@
     (root || document).querySelectorAll('img[data-photo-path]').forEach(function(img){
       var path = img.getAttribute('data-photo-path'); img.removeAttribute('data-photo-path');
       if(!(window.__ftPhotos && window.__ftPhotos.resolveURL)) return;  // no cloud: leave placeholder for next render
-      window.__ftPhotos.resolveURL(path).then(function(u){ img.src = u; }, function(err){
+      window.__ftPhotos.resolveURL(path).then(function(u){
+        // crossOrigin BEFORE src: keeps the SW-cached response CORS-clean so the
+        // share canvas can reuse the same cached image without tainting.
+        img.crossOrigin = 'anonymous';
+        img.src = u;
+      }, function(err){
         try{ console.warn('photo resolve failed', path, err && err.code); }catch(e){}
         var fb = img.getAttribute('data-fallback');
-        if(fb){ img.replaceWith(document.createTextNode(fb)); }
+        if(fb){ img.replaceWith(document.createTextNode(fb)); }   // person avatar -> emoji
+        else { img.remove(); }                                    // moment photo -> drop the broken img
       });
     });
   }

@@ -55,6 +55,8 @@ async function seed(ctx) {
   await setDoc(doc(db, 'trees', TREE, 'moments', 'm1', 'reactions', OWNER), { byUid: OWNER, emoji: '❤️' });
   await setDoc(doc(db, 'trees', TREE, 'moments', 'm1', 'comments', 'c1'), { byUid: OWNER, byEmail: 'o@x.com', text: 'nice' });
   await setDoc(doc(db, 'trees', TREE, 'activity', 'a1'), { byUid: OWNER, kind: 'created' });
+  // A photo doc (base64 in `data`) for the photos-subcollection checks.
+  await setDoc(doc(db, 'trees', TREE, 'photos', 'p_x'), { data: 'data:image/jpeg;base64,AAA' });
 
   // A legacy tree from the pre-createdBy era: no `createdBy` field at all.
   // Reuses OWNER/EDITOR as its members so the existing authenticated
@@ -372,6 +374,42 @@ await check('viewer can react (shared feed, isMember not canEdit)', () =>
 await check('viewer can comment (shared feed, isMember not canEdit)', () =>
   assertSucceeds(setDoc(doc(viewerDb, 'trees', TREE, 'moments', 'm1', 'comments', 'cv'),
     { byUid: VIEWER, byEmail: 'v@x.com', text: 'مبارك' })));
+
+// ── Photos subcollection (base64 docs kept out of the tree doc) ──────────
+await check('member can read a photo doc', () =>
+  assertSucceeds(getDoc(doc(viewerDb, 'trees', TREE, 'photos', 'p_x'))));
+
+await check('outsider cannot read a photo doc', () =>
+  assertFails(getDoc(doc(outsiderDb, 'trees', TREE, 'photos', 'p_x'))));
+
+await check('editor can create a photo doc', () =>
+  assertSucceeds(setDoc(doc(editorDb, 'trees', TREE, 'photos', 'p_e'), { data: 'data:image/jpeg;base64,BBB' })));
+
+await check('editor can overwrite (replace) a photo doc', () =>
+  assertSucceeds(setDoc(doc(editorDb, 'trees', TREE, 'photos', 'p_x'), { data: 'data:image/jpeg;base64,CCC' })));
+
+await check('viewer cannot write a photo doc', () =>
+  assertFails(setDoc(doc(viewerDb, 'trees', TREE, 'photos', 'p_v'), { data: 'data:image/jpeg;base64,DDD' })));
+
+await check('outsider cannot write a photo doc', () =>
+  assertFails(setDoc(doc(outsiderDb, 'trees', TREE, 'photos', 'p_o'), { data: 'x' })));
+
+await check('editor can delete a photo doc', () =>
+  assertSucceeds(deleteDoc(doc(editorDb, 'trees', TREE, 'photos', 'p_x'))));
+
+await check('viewer cannot delete a photo doc', () =>
+  assertFails(deleteDoc(doc(viewerDb, 'trees', TREE, 'photos', 'p_e'))));
+
+// Signed-out and cross-tenant (a non-member is, by definition, a member of some
+// OTHER tree): both must be denied — closes the regression from the removed
+// storage suite. `outsiderDb` above already covers the authenticated non-member
+// (cross-tenant) case for read+write; these add the unauthenticated case.
+const anonDb = testEnv.unauthenticatedContext().firestore();
+await check('signed-out user cannot read a photo doc', () =>
+  assertFails(getDoc(doc(anonDb, 'trees', TREE, 'photos', 'p_x'))));
+
+await check('signed-out user cannot write a photo doc', () =>
+  assertFails(setDoc(doc(anonDb, 'trees', TREE, 'photos', 'p_anon'), { data: 'x' })));
 
 await testEnv.cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);

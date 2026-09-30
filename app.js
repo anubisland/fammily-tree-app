@@ -1,6 +1,28 @@
 (function(){
   "use strict";
 
+  // Decide how to render a person/moment photo, backward-compatibly: a Storage
+  // path wins; else a legacy embedded base64 data URL; else nothing. Pure, so it
+  // is unit-tested in node. The async URL for a path is resolved by the caller
+  // via window.__ftPhotos.resolveURL. Declared here (function declaration, hoisted)
+  // so both the node-guard branch below and the browser branch (near resizeImage)
+  // can expose the same function on their respective globals.
+  function ftPhotoSource(rec){
+    if(rec && typeof rec.photoPath === 'string' && rec.photoPath) return { kind:'path', value: rec.photoPath };
+    if(rec && typeof rec.photo === 'string' && rec.photo) return { kind:'base64', value: rec.photo };
+    return { kind:'none', value:'' };
+  }
+
+  // People still holding an embedded base64 photo but no Storage path — the set
+  // the gradual migration converts. Pure (takes the people map), so it is
+  // unit-tested in node.
+  function ftPhotosNeedingMigration(people){
+    people = people || {};
+    return Object.keys(people).filter(function(id){
+      var p = people[id]; return !!(p && p.photo && !p.photoPath);
+    });
+  }
+
   // Node test hook: a self-contained pure nasab computer over a people map.
   // Runs before any DOM access so `require('./app.js')` works under node
   // (see scripts/names.test.cjs).
@@ -26,6 +48,8 @@
         lifespanText:function(b,d,l){var n=age(b,d); if(n===null||!d) return ''; return (l==='en')?('lived '+n+' years'):('عاش '+n+' سنة');}
       };
     })();
+    G.ftPhotoSource = ftPhotoSource;
+    G.ftPhotosNeedingMigration = ftPhotosNeedingMigration;
     return;   // don't run the DOM app under node
   }
 
@@ -100,6 +124,9 @@
     photoLabel:{ar:'الصورة الشخصية (اختياري)', en:'Photo (optional)'},
     photoChoose:{ar:'اختيار صورة', en:'Choose photo'},
     photoRemove:{ar:'إزالة الصورة', en:'Remove photo'},
+    photoUploading:{ar:'جارِ رفع الصورة…', en:'Uploading photo…'},
+    photoUploadFail:{ar:'تعذّر رفع الصورة — تحقّق من الاتصال', en:'Photo upload failed — check your connection'},
+    photoReadFail:{ar:'تعذّرت قراءة الصورة — جرّب صورة أخرى', en:'Couldn\'t read that image — try another'},
     keepAdding:{ar:'إضافة المزيد من الأبناء بعد الحفظ', en:'Keep adding more children after saving'},
     saveBtn:{ar:'حفظ', en:'Save'},
     addChildTitle:{ar:'إضافة ابن / ابنة', en:'Add child'},
@@ -669,6 +696,32 @@
   }
 
   /* ============== Photo handling ============== */
+  window.ftPhotoSource = ftPhotoSource;
+  window.ftPhotosNeedingMigration = ftPhotosNeedingMigration;
+
+  // Gradual, loss-safe migration of embedded base64 photos to Storage. Converts a
+  // small batch: fetch the data URL -> Blob, upload, set photoPath, and only THEN
+  // clear the base64 (so a failed upload never loses the original). Stops on the
+  // first failure and resumes next session. Returns remaining count so the caller
+  // can pace batches.
+  window.__ftMigratePhotoBatch = async function(treeId, limit){
+    if(!treeId || !window.__ftPhotos || !window.ftPhotoPaths) return { migrated:false, remaining:0 };
+    var ids = ftPhotosNeedingMigration(state.people).slice(0, limit || 5);
+    var changed = false;
+    for(var i=0;i<ids.length;i++){
+      var id = ids[i], p = state.people[id];
+      if(!p) continue;
+      try{
+        // p.photo is already a base64 data URL — store it as its own photo doc.
+        var path = window.ftPhotoPaths.person(treeId, id);
+        await window.__ftPhotos.uploadPhoto(path, p.photo);
+        p.photoPath = path; p.photo = null; changed = true;   // clear base64 ONLY after upload OK
+      }catch(e){ try{ console.error('[photo-migrate] failed for', id, e && e.code); }catch(_){}; break; }
+    }
+    if(changed) scheduleSave();
+    return { migrated: changed, remaining: ftPhotosNeedingMigration(state.people).length };
+  };
+
   function resizeImage(file, maxSize, cb){
     var reader = new FileReader();
     reader.onload = function(e){
@@ -681,9 +734,10 @@
         canvas.width = cw; canvas.height = ch;
         var ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, cw, ch);
-        cb(canvas.toDataURL('image/jpeg', 0.72));
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.72);   // instant preview
+        canvas.toBlob(function(blob){ cb(blob, dataUrl); }, 'image/jpeg', 0.72);
       };
-      img.onerror = function(){ cb(null); };
+      img.onerror = function(){ cb(null, null); };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
@@ -763,7 +817,8 @@
     if((p.residence || '') !== (data.residence || '')) changed.push('مكان الإقامة');
     if((p.bio || '') !== (data.bio || '')) changed.push('النبذة');
     if(!!p.deceased !== !!data.deceased) changed.push('الحالة');
-    if(data.photo !== undefined && p.photo !== data.photo) changed.push('الصورة');
+    if((data.photo !== undefined || data.photoPath !== undefined) &&
+       (p.photo !== data.photo || p.photoPath !== data.photoPath)) changed.push('الصورة');
 
     p.name = data.name; p.gender = data.gender;
     p.birthDate = data.birthDate || null;
@@ -772,6 +827,7 @@
     p.bio = data.bio || '';
     if(data.deceased !== undefined) p.deceased = !!data.deceased;
     if(data.photo !== undefined) p.photo = data.photo;
+    if(data.photoPath !== undefined) p.photoPath = data.photoPath;
     scheduleSave(); render();
     if(changed.length){ logActivity('edit', nameStr(data.name), changed.join('، ')); }
   }
@@ -794,6 +850,12 @@
     if(p.parentId){
       var parent = getPerson(p.parentId);
       if(parent) parent.childrenIds = parent.childrenIds.filter(function(x){ return x !== id; });
+    }
+    // Best-effort delete the person's Storage-doc photo too, else it lingers
+    // readable by any member at its deterministic path (leak + privacy). Fires
+    // per descendant because deletePerson recurses above.
+    if(p.photoPath && window.__ftPhotos && window.__ftPhotos.deletePhoto){
+      window.__ftPhotos.deletePhoto(p.photoPath).catch(function(e){ try{ console.warn('orphan photo delete failed', p.photoPath, e && e.code); }catch(_){} });
     }
     delete state.people[id];
     if(state.rootId === id){ state.rootId = null; state.familyName = ""; }
@@ -934,6 +996,37 @@
   // (lets the first/older generations be marked رحمه الله before dates are known).
   function isDeceased(p){ return !!(p && (p.deathDate || p.deceased)); }
 
+  // Returns avatar inner HTML immediately (emoji or base64 <img>), and for a
+  // Storage path inserts a placeholder <img data-photo-path> that fillPhotoRefs()
+  // resolves to a real URL after the node is in the DOM.
+  function avatarInnerHtml(rec, fallbackEmoji){
+    var s = ftPhotoSource(rec);
+    if(s.kind === 'base64') return '<img src="'+escapeHtml(s.value)+'" alt="">';
+    // Carry the fallback emoji so a failed resolve reads as "no photo", not a
+    // broken/blank image (see fillPhotoRefs). `fallbackEmoji` is an app emoji, safe.
+    if(s.kind === 'path')   return '<img data-photo-path="'+escapeHtml(s.value)+'" data-fallback="'+escapeHtml(fallbackEmoji||'')+'" alt="">';
+    return fallbackEmoji;
+  }
+  // Resolve any <img data-photo-path> under `root` to a real Storage URL. On
+  // failure (offline transient, denied, or a genuinely missing file) swap the img
+  // for its fallback emoji so it reads as "no photo" rather than a blank circle,
+  // and log — a permanent object-not-found is a real data/consistency signal.
+  function fillPhotoRefs(root){
+    (root || document).querySelectorAll('img[data-photo-path]').forEach(function(img){
+      var path = img.getAttribute('data-photo-path'); img.removeAttribute('data-photo-path');
+      if(!(window.__ftPhotos && window.__ftPhotos.resolveURL)) return;  // no cloud: leave placeholder for next render
+      window.__ftPhotos.resolveURL(path).then(function(u){
+        img.src = u;   // u is a base64 data URL (same-origin, canvas-safe)
+      }, function(err){
+        try{ console.warn('photo resolve failed', path, err && err.code); }catch(e){}
+        var fb = img.getAttribute('data-fallback');
+        if(fb){ img.replaceWith(document.createTextNode(fb)); }   // person avatar -> emoji
+        else { img.remove(); }                                    // moment photo -> drop the broken img
+      });
+    });
+  }
+  window.__ftFillPhotoRefs = fillPhotoRefs;
+
   function personCard(id){
     var p = getPerson(id);
     var depth = genOfPerson(id);
@@ -946,7 +1039,7 @@
     var childCount = p.childrenIds.length;
     var age = calcAge(p.birthDate);
     var lifespan = deceased ? lifespanText(p.birthDate, p.deathDate) : '';
-    var avatarInner = p.photo ? '<img src="'+escapeHtml(p.photo)+'" alt="">' : (p.gender==='f' ? '👩' : '👨');
+    var avatarInner = avatarInnerHtml(p, (p.gender==='f' ? '👩' : '👨'));
     var siblingInfo = null;
     if(p.parentId){
       var parentP = getPerson(p.parentId);
@@ -1079,6 +1172,7 @@
     var treeRoot = document.getElementById('treeRoot');
     treeRoot.innerHTML = '';
     treeRoot.appendChild(renderUnit(displayRoot));
+    fillPhotoRefs(treeRoot);   // resolve any Storage photo paths to URLs
     renderMeViewBar(displayRoot);
     document.getElementById('familyTitle').textContent = famNameOf() || t('appName');
     /* Title centered above the root couple, inside the canvas — so it scales and
@@ -1192,7 +1286,7 @@
     if(!ids.length) return t('completionHintEmpty');
     for(var i=0;i<ids.length;i++){
       var p = ppl[ids[i]];
-      if(!p.photo) return tf('completionHintMissingPhoto', {name: escapeHtml(fullNameOf(p))});
+      if(!p.photo && !p.photoPath) return tf('completionHintMissingPhoto', {name: escapeHtml(fullNameOf(p))});
       if(!p.birthDate) return tf('completionHintMissingBirth', {name: escapeHtml(fullNameOf(p))});
     }
     return t('completionHintDone');
@@ -1273,7 +1367,7 @@
     var ids = Object.keys(ppl);
     var count = ids.length;
     var gens = count ? maxGeneration() : 0;
-    var photos = ids.filter(function(id){ return ppl[id].photo; }).length;
+    var photos = ids.filter(function(id){ return ppl[id].photo || ppl[id].photoPath; }).length;
     // Completeness now spans English names + dates + photos (via the shared
     // engine), so the meter reflects the bilingual requirement, not just photos.
     var comp = window.ftCompleteness ? window.ftCompleteness(ppl) : { percent: 0 };
@@ -1985,14 +2079,14 @@
   }
 
   function wirePhotoRow(existingPhoto){
-    pendingPhoto = existingPhoto || null;
+    pendingPhoto = existingPhoto ? { dataUrl: existingPhoto, blob: null, existing: true } : null;
     document.getElementById('pf_choosePhoto').onclick = function(){ document.getElementById('pf_photoFile').click(); };
     document.getElementById('pf_photoFile').onchange = function(e){
       var file = e.target.files[0];
       if(!file) return;
-      resizeImage(file, 220, function(dataUrl){
-        if(!dataUrl) return;
-        pendingPhoto = dataUrl;
+      resizeImage(file, 220, function(blob, dataUrl){
+        if(!blob){ toast(t('photoReadFail')); return; }
+        pendingPhoto = { blob: blob, dataUrl: dataUrl };   // was: pendingPhoto = dataUrl
         document.getElementById('pf_photoPreview').innerHTML = '<img src="'+dataUrl+'">';
         document.getElementById('pf_removePhoto').style.display = '';
       });
@@ -2018,7 +2112,7 @@
     var p = getPerson(id); if(!p) return;
     var other = ownName(p, state.lang === 'ar' ? 'en' : 'ar');
     var deceased = isDeceased(p);
-    var av = p.photo ? '<img src="'+escapeHtml(p.photo)+'" alt="">' : (p.gender==='f' ? '👩' : '👨');
+    var av = avatarInnerHtml(p, (p.gender==='f' ? '👩' : '👨'));
     var lines = '';
     if(p.birthDate) lines += '<div class="prof-line">🎂 <b>'+t('profileBirth')+':</b> '+escapeHtml(fmtDate(p.birthDate))+
       (!deceased && ageYears(p.birthDate)!==null ? ' <span class="prof-dim">('+t('profileAge')+' '+escapeHtml(ageText(ageYears(p.birthDate)))+')</span>' : '')+'</div>';
@@ -2055,6 +2149,7 @@
         '<button class="primary-btn" id="prof_share" style="background:var(--gold);">📤 '+t('profileShare')+'</button>'+
       '</div>'
     );
+    fillPhotoRefs(document.getElementById('sheet'));   // resolve profile avatar + relatives' Storage photos
     sheetBody.querySelectorAll('[data-profile]').forEach(function(b){ b.onclick = function(){ openProfile(b.getAttribute('data-profile')); }; });
     var pe = document.getElementById('prof_edit'); if(pe) pe.onclick = function(){ openPersonForm('edit', id); };
     var pa = document.getElementById('prof_addchild'); if(pa) pa.onclick = function(){ openPersonForm('child', id); };
@@ -2133,13 +2228,21 @@
     var cy = 330, r = 150;
     g.save(); g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.closePath();
     g.fillStyle = p.gender==='f' ? '#F3E9D6' : '#E9F1EA'; g.fill();
-    if(p.photo){
-      var img = new Image();
-      await new Promise(function(res){ img.onload = res; img.onerror = res; img.src = p.photo; });
-      if(img.width){ g.clip(); g.drawImage(img, cx-r, cy-r, r*2, r*2); }
+    // Resolve the photo source: legacy base64 directly, or a Storage path via URL.
+    var ps = ftPhotoSource(p);
+    var photoSrc = ps.kind === 'base64' ? ps.value
+                 : ps.kind === 'path' && window.__ftPhotos ? await window.__ftPhotos.resolveURL(ps.value).catch(function(){ return null; })
+                 : null;
+    var drewPhoto = false;
+    if(photoSrc){
+      var img = new Image();   // photoSrc is a base64 data URL (same-origin, no canvas taint)
+      await new Promise(function(res){ img.onload = res; img.onerror = res; img.src = photoSrc; });
+      if(img.width){ g.clip(); g.drawImage(img, cx-r, cy-r, r*2, r*2); drewPhoto = true; }
     }
     g.restore();
-    if(!p.photo){ g.font = "150px serif"; g.fillStyle = '#0F5B4B'; g.fillText(p.gender==='f'?'👩':'👨', cx, cy+54); }
+    // If there was no photo OR it failed to load (width 0), draw the emoji so the
+    // shared card is never a blank portrait.
+    if(!drewPhoto){ g.font = "150px serif"; g.fillStyle = '#0F5B4B'; g.fillText(p.gender==='f'?'👩':'👨', cx, cy+54); }
     g.strokeStyle = '#B8862D'; g.lineWidth = 8; g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.stroke();
     var y = 560;
     g.fillStyle = '#2B2118'; g.font = "700 60px Amiri"; y = _wrap(g, fullNameOf(p), cx, y, W-160, 70);
@@ -2174,6 +2277,13 @@
       setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
       toast(t('shareDownloaded'));
     }, 'image/png');
+  }
+
+  // The active tree's id lives in cloud.js module scope; it exposes a getter
+  // on window.__ftCloud rather than a global, since only the cloud module
+  // knows it (local-only mode has no tree id at all).
+  function currentTreeIdForSave(){
+    return (window.__ftCloud && window.__ftCloud.getTreeId && window.__ftCloud.getTreeId()) || null;
   }
 
   function openPersonForm(mode, targetId){
@@ -2233,7 +2343,7 @@
     refreshName();
     arIn.focus();
 
-    document.getElementById('pf_save').onclick = function(){
+    document.getElementById('pf_save').onclick = async function(){
       var ar = document.getElementById('pf_name_ar').value.trim();
       var en = document.getElementById('pf_name_en').value.trim();
       if(!ar || !en){ toast(t('toastNameRequired')); return; }
@@ -2249,15 +2359,44 @@
       }
       else if(mode === 'spouse') addSpouse(targetId, nm, gender);
       else {
-        updatePerson(targetId, {
+        // Resolve the photo to store: a freshly-picked blob is uploaded to Storage
+        // and stored as a path; an unchanged existing photo keeps whatever it had.
+        var photoUpdate = {};
+        if(pendingPhoto === null){
+          photoUpdate = { photoPath: null, photo: null };   // removed
+          // Best-effort delete the Storage file too: the path is deterministic, so
+          // leaving it means a "removed" photo stays readable by any tree member.
+          var existingPerson = getPerson(targetId);
+          if(existingPerson && existingPerson.photoPath && window.__ftPhotos){
+            window.__ftPhotos.deletePhoto(existingPerson.photoPath).catch(function(e){ try{ console.warn('photo delete failed', e && e.code); }catch(_){}; });
+          }
+        } else if(pendingPhoto && pendingPhoto.blob){        // newly picked
+          var treeIdForSave = currentTreeIdForSave();
+          if(treeIdForSave && window.__ftPhotos){
+            toast(t('photoUploading'));
+            try{
+              var path = window.ftPhotoPaths.person(treeIdForSave, targetId);
+              await window.__ftPhotos.uploadPhoto(path, pendingPhoto.dataUrl);
+              photoUpdate = { photoPath: path, photo: null };
+            }catch(err){
+              toast(t('photoUploadFail'));
+              return;   // do not save the person if the upload failed
+            }
+          } else {
+            // No cloud tree (local-only): keep base64 so the save still works offline.
+            photoUpdate = { photo: pendingPhoto.dataUrl, photoPath: null };
+          }
+        }
+        // else: existing unchanged -> leave photoPath/photo out of the update entirely
+
+        updatePerson(targetId, Object.assign({
           name: nm, gender: gender,
           birthDate: document.getElementById('pf_birth').value || null,
           deathDate: document.getElementById('pf_death').value || null,
           residence: document.getElementById('pf_residence').value.trim(),
           bio: document.getElementById('pf_bio').value.trim(),
-          deceased: document.getElementById('pf_deceased').checked,
-          photo: pendingPhoto
-        });
+          deceased: document.getElementById('pf_deceased').checked
+        }, photoUpdate));
       }
       toast(t('toastSaved'));
       var keepOpen = mode === 'child' && document.getElementById('pf_keep') && document.getElementById('pf_keep').checked;

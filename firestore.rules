@@ -114,6 +114,16 @@ service cloud.firestore {
           allow update: if false;
         }
       }
+
+      // Photos: each person/moment photo is its own document (base64 in `data`),
+      // kept out of the single tree doc so it never hits the 1MB limit. Any member
+      // reads; only non-viewer members (editors/owner) write/replace/delete — the
+      // same authority as the tree itself. Firestore's 1MB doc cap bounds size.
+      match /photos/{photoId} {
+        allow read:          if isMember(treeId);
+        allow create, update: if canEdit(treeId);
+        allow delete:        if canEdit(treeId);
+      }
     }
   }
 }

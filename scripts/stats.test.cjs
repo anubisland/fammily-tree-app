@@ -33,4 +33,7 @@ const s2 = ftStats({
 ok(s2.living === 1 && s2.deceased === 1, 'flag: living 1 / deceased 1, got '+s2.living+'/'+s2.deceased);
 ok(s2.oldest && s2.oldest.id === 'x', 'flag: flagged-deceased excluded from age stats');
 
+// A Storage photoPath counts toward withPhoto (backward-compat with base64).
+ok(ftStats({ z:{ name:{ar:'ز'}, gender:'m', parentId:null, photoPath:'trees/t/people/z.jpg' } }, today).withPhoto === 1, 'photoPath counts in withPhoto');
+
 console.log(pass+' passed, '+fail+' failed'); process.exit(fail?1:0);

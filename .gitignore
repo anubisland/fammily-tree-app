@@ -3,3 +3,6 @@
 .claude/
 node_modules/
 firestore-debug.log
+
+# local test harness (index.html minus cloud.js) — never commit
+_d1.html

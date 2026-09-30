@@ -4,9 +4,11 @@
     createUserWithEmailAndPassword, signOut
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
   import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp,
+    getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+    doc, getDoc, setDoc, onSnapshot, serverTimestamp,
     collection, addDoc, getDocs, query, orderBy, limit, deleteDoc, updateDoc
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+  import { makePhotoApi } from "./photos.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCU4IJudvRs8PTElMNtbP8WsKhzly5MnNA",
@@ -19,7 +21,20 @@
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
-  const db = getFirestore(app);
+  // Persistent (IndexedDB) cache so the tree AND its photo docs work offline
+  // across reloads. The try/catch guards synchronous init errors; in private mode
+  // / unsupported browsers the SDK degrades to an in-memory cache on its own
+  // (asynchronously) — acceptable graceful degradation: online works normally,
+  // and the local tree still persists via localStorage; only cross-reload OFFLINE
+  // photo viewing is lost in that rare case.
+  let db;
+  try{
+    db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+  }catch(e){
+    try{ console.warn('Firestore persistence unavailable, using memory cache:', e && e.code); }catch(_){}
+    db = getFirestore(app);
+  }
+  window.__ftPhotos = makePhotoApi(db);
 
   var currentUid = null;
   var currentTreeId = null;
@@ -287,9 +302,33 @@
       applyingRemote = false;
       remoteLoaded = true;   // safe to push local edits now that we hold the real tree
       cloudBtn.dataset.status = 'online';
+      // A snapshot may carry a photo replaced on another device (stable photoPath,
+      // so no per-doc signal) — drop the photo cache so it re-reads fresh.
+      if(window.__ftPhotos && window.__ftPhotos.invalidateCache) window.__ftPhotos.invalidateCache();
+      maybeMigratePhotos();
     }, function(){
       cloudBtn.dataset.status = 'offline';
     });
+  }
+
+  // Gradual photo migration: an editor uploads any remaining base64 photos to
+  // Storage in small paced batches, resuming across snapshots/sessions. A flag
+  // prevents overlap; batches are spaced so migration never contends with saves.
+  var migrating = false;
+  function maybeMigratePhotos(){
+    if(migrating || currentRole === 'viewer' || !currentTreeId) return;
+    if(!window.__ftMigratePhotoBatch) return;
+    migrating = true;
+    (async function runBatch(){
+      try{
+        var res = await window.__ftMigratePhotoBatch(currentTreeId, 5);
+        if(res && res.migrated && res.remaining > 0){
+          setTimeout(runBatch, 3000);   // pace the next batch
+          return;
+        }
+      }catch(e){ try{ console.error('[photo-migrate] batch error', e); }catch(_){}; }
+      migrating = false;
+    })();
   }
 
   async function logActivity(action, personName, detail){
@@ -504,7 +543,12 @@
           '<span class="moment-type-badge">' + tp.icon + ' ' + tp.label + '</span>' +
           '<span class="moment-time">' + when + '</span></div>' +
         (v.text ? '<div class="moment-text">' + esc(v.text) + '</div>' : '') +
-        (v.photo ? '<img class="moment-photo" src="' + esc(v.photo) + '">' : '') +
+        (function(){
+          var s = window.ftPhotoSource ? window.ftPhotoSource({ photoPath: v.photoPath, photo: v.photo }) : { kind:'none' };
+          if(s.kind === 'base64') return '<img class="moment-photo" src="' + esc(s.value) + '">';
+          if(s.kind === 'path')   return '<img class="moment-photo" data-photo-path="' + esc(s.value) + '">';
+          return '';
+        })() +
         '<div class="moment-actions">' +
           '<button class="react-btn" data-mid="' + d.id + '">🤍 <span class="react-count">0</span></button>' +
           '<button class="comment-btn" data-mid="' + d.id + '">💬 <span class="comment-count">0</span></button>' +
@@ -520,11 +564,16 @@
       '</div>';
     });
     list.innerHTML = html;
+    if(window.__ftFillPhotoRefs) window.__ftFillPhotoRefs(list);   // resolve Storage moment photos
     list.querySelectorAll('.moment-del').forEach(function(btn){
       btn.onclick = async function(){
         if(!confirm('حذف هذه اللحظة؟')) return;
-        try{ await deleteDoc(doc(db, 'trees', currentTreeId, 'moments', btn.dataset.id)); }
-        catch(e){ alert('تعذّر الحذف.'); }
+        try{
+          await deleteDoc(doc(db, 'trees', currentTreeId, 'moments', btn.dataset.id));
+          // Best-effort remove the moment's Storage photo too (no-op if none).
+          if(window.__ftPhotos && window.ftPhotoPaths) window.__ftPhotos.deletePhoto(window.ftPhotoPaths.moment(currentTreeId, btn.dataset.id)).catch(function(){});
+        }
+        catch(e){ console.error('moment delete failed', e && e.code, e); alert(writeErrMsg(e, 'تعذّر الحذف')); }
       };
     });
     docs.forEach(function(d){ wireMomentSocial(d.id); });
@@ -690,9 +739,9 @@
   document.getElementById('momentPhotoFile').addEventListener('change', function(e){
     var file = e.target.files[0];
     if(!file || !window.__ftResizeImage) return;
-    window.__ftResizeImage(file, 640, function(dataUrl){
-      if(!dataUrl) return;
-      pendingMomentPhoto = dataUrl;
+    window.__ftResizeImage(file, 640, function(blob, dataUrl){
+      if(!blob){ alert(t('photoReadFail')); return; }
+      pendingMomentPhoto = { blob: blob, dataUrl: dataUrl };
       var prev = document.getElementById('momentPhotoPreview');
       prev.style.display = 'block';
       prev.innerHTML = '<img src="'+dataUrl+'"><button type="button" class="remove-photo-x" id="momentRemovePhoto">✕</button>';
@@ -710,12 +759,32 @@
     var btn = document.getElementById('momentPostBtn');
     btn.disabled = true;
     try{
-      await addDoc(collection(db, 'trees', currentTreeId, 'moments'), {
-        text: text, photo: pendingMomentPhoto || null,
-        type: selectedMomentType || 'news',
-        byEmail: (auth.currentUser && auth.currentUser.email) || '', byUid: currentUid,
-        at: serverTimestamp()
-      });
+      // The doc ref is created up front so the moment's Storage path (keyed by
+      // its own id) is known before the doc is written.
+      var mref = doc(collection(db, 'trees', currentTreeId, 'moments'));
+      var photoPath = null;
+      if(pendingMomentPhoto && pendingMomentPhoto.blob){
+        photoPath = window.ftPhotoPaths.moment(currentTreeId, mref.id);
+        try{
+          await window.__ftPhotos.uploadPhoto(photoPath, pendingMomentPhoto.dataUrl);
+        }catch(upErr){
+          console.error('moment photo upload failed', upErr && upErr.code, upErr);
+          alert(writeErrMsg(upErr, 'تعذّر رفع صورة اللحظة'));
+          btn.disabled = false; return;
+        }
+      }
+      try{
+        await setDoc(mref, {
+          text: text, photoPath: photoPath,
+          type: selectedMomentType || 'news',
+          byEmail: (auth.currentUser && auth.currentUser.email) || '', byUid: currentUid,
+          at: serverTimestamp()
+        });
+      }catch(docErr){
+        // Photo uploaded but the doc write failed → remove the orphaned file.
+        if(photoPath && window.__ftPhotos) window.__ftPhotos.deletePhoto(photoPath).catch(function(){});
+        throw docErr;
+      }
       textEl.value = '';
       pendingMomentPhoto = null;
       selectedMomentType = 'news';
@@ -723,7 +792,8 @@
       var prev = document.getElementById('momentPhotoPreview');
       prev.style.display = 'none'; prev.innerHTML = '';
     }catch(e){
-      alert('تعذّر النشر — تأكد من تحديث قواعد الأمان (Firestore Rules).');
+      console.error('moment post failed', e && e.code, e);
+      alert(writeErrMsg(e, 'تعذّر النشر'));
     }
     btn.disabled = false;
   });
@@ -753,7 +823,8 @@
     showActivityLog: showActivityLog,
     createInvite: createInvite,
     showMembers: showMembers,
-    signOut: function(){ signOut(auth); }
+    signOut: function(){ signOut(auth); },
+    getTreeId: function(){ return currentTreeId; }
   };
 
   async function pushToCloud(state){

@@ -11,7 +11,7 @@
    ============================================================ */
 'use strict';
 
-var CACHE = 'family-tree-v23';
+var CACHE = 'family-tree-v26';
 // The shell we want available offline. Same-origin, no cache-buster here.
 var SHELL = [
   './',
@@ -51,6 +51,7 @@ self.addEventListener('fetch', function(e){
   var req = e.request;
   if(req.method !== 'GET') return;                 // never touch writes
   var url = new URL(req.url);
+
   if(url.origin !== self.location.origin) return;  // let Firebase/fonts hit network directly
 
   e.respondWith(

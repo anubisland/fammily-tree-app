@@ -115,6 +115,7 @@
     photoRemove:{ar:'إزالة الصورة', en:'Remove photo'},
     photoUploading:{ar:'جارِ رفع الصورة…', en:'Uploading photo…'},
     photoUploadFail:{ar:'تعذّر رفع الصورة — تحقّق من الاتصال', en:'Photo upload failed — check your connection'},
+    photoReadFail:{ar:'تعذّرت قراءة الصورة — جرّب صورة أخرى', en:'Couldn\'t read that image — try another'},
     keepAdding:{ar:'إضافة المزيد من الأبناء بعد الحفظ', en:'Keep adding more children after saving'},
     saveBtn:{ar:'حفظ', en:'Save'},
     addChildTitle:{ar:'إضافة ابن / ابنة', en:'Add child'},
@@ -960,17 +961,24 @@
   function avatarInnerHtml(rec, fallbackEmoji){
     var s = ftPhotoSource(rec);
     if(s.kind === 'base64') return '<img src="'+escapeHtml(s.value)+'" alt="">';
-    if(s.kind === 'path')   return '<img data-photo-path="'+escapeHtml(s.value)+'" alt="">';
+    // Carry the fallback emoji so a failed resolve reads as "no photo", not a
+    // broken/blank image (see fillPhotoRefs). `fallbackEmoji` is an app emoji, safe.
+    if(s.kind === 'path')   return '<img data-photo-path="'+escapeHtml(s.value)+'" data-fallback="'+escapeHtml(fallbackEmoji||'')+'" alt="">';
     return fallbackEmoji;
   }
-  // Resolve any <img data-photo-path> under `root` to a real Storage URL. Offline
-  // or denied reads leave the img blank rather than throwing.
+  // Resolve any <img data-photo-path> under `root` to a real Storage URL. On
+  // failure (offline transient, denied, or a genuinely missing file) swap the img
+  // for its fallback emoji so it reads as "no photo" rather than a blank circle,
+  // and log — a permanent object-not-found is a real data/consistency signal.
   function fillPhotoRefs(root){
     (root || document).querySelectorAll('img[data-photo-path]').forEach(function(img){
       var path = img.getAttribute('data-photo-path'); img.removeAttribute('data-photo-path');
-      if(window.__ftPhotos && window.__ftPhotos.resolveURL){
-        window.__ftPhotos.resolveURL(path).then(function(u){ img.src = u; }, function(){ /* offline/denied: stays blank */ });
-      }
+      if(!(window.__ftPhotos && window.__ftPhotos.resolveURL)) return;  // no cloud: leave placeholder for next render
+      window.__ftPhotos.resolveURL(path).then(function(u){ img.src = u; }, function(err){
+        try{ console.warn('photo resolve failed', path, err && err.code); }catch(e){}
+        var fb = img.getAttribute('data-fallback');
+        if(fb){ img.replaceWith(document.createTextNode(fb)); }
+      });
     });
   }
   window.__ftFillPhotoRefs = fillPhotoRefs;
@@ -2033,7 +2041,7 @@
       var file = e.target.files[0];
       if(!file) return;
       resizeImage(file, 220, function(blob, dataUrl){
-        if(!blob) return;
+        if(!blob){ toast(t('photoReadFail')); return; }
         pendingPhoto = { blob: blob, dataUrl: dataUrl };   // was: pendingPhoto = dataUrl
         document.getElementById('pf_photoPreview').innerHTML = '<img src="'+dataUrl+'">';
         document.getElementById('pf_removePhoto').style.display = '';
@@ -2181,14 +2189,17 @@
     var photoSrc = ps.kind === 'base64' ? ps.value
                  : ps.kind === 'path' && window.__ftPhotos ? await window.__ftPhotos.resolveURL(ps.value).catch(function(){ return null; })
                  : null;
+    var drewPhoto = false;
     if(photoSrc){
       var img = new Image();
       img.crossOrigin = 'anonymous';   // Storage URLs are CORS-enabled; prevents canvas taint so toDataURL works
       await new Promise(function(res){ img.onload = res; img.onerror = res; img.src = photoSrc; });
-      if(img.width){ g.clip(); g.drawImage(img, cx-r, cy-r, r*2, r*2); }
+      if(img.width){ g.clip(); g.drawImage(img, cx-r, cy-r, r*2, r*2); drewPhoto = true; }
     }
     g.restore();
-    if(!photoSrc){ g.font = "150px serif"; g.fillStyle = '#0F5B4B'; g.fillText(p.gender==='f'?'👩':'👨', cx, cy+54); }
+    // If there was no photo OR it failed to load (width 0), draw the emoji so the
+    // shared card is never a blank portrait.
+    if(!drewPhoto){ g.font = "150px serif"; g.fillStyle = '#0F5B4B'; g.fillText(p.gender==='f'?'👩':'👨', cx, cy+54); }
     g.strokeStyle = '#B8862D'; g.lineWidth = 8; g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.stroke();
     var y = 560;
     g.fillStyle = '#2B2118'; g.font = "700 60px Amiri"; y = _wrap(g, fullNameOf(p), cx, y, W-160, 70);
@@ -2310,6 +2321,12 @@
         var photoUpdate = {};
         if(pendingPhoto === null){
           photoUpdate = { photoPath: null, photo: null };   // removed
+          // Best-effort delete the Storage file too: the path is deterministic, so
+          // leaving it means a "removed" photo stays readable by any tree member.
+          var existingPerson = getPerson(targetId);
+          if(existingPerson && existingPerson.photoPath && window.__ftPhotos){
+            window.__ftPhotos.deletePhoto(existingPerson.photoPath).catch(function(e){ try{ console.warn('photo delete failed', e && e.code); }catch(_){}; });
+          }
         } else if(pendingPhoto && pendingPhoto.blob){        // newly picked
           var treeIdForSave = currentTreeIdForSave();
           if(treeIdForSave && window.__ftPhotos){

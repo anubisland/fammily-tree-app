@@ -533,8 +533,12 @@
     list.querySelectorAll('.moment-del').forEach(function(btn){
       btn.onclick = async function(){
         if(!confirm('حذف هذه اللحظة؟')) return;
-        try{ await deleteDoc(doc(db, 'trees', currentTreeId, 'moments', btn.dataset.id)); }
-        catch(e){ alert('تعذّر الحذف.'); }
+        try{
+          await deleteDoc(doc(db, 'trees', currentTreeId, 'moments', btn.dataset.id));
+          // Best-effort remove the moment's Storage photo too (no-op if none).
+          if(window.__ftPhotos && window.ftPhotoPaths) window.__ftPhotos.deletePhoto(window.ftPhotoPaths.moment(currentTreeId, btn.dataset.id)).catch(function(){});
+        }
+        catch(e){ console.error('moment delete failed', e && e.code, e); alert(writeErrMsg(e, 'تعذّر الحذف')); }
       };
     });
     docs.forEach(function(d){ wireMomentSocial(d.id); });
@@ -701,7 +705,7 @@
     var file = e.target.files[0];
     if(!file || !window.__ftResizeImage) return;
     window.__ftResizeImage(file, 640, function(blob, dataUrl){
-      if(!blob) return;
+      if(!blob){ alert(t('photoReadFail')); return; }
       pendingMomentPhoto = { blob: blob, dataUrl: dataUrl };
       var prev = document.getElementById('momentPhotoPreview');
       prev.style.display = 'block';
@@ -726,14 +730,26 @@
       var photoPath = null;
       if(pendingMomentPhoto && pendingMomentPhoto.blob){
         photoPath = window.ftPhotoPaths.moment(currentTreeId, mref.id);
-        await window.__ftPhotos.uploadPhoto(photoPath, pendingMomentPhoto.blob);
+        try{
+          await window.__ftPhotos.uploadPhoto(photoPath, pendingMomentPhoto.blob);
+        }catch(upErr){
+          console.error('moment photo upload failed', upErr && upErr.code, upErr);
+          alert(writeErrMsg(upErr, 'تعذّر رفع صورة اللحظة'));
+          btn.disabled = false; return;
+        }
       }
-      await setDoc(mref, {
-        text: text, photoPath: photoPath,
-        type: selectedMomentType || 'news',
-        byEmail: (auth.currentUser && auth.currentUser.email) || '', byUid: currentUid,
-        at: serverTimestamp()
-      });
+      try{
+        await setDoc(mref, {
+          text: text, photoPath: photoPath,
+          type: selectedMomentType || 'news',
+          byEmail: (auth.currentUser && auth.currentUser.email) || '', byUid: currentUid,
+          at: serverTimestamp()
+        });
+      }catch(docErr){
+        // Photo uploaded but the doc write failed → remove the orphaned file.
+        if(photoPath && window.__ftPhotos) window.__ftPhotos.deletePhoto(photoPath).catch(function(){});
+        throw docErr;
+      }
       textEl.value = '';
       pendingMomentPhoto = null;
       selectedMomentType = 'news';
@@ -741,7 +757,8 @@
       var prev = document.getElementById('momentPhotoPreview');
       prev.style.display = 'none'; prev.innerHTML = '';
     }catch(e){
-      alert('تعذّر النشر — تأكد من تحديث قواعد الأمان (Firestore Rules).');
+      console.error('moment post failed', e && e.code, e);
+      alert(writeErrMsg(e, 'تعذّر النشر'));
     }
     btn.disabled = false;
   });

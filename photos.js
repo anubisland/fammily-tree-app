@@ -7,6 +7,7 @@ export function makePhotoApi(storage){
   return {
     async uploadPhoto(path, blob){
       await uploadBytes(ref(storage, path), blob, { contentType: 'image/jpeg' });
+      delete _urlCache[path];   // overwrite regenerates the download token; drop any stale URL
       return path;
     },
     async resolveURL(path){
@@ -18,6 +19,7 @@ export function makePhotoApi(storage){
     async deletePhoto(path){
       try{ await deleteObject(ref(storage, path)); }
       catch(e){ if(!(e && e.code === 'storage/object-not-found')) throw e; }
+      finally{ delete _urlCache[path]; }
     }
   };
 }

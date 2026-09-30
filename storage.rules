@@ -22,12 +22,16 @@ service firebase.storage {
       return isMember(treeId) && memberDoc(treeId).data.role != 'viewer';
     }
 
+    // `sub` is constrained to the two known photo folders; raster image types
+    // only (svg+xml can carry script, so it is excluded even though bytes aren't
+    // validated). Reads are member-only; writes/deletes are non-viewer members.
     match /trees/{treeId}/{sub}/{fileName} {
-      allow read:   if isMember(treeId);
+      allow read:   if isMember(treeId) && sub in ['people', 'moments'];
       allow write:  if canEdit(treeId)
+                    && sub in ['people', 'moments']
                     && request.resource.size < 2 * 1024 * 1024
-                    && request.resource.contentType.matches('image/.*');
-      allow delete: if canEdit(treeId);
+                    && request.resource.contentType.matches('image/(jpeg|png|webp|gif)');
+      allow delete: if canEdit(treeId) && sub in ['people', 'moments'];
     }
 
     // Everything outside the per-tree photo tree is denied by default.

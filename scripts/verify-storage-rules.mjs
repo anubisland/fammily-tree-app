@@ -86,6 +86,39 @@ await check('editor of t1 cannot upload into another tree (t2)', () =>
 await check('editor of t1 cannot read another tree (t2)', () =>
   assertFails(getBytes(ref(editor, `trees/${OTHER}/people/p1.jpg`))));
 
+// ── CONTENT TYPE: raster only, no svg ───────────────────────────────────
+await check('editor can upload a PNG', () =>
+  assertSucceeds(uploadBytes(ref(editor, `trees/${TREE}/people/png.jpg`), IMG, { contentType: 'image/png' })));
+
+await check('editor cannot upload an SVG (script-carrying)', () =>
+  assertFails(uploadBytes(ref(editor, `trees/${TREE}/people/svg.jpg`), IMG, { contentType: 'image/svg+xml' })));
+
+// ── {sub} is constrained to people|moments ──────────────────────────────
+await check('editor cannot write outside people/moments (e.g. sub=other)', () =>
+  assertFails(uploadBytes(ref(editor, `trees/${TREE}/other/x.jpg`), IMG, JPEG)));
+
+await check('editor can write into moments/', () =>
+  assertSucceeds(uploadBytes(ref(editor, `trees/${TREE}/moments/m1.jpg`), IMG, JPEG)));
+
+// ── OVERWRITE (update) is gated like create ─────────────────────────────
+await check('editor can overwrite an existing photo', () =>
+  assertSucceeds(uploadBytes(ref(editor, `trees/${TREE}/people/p1.jpg`), IMG, JPEG)));
+
+await check('viewer cannot overwrite an existing photo', () =>
+  assertFails(uploadBytes(ref(viewer, `trees/${TREE}/people/p1.jpg`), IMG, JPEG)));
+
+// ── UNAUTHENTICATED ─────────────────────────────────────────────────────
+const anon = testEnv.unauthenticatedContext().storage();
+await check('signed-out user cannot read', () =>
+  assertFails(getBytes(ref(anon, `trees/${TREE}/people/p1.jpg`))));
+
+await check('signed-out user cannot upload', () =>
+  assertFails(uploadBytes(ref(anon, `trees/${TREE}/people/anon.jpg`), IMG, JPEG)));
+
+// ── DEFAULT-DENY: nested / no-fileName paths ────────────────────────────
+await check('editor cannot write a deeper nested path', () =>
+  assertFails(uploadBytes(ref(editor, `trees/${TREE}/people/sub/deep.jpg`), IMG, JPEG)));
+
 await testEnv.cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

@@ -400,6 +400,17 @@ await check('editor can delete a photo doc', () =>
 await check('viewer cannot delete a photo doc', () =>
   assertFails(deleteDoc(doc(viewerDb, 'trees', TREE, 'photos', 'p_e'))));
 
+// Signed-out and cross-tenant (a non-member is, by definition, a member of some
+// OTHER tree): both must be denied — closes the regression from the removed
+// storage suite. `outsiderDb` above already covers the authenticated non-member
+// (cross-tenant) case for read+write; these add the unauthenticated case.
+const anonDb = testEnv.unauthenticatedContext().firestore();
+await check('signed-out user cannot read a photo doc', () =>
+  assertFails(getDoc(doc(anonDb, 'trees', TREE, 'photos', 'p_x'))));
+
+await check('signed-out user cannot write a photo doc', () =>
+  assertFails(setDoc(doc(anonDb, 'trees', TREE, 'photos', 'p_anon'), { data: 'x' })));
+
 await testEnv.cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

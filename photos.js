@@ -25,6 +25,10 @@ export function makePhotoApi(db){
     async deletePhoto(pathKey){
       try{ await deleteDoc(doc(db, pathKey)); }
       finally{ delete _cache[pathKey]; }
-    }
+    },
+    // Drop the in-memory cache so the next resolveURL re-reads fresh. Called when a
+    // tree snapshot arrives, so a photo replaced on ANOTHER device isn't shown
+    // stale here (photo docs are read one-shot, with no per-doc listener).
+    invalidateCache(){ for(var k in _cache){ if(Object.prototype.hasOwnProperty.call(_cache, k)) delete _cache[k]; } }
   };
 }

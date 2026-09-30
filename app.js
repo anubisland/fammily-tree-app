@@ -851,6 +851,12 @@
       var parent = getPerson(p.parentId);
       if(parent) parent.childrenIds = parent.childrenIds.filter(function(x){ return x !== id; });
     }
+    // Best-effort delete the person's Storage-doc photo too, else it lingers
+    // readable by any member at its deterministic path (leak + privacy). Fires
+    // per descendant because deletePerson recurses above.
+    if(p.photoPath && window.__ftPhotos && window.__ftPhotos.deletePhoto){
+      window.__ftPhotos.deletePhoto(p.photoPath).catch(function(e){ try{ console.warn('orphan photo delete failed', p.photoPath, e && e.code); }catch(_){} });
+    }
     delete state.people[id];
     if(state.rootId === id){ state.rootId = null; state.familyName = ""; }
     scheduleSave(); render();

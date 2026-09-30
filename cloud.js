@@ -22,8 +22,11 @@
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   // Persistent (IndexedDB) cache so the tree AND its photo docs work offline
-  // across reloads. Fall back to the default in-memory Firestore if persistence
-  // can't initialise (e.g. private mode / unsupported browser).
+  // across reloads. The try/catch guards synchronous init errors; in private mode
+  // / unsupported browsers the SDK degrades to an in-memory cache on its own
+  // (asynchronously) — acceptable graceful degradation: online works normally,
+  // and the local tree still persists via localStorage; only cross-reload OFFLINE
+  // photo viewing is lost in that rare case.
   let db;
   try{
     db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
@@ -299,6 +302,9 @@
       applyingRemote = false;
       remoteLoaded = true;   // safe to push local edits now that we hold the real tree
       cloudBtn.dataset.status = 'online';
+      // A snapshot may carry a photo replaced on another device (stable photoPath,
+      // so no per-doc signal) — drop the photo cache so it re-reads fresh.
+      if(window.__ftPhotos && window.__ftPhotos.invalidateCache) window.__ftPhotos.invalidateCache();
       maybeMigratePhotos();
     }, function(){
       cloudBtn.dataset.status = 'offline';

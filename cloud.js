@@ -291,9 +291,30 @@
       applyingRemote = false;
       remoteLoaded = true;   // safe to push local edits now that we hold the real tree
       cloudBtn.dataset.status = 'online';
+      maybeMigratePhotos();
     }, function(){
       cloudBtn.dataset.status = 'offline';
     });
+  }
+
+  // Gradual photo migration: an editor uploads any remaining base64 photos to
+  // Storage in small paced batches, resuming across snapshots/sessions. A flag
+  // prevents overlap; batches are spaced so migration never contends with saves.
+  var migrating = false;
+  function maybeMigratePhotos(){
+    if(migrating || currentRole === 'viewer' || !currentTreeId) return;
+    if(!window.__ftMigratePhotoBatch) return;
+    migrating = true;
+    (async function runBatch(){
+      try{
+        var res = await window.__ftMigratePhotoBatch(currentTreeId, 5);
+        if(res && res.migrated && res.remaining > 0){
+          setTimeout(runBatch, 3000);   // pace the next batch
+          return;
+        }
+      }catch(e){ try{ console.error('[photo-migrate] batch error', e); }catch(_){}; }
+      migrating = false;
+    })();
   }
 
   async function logActivity(action, personName, detail){

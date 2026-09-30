@@ -13,6 +13,16 @@
     return { kind:'none', value:'' };
   }
 
+  // People still holding an embedded base64 photo but no Storage path — the set
+  // the gradual migration converts. Pure (takes the people map), so it is
+  // unit-tested in node.
+  function ftPhotosNeedingMigration(people){
+    people = people || {};
+    return Object.keys(people).filter(function(id){
+      var p = people[id]; return !!(p && p.photo && !p.photoPath);
+    });
+  }
+
   // Node test hook: a self-contained pure nasab computer over a people map.
   // Runs before any DOM access so `require('./app.js')` works under node
   // (see scripts/names.test.cjs).
@@ -39,6 +49,7 @@
       };
     })();
     G.ftPhotoSource = ftPhotoSource;
+    G.ftPhotosNeedingMigration = ftPhotosNeedingMigration;
     return;   // don't run the DOM app under node
   }
 
@@ -686,6 +697,31 @@
 
   /* ============== Photo handling ============== */
   window.ftPhotoSource = ftPhotoSource;
+  window.ftPhotosNeedingMigration = ftPhotosNeedingMigration;
+
+  // Gradual, loss-safe migration of embedded base64 photos to Storage. Converts a
+  // small batch: fetch the data URL -> Blob, upload, set photoPath, and only THEN
+  // clear the base64 (so a failed upload never loses the original). Stops on the
+  // first failure and resumes next session. Returns remaining count so the caller
+  // can pace batches.
+  window.__ftMigratePhotoBatch = async function(treeId, limit){
+    if(!treeId || !window.__ftPhotos || !window.ftPhotoPaths) return { migrated:false, remaining:0 };
+    var ids = ftPhotosNeedingMigration(state.people).slice(0, limit || 5);
+    var changed = false;
+    for(var i=0;i<ids.length;i++){
+      var id = ids[i], p = state.people[id];
+      if(!p) continue;
+      try{
+        var resp = await fetch(p.photo);
+        var blob = await resp.blob();
+        var path = window.ftPhotoPaths.person(treeId, id);
+        await window.__ftPhotos.uploadPhoto(path, blob);
+        p.photoPath = path; p.photo = null; changed = true;   // clear base64 ONLY after upload OK
+      }catch(e){ try{ console.error('[photo-migrate] failed for', id, e && e.code); }catch(_){}; break; }
+    }
+    if(changed) scheduleSave();
+    return { migrated: changed, remaining: ftPhotosNeedingMigration(state.people).length };
+  };
 
   function resizeImage(file, maxSize, cb){
     var reader = new FileReader();

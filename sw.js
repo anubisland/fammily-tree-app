@@ -11,7 +11,10 @@
    ============================================================ */
 'use strict';
 
-var CACHE = 'family-tree-v23';
+var CACHE = 'family-tree-v24';
+// Firebase Storage photos live in their own long-lived cache (survives shell
+// version bumps) so photos seen once keep working offline.
+var IMG_CACHE = 'family-tree-img-v1';
 // The shell we want available offline. Same-origin, no cache-buster here.
 var SHELL = [
   './',
@@ -42,7 +45,8 @@ self.addEventListener('install', function(e){
 self.addEventListener('activate', function(e){
   e.waitUntil(
     caches.keys().then(function(keys){
-      return Promise.all(keys.map(function(k){ return k === CACHE ? null : caches.delete(k); }));
+      // Keep the current shell cache AND the photo cache; drop everything else.
+      return Promise.all(keys.map(function(k){ return (k === CACHE || k === IMG_CACHE) ? null : caches.delete(k); }));
     }).then(function(){ return self.clients.claim(); })
   );
 });
@@ -51,6 +55,24 @@ self.addEventListener('fetch', function(e){
   var req = e.request;
   if(req.method !== 'GET') return;                 // never touch writes
   var url = new URL(req.url);
+
+  // Firebase Storage photos: cache-first so a photo seen once shows offline. The
+  // download URL carries a token query, so cache/match by the FULL request.
+  if(url.hostname.indexOf('firebasestorage') !== -1){
+    e.respondWith(
+      caches.open(IMG_CACHE).then(function(c){
+        return c.match(req).then(function(hit){
+          if(hit) return hit;
+          return fetch(req).then(function(res){
+            if(res && res.status === 200){ c.put(req, res.clone()).catch(function(){}); }
+            return res;
+          });
+        });
+      })
+    );
+    return;
+  }
+
   if(url.origin !== self.location.origin) return;  // let Firebase/fonts hit network directly
 
   e.respondWith(

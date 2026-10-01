@@ -1012,6 +1012,24 @@
     }catch(e){ console.error('revokeLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkRevokeFail'))); }
   }
 
+  // Open a linked tree read-only (project 3a): read it once (the viewer grant
+  // allows it) and hand it to the app's isolated linked-view. A permission-denied
+  // here means the other side severed the link, so surface it gently.
+  async function viewLinkedTree(remoteTreeId, personId){
+    if(!remoteTreeId){ return; }
+    try{
+      var snap = await getDoc(doc(db, 'trees', remoteTreeId));
+      if(!snap.exists()){ alert(t('linkViewGone')); return; }
+      var d = snap.data();
+      if(window.__ftEnterLinkedView) window.__ftEnterLinkedView(
+        { familyName: d.familyName || '', lang: d.lang || 'ar', rootId: d.rootId || null, people: d.people || {} },
+        { remoteTreeId: remoteTreeId, focusPersonId: personId });
+    }catch(e){
+      console.error('viewLinkedTree failed', e && e.code, e);
+      alert(t('linkViewGone'));
+    }
+  }
+
   // Approver side: a logged-in owner opens a `#link=` → read the pending request
   // by token → hand it to the app's approval sheet. Guarded so the hourly
   // onAuthStateChanged token refresh (which re-runs the success block) can't
@@ -1066,6 +1084,7 @@
     readLinkRequest: readLinkRequest,
     approveLink: approveLink,
     revokeLink: revokeLink,
+    viewLinkedTree: viewLinkedTree,
     listLinks: function(){ return currentLinks.slice(); },
     isOwner: function(){ return currentRole === 'owner'; }
   };

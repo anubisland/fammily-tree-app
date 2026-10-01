@@ -1054,6 +1054,48 @@
     }, function(e){ console.error('gc list failed', e && e.code); });
   }
 
+  // Owner-only management sheet (project 3c): pending requests (cancel) + who can
+  // view my tree (revoke). All strings via t(); all interpolation escaped.
+  async function showLinksManager(){
+    if(currentRole !== 'owner'){ toast(t('linkOwnerOnly')); return; }
+    var overlay = document.getElementById('overlay');
+    var sheet = document.getElementById('sheet');
+    var body = document.getElementById('sheetBody');
+    var esc = window.__ftEscapeHtml || function(s){ return String(s == null ? '' : s); };
+    var fam = window.__ftFamLabel || function(o){ return (o && (o.ar || o.en)) || ''; };
+    var ago = window.__ftTimeAgo || function(){ return ''; };
+    body.innerHTML = '<h3>🔗 ' + t('linksMgrTitle') + '</h3><div class="context">' + t('linksMgrLoading') + '</div>';
+    overlay.classList.add('open'); sheet.classList.add('open');
+    try{
+      var reqs = await listLinkRequests();
+      var viewers = await listTreeViewers();
+      var famByTree = {}; currentLinks.forEach(function(l){ if(l.remoteTreeId) famByTree[l.remoteTreeId] = l.remoteFamilyName; });
+      var reqRows = reqs.length ? reqs.map(function(r){
+        var when = (r.createdAt && r.createdAt.toDate) ? ago(r.createdAt.toDate()) : '';
+        return '<div class="lm-row"><div class="lm-main"><b>' + esc(fam(r.localPersonName)) + '</b>' +
+          '<div class="lm-sub">' + t('linkedToFamily') + ' «' + esc(fam(r.localFamilyName)) + '»' + (when ? (' · ' + esc(when)) : '') + '</div></div>' +
+          '<button class="mini-btn danger" data-lmreq="' + esc(r.token) + '">' + t('linkReqCancel') + '</button></div>';
+      }).join('') : '<div class="lm-empty">' + t('linksMgrNoRequests') + '</div>';
+      var viewerRows = viewers.length ? viewers.map(function(v){
+        var label = famByTree[v.remoteTreeId] ? fam(famByTree[v.remoteTreeId]) : t('linkedFamilyGeneric');
+        return '<div class="lm-row"><div class="lm-main"><b>' + esc(label) + '</b></div>' +
+          '<button class="mini-btn danger" data-lmviewer="' + esc(v.uid) + '">' + t('viewerRevokeBtn') + '</button></div>';
+      }).join('') : '<div class="lm-empty">' + t('linksMgrNoViewers') + '</div>';
+      body.innerHTML = '<h3>🔗 ' + t('linksMgrTitle') + '</h3>' +
+        '<div class="lm-section-h">' + t('linksMgrRequestsH') + '</div>' + reqRows +
+        '<div class="lm-section-h" style="margin-top:16px;">' + t('linksMgrViewersH') + '</div>' + viewerRows;
+      body.querySelectorAll('[data-lmreq]').forEach(function(b){
+        b.onclick = async function(){ if(!confirm(t('linkReqCancelConfirm'))) return; try{ await deleteLinkRequest(b.getAttribute('data-lmreq')); showLinksManager(); }catch(e){} };
+      });
+      body.querySelectorAll('[data-lmviewer]').forEach(function(b){
+        b.onclick = async function(){ if(!confirm(t('viewerRevokeConfirm'))) return; try{ await revokeViewer(b.getAttribute('data-lmviewer')); showLinksManager(); }catch(e){} };
+      });
+    }catch(e){
+      console.error('showLinksManager failed', e && e.code, e);
+      body.innerHTML = '<h3>🔗 ' + t('linksMgrTitle') + '</h3><div class="context">' + t('linksMgrError') + '</div>';
+    }
+  }
+
   // Open a linked tree read-only (project 3a): read it once (the viewer grant
   // allows it) and hand it to the app's isolated linked-view. A permission-denied
   // here means the other side severed the link, so surface it gently.
@@ -1133,6 +1175,7 @@
     deleteLinkRequest: deleteLinkRequest,
     listTreeViewers: listTreeViewers,
     revokeViewer: revokeViewer,
+    showLinksManager: showLinksManager,
     listLinks: function(){ return currentLinks.slice(); },
     isOwner: function(){ return currentRole === 'owner'; }
   };

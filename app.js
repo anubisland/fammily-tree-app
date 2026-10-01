@@ -268,6 +268,18 @@
     linkRevokePartial:{ar:'أُزيل الرابط، لكن تعذّر إلغاء وصول الطرف الآخر بالكامل — أعد المحاولة', en:'Link removed, but the other family\'s access could not be fully revoked — try again'},
     linkReqDeleteFail:{ar:'تعذّر حذف الطلب', en:'Could not delete the request'},
     viewerRevokeFail:{ar:'تعذّر إلغاء الوصول', en:'Could not revoke access'},
+    linksMgrTitle:{ar:'إدارة روابط العائلة', en:'Family links'},
+    linksMgrLoading:{ar:'جارِ التحميل…', en:'Loading…'},
+    linksMgrError:{ar:'تعذّر التحميل', en:'Could not load'},
+    linksMgrRequestsH:{ar:'طلبات ربط معلّقة', en:'Pending link requests'},
+    linksMgrViewersH:{ar:'من يمكنه رؤية شجرتك', en:'Who can view your tree'},
+    linksMgrNoRequests:{ar:'لا طلبات معلّقة', en:'No pending requests'},
+    linksMgrNoViewers:{ar:'لا أحد يرى شجرتك', en:'No one can view your tree'},
+    linkReqCancel:{ar:'إلغاء الطلب', en:'Cancel'},
+    linkReqCancelConfirm:{ar:'إلغاء هذا الطلب المعلّق؟', en:'Cancel this pending request?'},
+    linkedFamilyGeneric:{ar:'عائلة مرتبطة', en:'A linked family'},
+    viewerRevokeBtn:{ar:'إلغاء الوصول', en:'Revoke'},
+    viewerRevokeConfirm:{ar:'إلغاء وصول هذه العائلة لرؤية شجرتك؟', en:'Revoke this family\'s access to view your tree?'},
     linkViewBannerPrefix:{ar:'عرض: عائلة', en:'Viewing: family'},
     linkViewReadonly:{ar:'قراءة فقط', en:'read-only'},
     linkViewBack:{ar:'رجوع لشجرتي', en:'Back to my tree'},
@@ -526,6 +538,7 @@
     applyLang(); render();
   };
   window.__ftGetState = function(){ return state; };
+  window.__ftFamLabel = function(o){ return famLabel(o); };   // for the cloud.js links-manager sheet
   window.__ftResizeImage = resizeImage;
   window.__ftEscapeHtml = escapeHtml;
   window.__ftTimeAgo = function(dateObj){

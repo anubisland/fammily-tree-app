@@ -525,6 +525,10 @@ await check('a viewer CANNOT read the member roster', () =>
   assertFails(getDocs(collection(linkedDb, 'trees', TREE, 'members'))));
 await check('a viewer CANNOT read the activity log', () =>
   assertFails(getDoc(doc(linkedDb, 'trees', TREE, 'activity', 'a1'))));
+await check('a viewer CANNOT read moment reactions', () =>
+  assertFails(getDocs(collection(linkedDb, 'trees', TREE, 'moments', 'm1', 'reactions'))));
+await check('a viewer CANNOT read moment comments', () =>
+  assertFails(getDocs(collection(linkedDb, 'trees', TREE, 'moments', 'm1', 'comments'))));
 await check('a viewer CANNOT write the tree', () =>
   assertFails(updateDoc(doc(linkedDb, 'trees', TREE), { rootId: 'x' })));
 await check('a viewer CANNOT write a photo', () =>

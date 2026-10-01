@@ -425,6 +425,7 @@
   var migrating = false;
   function maybeMigratePhotos(){
     if(migrating || currentRole === 'viewer' || !currentTreeId) return;
+    if(window.__ftInLinkedView && window.__ftInLinkedView()) return;   // not while viewing another tree
     if(!window.__ftMigratePhotoBatch) return;
     migrating = true;
     (async function runBatch(){
@@ -997,18 +998,23 @@
     try{
       await deleteDoc(doc(db, 'trees', currentTreeId, 'links', linkId));
       currentLinks = currentLinks.filter(function(l){ return l.linkId !== linkId; });
+      var grantFailed = false;
       if(link){
-        // Sever both read grants. I own my tree, so I can revoke the other party's
-        // view of it; and viewerUid==uid() lets me drop my own view of their tree
-        // (only when no other link to it remains).
+        // Sever both read grants and AWAIT them — these are what actually revoke
+        // cross-tree access, so a silent failure would leave the other family able
+        // to read my tree while I'm told it's revoked. I own my tree (revoke the
+        // other party's view of it); viewerUid==uid() lets me drop my own view of
+        // theirs (only when no other link to it remains).
         var otherUid = (link.requestedBy === currentUid) ? link.approvedBy : link.requestedBy;
-        if(otherUid) deleteDoc(doc(db, 'trees', currentTreeId, 'viewers', otherUid))
-          .catch(function(e){ console.error('revoke grant (mine) failed', e && e.code); });
+        var jobs = [];
+        if(otherUid) jobs.push(deleteDoc(doc(db, 'trees', currentTreeId, 'viewers', otherUid)));
         var stillLinked = currentLinks.some(function(l){ return l.remoteTreeId === link.remoteTreeId; });
-        if(link.remoteTreeId && !stillLinked) deleteDoc(doc(db, 'trees', link.remoteTreeId, 'viewers', currentUid))
-          .catch(function(e){ console.error('revoke grant (theirs) failed', e && e.code); });
+        if(link.remoteTreeId && !stillLinked) jobs.push(deleteDoc(doc(db, 'trees', link.remoteTreeId, 'viewers', currentUid)));
+        var results = await Promise.allSettled(jobs);
+        results.forEach(function(r){ if(r.status === 'rejected'){ grantFailed = true; console.error('revoke grant failed', r.reason && r.reason.code, r.reason); } });
       }
-      toast(t('linkRevoked'));
+      if(grantFailed) alert(t('linkRevokePartial'));   // don't claim full severance when it half-failed
+      else toast(t('linkRevoked'));
     }catch(e){ console.error('revokeLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkRevokeFail'))); }
   }
 
@@ -1025,8 +1031,10 @@
         { familyName: d.familyName || '', lang: d.lang || 'ar', rootId: d.rootId || null, people: d.people || {} },
         { remoteTreeId: remoteTreeId, focusPersonId: personId });
     }catch(e){
+      // permission-denied = the other side severed the link; anything else
+      // (unavailable/offline) is transient — don't mislabel it as removed.
       console.error('viewLinkedTree failed', e && e.code, e);
-      alert(t('linkViewGone'));
+      alert(e && e.code === 'permission-denied' ? t('linkViewGone') : t('linkViewOffline'));
     }
   }
 

@@ -264,6 +264,8 @@
     linkConfirm:{ar:'ربط «{y}» في شجرتك بـ«{x}» في العائلة الأخرى؟', en:'Link "{y}" in your tree to "{x}" in the other family?'},
     linkViewBtn:{ar:'عرض الشجرة', en:'View tree'},
     linkViewGone:{ar:'لم يعد متاحاً — ربما أُلغي الربط من الطرف الآخر', en:'No longer available — the link may have been removed by the other side'},
+    linkViewOffline:{ar:'تعذّر التحميل — تحقّق من اتصالك وأعد المحاولة', en:'Couldn\'t load — check your connection and try again'},
+    linkRevokePartial:{ar:'أُزيل الرابط، لكن تعذّر إلغاء وصول الطرف الآخر بالكامل — أعد المحاولة', en:'Link removed, but the other family\'s access could not be fully revoked — try again'},
     linkViewBannerPrefix:{ar:'عرض: عائلة', en:'Viewing: family'},
     linkViewReadonly:{ar:'قراءة فقط', en:'read-only'},
     linkViewBack:{ar:'رجوع لشجرتي', en:'Back to my tree'},
@@ -536,13 +538,26 @@
   /* Edit permission (true = local-only or owner/editor; false = viewer / read-only).
      Set by the cloud module after it resolves the signed-in user's role. */
   var canEditCloud = true;
-  window.__ftSetEditable = function(val){ canEditCloud = !!val; render(); };
+  window.__ftSetEditable = function(val){
+    // While viewing another tree read-only, never re-enable editing (the hourly auth
+    // refresh re-calls this). Stash the intended value so exit restores it.
+    if(linkedView){ linkedView.savedCanEdit = !!val; return; }
+    canEditCloud = !!val; render();
+  };
+  window.__ftInLinkedView = function(){ return !!linkedView; };
 
   /* Linked-view (project 3a): render ANOTHER tree read-only without touching this
      user's state, localStorage, or cloud. save()/scheduleSave() are no-ops while
      active, and an incoming own-tree snapshot is stashed (not applied) until exit. */
   window.__ftEnterLinkedView = function(viewState, meta){
     if(linkedView) return;
+    // Resolve the banner DOM FIRST — if a stale cached index.html lacks it, bail
+    // before committing linkedView/state so we can never get stuck in a bannerless,
+    // save-disabled isolated view with no way out.
+    var bar = document.getElementById('linkedViewBar'),
+        labelEl = document.getElementById('linkedViewLabel'),
+        backEl = document.getElementById('linkedViewBack');
+    if(!bar || !labelEl || !backEl || !viewState || !viewState.people){ console.error('linkedView unavailable (DOM or data missing)'); alert(t('linkViewGone')); return; }
     linkedView = { savedState: state, savedCanEdit: canEditCloud, meta: meta || {} };
     state = viewState; state.lang = state.lang || 'ar';
     Object.keys(state.people).forEach(function(id){ migratePerson(state.people[id]); });
@@ -550,9 +565,9 @@
     canEditCloud = false;
     var fam = state.familyName;
     var label = (fam && (fam[state.lang] || fam.ar || fam.en)) || t('unnamedFamily');
-    document.getElementById('linkedViewLabel').textContent = t('linkViewBannerPrefix') + ' «' + label + '» — ' + t('linkViewReadonly');
-    document.getElementById('linkedViewBack').textContent = '‹ ' + t('linkViewBack');
-    document.getElementById('linkedViewBar').style.display = 'flex';
+    labelEl.textContent = t('linkViewBannerPrefix') + ' «' + label + '» — ' + t('linkViewReadonly');
+    backEl.textContent = '‹ ' + t('linkViewBack');
+    bar.style.display = 'flex';
     applyLang(); render();
     if(window.__ftShowTab) window.__ftShowTab('tree');
     if(meta && meta.focusPersonId && state.people[meta.focusPersonId]) focusPerson(meta.focusPersonId);
@@ -561,9 +576,15 @@
     if(!linkedView) return;
     var saved = linkedView;
     linkedView = null;
-    document.getElementById('linkedViewBar').style.display = 'none';
+    var bar = document.getElementById('linkedViewBar'); if(bar) bar.style.display = 'none';
     canEditCloud = saved.savedCanEdit;
     state = saved.savedState;
+    // The stash may hold a raw snapshot that arrived during the view (it bypassed
+    // __ftApplyRemote's migration) — migrate before rendering so names stay {ar,en}.
+    if(state && state.people){
+      Object.keys(state.people).forEach(function(id){ migratePerson(state.people[id]); });
+      migrateNames(state);
+    }
     applyLang(); render();
   };
 
@@ -795,6 +816,10 @@
   // first failure and resumes next session. Returns remaining count so the caller
   // can pace batches.
   window.__ftMigratePhotoBatch = async function(treeId, limit){
+    // Defense in depth: never migrate while viewing another tree — `state` is the
+    // remote tree but treeId is the user's own, so this would upload a stranger's
+    // photos into the user's own Storage (cross-tree write).
+    if(linkedView) return { migrated:false, remaining:0 };
     if(!treeId || !window.__ftPhotos || !window.ftPhotoPaths) return { migrated:false, remaining:0 };
     var ids = ftPhotosNeedingMigration(state.people).slice(0, limit || 5);
     var changed = false;
@@ -2270,12 +2295,16 @@
     // Family links (project 2): owner-only create + revoke; a linked badge shows
     // which other family this person is tied to, for every member to see.
     var isOwnerCloud = !!(window.__ftCloud && window.__ftCloud.isOwner && window.__ftCloud.isOwner());
-    var myLinks = (window.__ftCloud && window.__ftCloud.listLinks)
+    // Not while viewing another tree — listLinks() is the OWN tree's links, wrong context there.
+    var myLinks = (!window.__ftInLinkedView || !window.__ftInLinkedView()) && window.__ftCloud && window.__ftCloud.listLinks
       ? window.__ftCloud.listLinks().filter(function(l){ return l.localPersonId === id; }) : [];
     var linkBadges = myLinks.map(function(l){
-      return '<div class="prof-link-badge" data-view-tree="'+escapeHtml(l.remoteTreeId)+'" data-view-person="'+escapeHtml(l.remotePersonId)+'">'+
-             '🔗 '+t('linkedToFamily')+' «'+escapeHtml(famLabel(l.remoteFamilyName))+'» '+
-             '<span class="prof-link-view">'+t('linkViewBtn')+' ›</span>'+
+      // Only the grant-holders (the two linking owners) can actually read the other
+      // tree; showing "View tree" to a non-owner member would always hit linkViewGone.
+      var canView = isOwnerCloud;
+      return '<div class="prof-link-badge"'+(canView ? ' data-view-tree="'+escapeHtml(l.remoteTreeId)+'" data-view-person="'+escapeHtml(l.remotePersonId)+'"' : '')+'>'+
+             '🔗 '+t('linkedToFamily')+' «'+escapeHtml(famLabel(l.remoteFamilyName))+'»'+
+             (canView ? ' <span class="prof-link-view">'+t('linkViewBtn')+' ›</span>' : '')+
              (isOwnerCloud ? ' <button class="prof-link-revoke" data-link="'+escapeHtml(l.linkId)+'">'+t('linkRevokeBtn')+'</button>' : '')+
              '</div>';
     }).join('');

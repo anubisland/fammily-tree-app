@@ -182,7 +182,9 @@
         // Membership create is authorised by the invite path in the rules.
         await setDoc(doc(db, 'trees', joinTreeId, 'members', cred.user.uid),
           { email: email, role: invRole, viaInvite: joinToken, joinedAt: serverTimestamp() });
-        await setDoc(doc(db, 'users', cred.user.uid), { email: email, treeId: joinTreeId });
+        await setDoc(doc(db, 'users', cred.user.uid), { email: email, treeId: joinTreeId, activeTreeId: joinTreeId });
+        await setDoc(doc(db, 'users', cred.user.uid, 'memberships', joinTreeId),
+          { role: invRole, familyName: { ar: '', en: '' }, joinedAt: serverTimestamp() });
         joined = true; // membership committed — the account is now valid, no rollback
         currentUid = cred.user.uid; currentTreeId = joinTreeId;
         currentRole = invRole;
@@ -205,7 +207,9 @@
         // Tree doc FIRST: the members bootstrap rule reads trees/{id}.createdBy.
         await setDoc(treeRef, { familyName:{ar:'',en:''}, lang:'ar', rootId:null, people:{}, createdBy: cred2.user.uid, updatedAt: serverTimestamp() });
         await setDoc(doc(db, 'trees', newCode, 'members', cred2.user.uid), { email: email, role: 'owner', joinedAt: serverTimestamp() });
-        await setDoc(doc(db, 'users', cred2.user.uid), { email: email, treeId: newCode });
+        await setDoc(doc(db, 'users', cred2.user.uid), { email: email, treeId: newCode, activeTreeId: newCode });
+        await setDoc(doc(db, 'users', cred2.user.uid, 'memberships', newCode),
+          { role: 'owner', familyName: { ar: '', en: '' }, joinedAt: serverTimestamp() });
         joined = true; // owner membership committed — no rollback
         currentUid = cred2.user.uid; currentTreeId = newCode;
         currentRole = 'owner';
@@ -288,6 +292,12 @@
       showErr('تعذّر تحميل بيانات الحساب: ' + (err.message||err.code));
     }
   });
+
+  // Self-written index entry so the "my families" sheet can list this tree.
+  async function writeMembership(treeId, role, familyName){
+    await setDoc(doc(db, 'users', currentUid, 'memberships', treeId),
+      { role: role, familyName: familyName || { ar: '', en: '' }, joinedAt: serverTimestamp() });
+  }
 
   function subscribeTree(treeId){
     if(unsubTree) unsubTree();

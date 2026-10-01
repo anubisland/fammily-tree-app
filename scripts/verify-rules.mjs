@@ -24,6 +24,7 @@ const JOINER = 'uid-joiner';
 const EDITOR = 'uid-editor';
 const VIEWER = 'uid-viewer';
 const THROWAWAY = 'uid-throwaway';
+const LINKED = 'uid-linked';            // a cross-tree viewer (granted read of TREE, not a member)
 const TREE = 'tree-1';
 const TREE_LEGACY = 'tree-legacy';
 const INVITE_EDITOR = 'invite-editor-token';
@@ -66,6 +67,10 @@ async function seed(ctx) {
     { localPersonId: 'pX', remoteTreeId: 'tB', remotePersonId: 'pY', kind: 'same_person',
       status: 'accepted', grantedScope: 'view_tree', requestedBy: OWNER, approvedBy: OWNER,
       remoteFamilyName: { ar: '', en: '' } });
+  // A cross-tree viewer grant for LINKED (a non-member of TREE who owns another tree).
+  // Deliberately NOT OUTSIDER, so the existing "outsider cannot read" checks stay valid.
+  await setDoc(doc(db, 'trees', TREE, 'viewers', LINKED),
+    { grantedBy: LINKED, viaRequest: 'req1', remoteTreeId: 'tB' });
 
   // A legacy tree from the pre-createdBy era: no `createdBy` field at all.
   // Reuses OWNER/EDITOR as its members so the existing authenticated
@@ -93,6 +98,7 @@ const joinerDb = testEnv.authenticatedContext(JOINER).firestore();
 const editorDb = testEnv.authenticatedContext(EDITOR).firestore();
 const viewerDb = testEnv.authenticatedContext(VIEWER).firestore();
 const throwawayDb = testEnv.authenticatedContext(THROWAWAY).firestore();
+const linkedDb = testEnv.authenticatedContext(LINKED).firestore();
 
 // Reset to the known-good baseline before every single check, so one
 // check's side effects (e.g. a successful self-grant) can never leak into
@@ -505,6 +511,46 @@ await check('owner can revoke (delete) a link; editor cannot', async () => {
   await assertFails(deleteDoc(doc(editorDb, 'trees', TREE, 'links', 'L_own')));
   await assertSucceeds(deleteDoc(doc(ownerDb, 'trees', TREE, 'links', 'L_own')));
 });
+
+// ── Cross-tree viewer grant (project 3a) ─────────────────────────────────
+await check('a granted viewer can READ the whole tree doc', () =>
+  assertSucceeds(getDoc(doc(linkedDb, 'trees', TREE))));
+await check('a granted viewer can READ a photo doc', () =>
+  assertSucceeds(getDoc(doc(linkedDb, 'trees', TREE, 'photos', 'p_x'))));
+await check('a non-granted outsider still cannot read the tree', () =>
+  assertFails(getDoc(doc(throwawayDb, 'trees', TREE))));
+await check('a viewer CANNOT read the private moments feed', () =>
+  assertFails(getDoc(doc(linkedDb, 'trees', TREE, 'moments', 'm1'))));
+await check('a viewer CANNOT read the member roster', () =>
+  assertFails(getDocs(collection(linkedDb, 'trees', TREE, 'members'))));
+await check('a viewer CANNOT read the activity log', () =>
+  assertFails(getDoc(doc(linkedDb, 'trees', TREE, 'activity', 'a1'))));
+await check('a viewer CANNOT read moment reactions', () =>
+  assertFails(getDocs(collection(linkedDb, 'trees', TREE, 'moments', 'm1', 'reactions'))));
+await check('a viewer CANNOT read moment comments', () =>
+  assertFails(getDocs(collection(linkedDb, 'trees', TREE, 'moments', 'm1', 'comments'))));
+await check('a viewer CANNOT write the tree', () =>
+  assertFails(updateDoc(doc(linkedDb, 'trees', TREE), { rootId: 'x' })));
+await check('a viewer CANNOT write a photo', () =>
+  assertFails(setDoc(doc(linkedDb, 'trees', TREE, 'photos', 'p_hack'), { data: 'x' })));
+await check('owner can create a viewer grant directly', () =>
+  assertSucceeds(setDoc(doc(ownerDb, 'trees', TREE, 'viewers', 'uid-added'), { grantedBy: OWNER, remoteTreeId: 'tB' })));
+await check('self-grant via a matching pending request succeeds', () =>
+  assertSucceeds(setDoc(doc(throwawayDb, 'trees', TREE, 'viewers', THROWAWAY), { grantedBy: THROWAWAY, viaRequest: 'req1', remoteTreeId: 'tB' })));
+await check('self-grant with NO pending request fails', () =>
+  assertFails(setDoc(doc(throwawayDb, 'trees', TREE, 'viewers', THROWAWAY), { grantedBy: THROWAWAY, viaRequest: 'nope', remoteTreeId: 'tB' })));
+await check('cannot grant a viewer doc under ANOTHER uid via request', () =>
+  assertFails(setDoc(doc(throwawayDb, 'trees', TREE, 'viewers', OUTSIDER), { grantedBy: THROWAWAY, viaRequest: 'req1', remoteTreeId: 'tB' })));
+await check('a viewer grant cannot be edited', () =>
+  assertFails(updateDoc(doc(ownerDb, 'trees', TREE, 'viewers', LINKED), { remoteTreeId: 'evil' })));
+await check('viewer can revoke their OWN grant', () =>
+  assertSucceeds(deleteDoc(doc(linkedDb, 'trees', TREE, 'viewers', LINKED))));
+await check('owner can revoke any viewer grant', () =>
+  assertSucceeds(deleteDoc(doc(ownerDb, 'trees', TREE, 'viewers', LINKED))));
+await check('a third party cannot revoke someone else\'s viewer grant', () =>
+  assertFails(deleteDoc(doc(throwawayDb, 'trees', TREE, 'viewers', LINKED))));
+await check('outsider cannot list viewers', () =>
+  assertFails(getDocs(collection(throwawayDb, 'trees', TREE, 'viewers'))));
 
 await testEnv.cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -27,7 +27,20 @@
     });
     return { aSide: aSide, bSide: bSide, linkId: linkId };
   }
-  var api = { parseLinkHash: parseLinkHash, buildLinkPair: buildLinkPair };
+  // Cross-tree read grants (project 3a): one uid-keyed viewer doc per tree, so the
+  // rule can check it with exists(uid). onRequestTree grants the approver (B) view
+  // of A (authorised by the pending request); onApproveTree grants the requester
+  // (A) view of B (written by B, who owns B).
+  function buildViewerGrants(req, approveTreeId, approverUid){
+    return {
+      onRequestTree: { treeId: req.treeId, uid: approverUid,
+        data: { grantedBy: approverUid, viaRequest: req.token, remoteTreeId: approveTreeId } },
+      onApproveTree: { treeId: approveTreeId, uid: req.requestedBy,
+        data: { grantedBy: approverUid, remoteTreeId: req.treeId } }
+    };
+  }
+
+  var api = { parseLinkHash: parseLinkHash, buildLinkPair: buildLinkPair, buildViewerGrants: buildViewerGrants };
   if(typeof module !== 'undefined' && module.exports) module.exports = api;
   global.ftLinks = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -425,6 +425,7 @@
   var migrating = false;
   function maybeMigratePhotos(){
     if(migrating || currentRole === 'viewer' || !currentTreeId) return;
+    if(window.__ftInLinkedView && window.__ftInLinkedView()) return;   // not while viewing another tree
     if(!window.__ftMigratePhotoBatch) return;
     migrating = true;
     (async function runBatch(){
@@ -958,6 +959,12 @@
       var batch = writeBatch(db);
       batch.set(doc(db, 'trees', currentTreeId, 'links', linkId), Object.assign({ createdAt: serverTimestamp() }, pair.bSide));
       batch.set(doc(db, 'trees', req.treeId, 'links', linkId), Object.assign({ createdAt: serverTimestamp() }, pair.aSide));
+      // Cross-tree read grants (project 3a) — both viewer docs in the same atomic batch.
+      var grants = window.ftLinks.buildViewerGrants(req, currentTreeId, currentUid);
+      batch.set(doc(db, 'trees', grants.onApproveTree.treeId, 'viewers', grants.onApproveTree.uid),
+        Object.assign({ at: serverTimestamp() }, grants.onApproveTree.data));
+      batch.set(doc(db, 'trees', grants.onRequestTree.treeId, 'viewers', grants.onRequestTree.uid),
+        Object.assign({ at: serverTimestamp() }, grants.onRequestTree.data));
       await batch.commit();
       loadLinks();
       toast(t('linkApproved'));
@@ -987,11 +994,48 @@
   }
 
   async function revokeLink(linkId){
+    var link = currentLinks.filter(function(l){ return l.linkId === linkId; })[0];
     try{
       await deleteDoc(doc(db, 'trees', currentTreeId, 'links', linkId));
       currentLinks = currentLinks.filter(function(l){ return l.linkId !== linkId; });
-      toast(t('linkRevoked'));
+      var grantFailed = false;
+      if(link){
+        // Sever both read grants and AWAIT them — these are what actually revoke
+        // cross-tree access, so a silent failure would leave the other family able
+        // to read my tree while I'm told it's revoked. I own my tree (revoke the
+        // other party's view of it); viewerUid==uid() lets me drop my own view of
+        // theirs (only when no other link to it remains).
+        var otherUid = (link.requestedBy === currentUid) ? link.approvedBy : link.requestedBy;
+        var jobs = [];
+        if(otherUid) jobs.push(deleteDoc(doc(db, 'trees', currentTreeId, 'viewers', otherUid)));
+        var stillLinked = currentLinks.some(function(l){ return l.remoteTreeId === link.remoteTreeId; });
+        if(link.remoteTreeId && !stillLinked) jobs.push(deleteDoc(doc(db, 'trees', link.remoteTreeId, 'viewers', currentUid)));
+        var results = await Promise.allSettled(jobs);
+        results.forEach(function(r){ if(r.status === 'rejected'){ grantFailed = true; console.error('revoke grant failed', r.reason && r.reason.code, r.reason); } });
+      }
+      if(grantFailed) alert(t('linkRevokePartial'));   // don't claim full severance when it half-failed
+      else toast(t('linkRevoked'));
     }catch(e){ console.error('revokeLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkRevokeFail'))); }
+  }
+
+  // Open a linked tree read-only (project 3a): read it once (the viewer grant
+  // allows it) and hand it to the app's isolated linked-view. A permission-denied
+  // here means the other side severed the link, so surface it gently.
+  async function viewLinkedTree(remoteTreeId, personId){
+    if(!remoteTreeId){ return; }
+    try{
+      var snap = await getDoc(doc(db, 'trees', remoteTreeId));
+      if(!snap.exists()){ alert(t('linkViewGone')); return; }
+      var d = snap.data();
+      if(window.__ftEnterLinkedView) window.__ftEnterLinkedView(
+        { familyName: d.familyName || '', lang: d.lang || 'ar', rootId: d.rootId || null, people: d.people || {} },
+        { remoteTreeId: remoteTreeId, focusPersonId: personId });
+    }catch(e){
+      // permission-denied = the other side severed the link; anything else
+      // (unavailable/offline) is transient — don't mislabel it as removed.
+      console.error('viewLinkedTree failed', e && e.code, e);
+      alert(e && e.code === 'permission-denied' ? t('linkViewGone') : t('linkViewOffline'));
+    }
   }
 
   // Approver side: a logged-in owner opens a `#link=` → read the pending request
@@ -1048,6 +1092,7 @@
     readLinkRequest: readLinkRequest,
     approveLink: approveLink,
     revokeLink: revokeLink,
+    viewLinkedTree: viewLinkedTree,
     listLinks: function(){ return currentLinks.slice(); },
     isOwner: function(){ return currentRole === 'owner'; }
   };

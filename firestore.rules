@@ -31,6 +31,13 @@ service cloud.firestore {
     function linkRequestDoc(treeId, token) {
       return /databases/$(database)/documents/trees/$(treeId)/linkRequests/$(token);
     }
+    function viewerDoc(treeId, user) {
+      return /databases/$(database)/documents/trees/$(treeId)/viewers/$(user);
+    }
+    // A link grants cross-tree READ via a uid-keyed viewer doc (not membership).
+    function canViewTree(treeId) {
+      return isMember(treeId) || (signedIn() && exists(viewerDoc(treeId, uid())));
+    }
 
     // users/{uid}: self only. Never a source of permission.
     match /users/{userId} {
@@ -44,7 +51,7 @@ service cloud.firestore {
     }
 
     match /trees/{treeId} {
-      allow read:   if isMember(treeId);
+      allow read:   if canViewTree(treeId);   // members, or a cross-tree linked viewer (read-only)
       allow create: if signedIn() && request.resource.data.createdBy == uid();
       // createdBy is immutable on update: an editor could otherwise rewrite it
       // to a throwaway uid that then satisfies the bootstrap owner path (C1).
@@ -129,7 +136,7 @@ service cloud.firestore {
       // reads; only non-viewer members (editors/owner) write/replace/delete — the
       // same authority as the tree itself. Firestore's 1MB doc cap bounds size.
       match /photos/{photoId} {
-        allow read:          if isMember(treeId);
+        allow read:          if canViewTree(treeId);   // profile photos are part of the revealed tree
         allow create, update: if canEdit(treeId);
         allow delete:        if canEdit(treeId);
       }
@@ -166,6 +173,23 @@ service cloud.firestore {
                       );
         allow delete: if isOwner(treeId);            // any owner revokes their own copy
         allow update: if false;                      // immutable; revoke = delete
+      }
+
+      // Cross-tree read grant (project 3a). A uid-keyed doc: its existence lets the
+      // named user READ this tree (canViewTree). Created by the tree owner, or by a
+      // user granting THEMSELVES via a matching pending link request (same token
+      // trust model as the link doc). Revocable by that viewer OR the tree owner —
+      // mutual sovereignty. Never grants write (the viewer is not a member).
+      match /viewers/{viewerUid} {
+        allow get:    if isMember(treeId) || viewerUid == uid();
+        allow list:   if isOwner(treeId);
+        allow create: if signedIn() && (
+                        isOwner(treeId)
+                        || ( viewerUid == uid()
+                             && exists(linkRequestDoc(treeId, request.resource.data.viaRequest)) )
+                      );
+        allow delete: if isOwner(treeId) || viewerUid == uid();
+        allow update: if false;
       }
     }
   }

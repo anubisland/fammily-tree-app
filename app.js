@@ -2224,6 +2224,17 @@
     if(p.bio) lines += '<div class="prof-bio">'+escapeHtml(p.bio)+'</div>';
     var spouses = (p.spouseIds||[]).map(getPerson);
     var children = (p.childrenIds||[]).map(getPerson);
+    // Family links (project 2): owner-only create + revoke; a linked badge shows
+    // which other family this person is tied to, for every member to see.
+    var isOwnerCloud = !!(window.__ftCloud && window.__ftCloud.isOwner && window.__ftCloud.isOwner());
+    var myLinks = (window.__ftCloud && window.__ftCloud.listLinks)
+      ? window.__ftCloud.listLinks().filter(function(l){ return l.localPersonId === id; }) : [];
+    var linkBadges = myLinks.map(function(l){
+      return '<div class="prof-link-badge">🔗 '+t('linkedToFamily')+' «'+escapeHtml(famLabel(l.remoteFamilyName))+'»'+
+             (isOwnerCloud ? ' <button class="prof-link-revoke" data-link="'+escapeHtml(l.linkId)+'">'+t('linkRevokeBtn')+'</button>' : '')+'</div>';
+    }).join('');
+    var linkBtn = isOwnerCloud
+      ? '<button class="primary-btn" id="prof_link" style="background:var(--teal);">🔗 '+t('linkToFamilyBtn')+'</button>' : '';
     var actions = canEditCloud
       ? '<button class="primary-btn" id="prof_edit">✎ '+t('profileEdit')+'</button>'+
         '<button class="primary-btn" id="prof_addchild" style="background:var(--teal);">＋ '+t('profileAddChild')+'</button>'
@@ -2238,6 +2249,7 @@
           '<button class="prof-nasab-copy" id="prof_copy">📋 '+t('nasabCopyBtn')+'</button></div>'+
         '<div class="prof-nasab-text" id="prof_nasab_text">'+escapeHtml(nasabChain(id))+'</div>'+
       '</div>'+
+      (linkBadges ? '<div class="prof-links">'+linkBadges+'</div>' : '')+
       '<div class="prof-body">'+ (lines||'') +
         relRow('relFather', [fatherOfPerson(p)]) +
         relRow('relMother', [motherOfPerson(p)]) +
@@ -2248,6 +2260,7 @@
         '<button class="primary-btn" id="prof_center" style="background:var(--emerald);">🎯 '+t('profileCenter')+'</button>'+
         '<button class="primary-btn" id="prof_kin" style="background:var(--plum);">🔗 '+t('profileKinship')+'</button>'+
         '<button class="primary-btn" id="prof_share" style="background:var(--gold);">📤 '+t('profileShare')+'</button>'+
+        linkBtn+
       '</div>'
     );
     fillPhotoRefs(document.getElementById('sheet'));   // resolve profile avatar + relatives' Storage photos
@@ -2258,6 +2271,11 @@
     var pc = document.getElementById('prof_center'); if(pc) pc.onclick = function(){ centerTreeOn(id); };
     document.getElementById('prof_kin').onclick = function(){ closeSheet(); startKinship(); };
     document.getElementById('prof_share').onclick = function(){ shareProfileImage(id); };
+    var plink = document.getElementById('prof_link');
+    if(plink) plink.onclick = function(){ window.__ftCloud.requestLink(id, p.name, state.familyName); };
+    sheetBody.querySelectorAll('.prof-link-revoke').forEach(function(b){
+      b.onclick = function(){ if(confirm(t('linkRevokeConfirm'))){ window.__ftCloud.revokeLink(b.getAttribute('data-link')); closeSheet(); } };
+    });
   }
 
   // Copy a person's full name (already the nasab as typed) + family name for

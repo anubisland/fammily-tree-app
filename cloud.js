@@ -958,6 +958,12 @@
       var batch = writeBatch(db);
       batch.set(doc(db, 'trees', currentTreeId, 'links', linkId), Object.assign({ createdAt: serverTimestamp() }, pair.bSide));
       batch.set(doc(db, 'trees', req.treeId, 'links', linkId), Object.assign({ createdAt: serverTimestamp() }, pair.aSide));
+      // Cross-tree read grants (project 3a) — both viewer docs in the same atomic batch.
+      var grants = window.ftLinks.buildViewerGrants(req, currentTreeId, currentUid);
+      batch.set(doc(db, 'trees', grants.onApproveTree.treeId, 'viewers', grants.onApproveTree.uid),
+        Object.assign({ at: serverTimestamp() }, grants.onApproveTree.data));
+      batch.set(doc(db, 'trees', grants.onRequestTree.treeId, 'viewers', grants.onRequestTree.uid),
+        Object.assign({ at: serverTimestamp() }, grants.onRequestTree.data));
       await batch.commit();
       loadLinks();
       toast(t('linkApproved'));
@@ -987,9 +993,21 @@
   }
 
   async function revokeLink(linkId){
+    var link = currentLinks.filter(function(l){ return l.linkId === linkId; })[0];
     try{
       await deleteDoc(doc(db, 'trees', currentTreeId, 'links', linkId));
       currentLinks = currentLinks.filter(function(l){ return l.linkId !== linkId; });
+      if(link){
+        // Sever both read grants. I own my tree, so I can revoke the other party's
+        // view of it; and viewerUid==uid() lets me drop my own view of their tree
+        // (only when no other link to it remains).
+        var otherUid = (link.requestedBy === currentUid) ? link.approvedBy : link.requestedBy;
+        if(otherUid) deleteDoc(doc(db, 'trees', currentTreeId, 'viewers', otherUid))
+          .catch(function(e){ console.error('revoke grant (mine) failed', e && e.code); });
+        var stillLinked = currentLinks.some(function(l){ return l.remoteTreeId === link.remoteTreeId; });
+        if(link.remoteTreeId && !stillLinked) deleteDoc(doc(db, 'trees', link.remoteTreeId, 'viewers', currentUid))
+          .catch(function(e){ console.error('revoke grant (theirs) failed', e && e.code); });
+      }
       toast(t('linkRevoked'));
     }catch(e){ console.error('revokeLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkRevokeFail'))); }
   }

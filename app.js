@@ -231,6 +231,7 @@
     familyPrefix:{ar:'عائلة ', en:''},
     familySuffix:{ar:'', en:' Family'},
     errBadInvite:{ar:'رابط الدعوة غير صحيح أو انتهت صلاحيته', en:'The invite link is invalid or has expired'},
+    errJoinFailed:{ar:'تعذّر الانضمام — تحقّق من الرابط والاتصال', en:'Join failed — check the link and your connection'},
     menuInvite:{ar:'➕ دعوة فرد للعائلة', en:'➕ Invite a family member'},
     inviteCopied:{ar:'تم نسخ رابط الدعوة', en:'Invite link copied'},
     joinCodePh:{ar:'الصق رابط الدعوة هنا', en:'Paste the invite link here'},

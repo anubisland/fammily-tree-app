@@ -324,6 +324,47 @@
       { role: role, familyName: familyName || { ar: '', en: '' }, joinedAt: serverTimestamp() });
   }
 
+  // Create a brand-new family the signed-in user owns (no new auth account). Uses
+  // the existing bootstrap-owner rule (trees/{id}.createdBy == uid && !member).
+  async function createFamily(nameObj){
+    if(!currentUid) return;
+    try{
+      var treeRef = doc(collection(db, 'trees'));
+      var newId = treeRef.id;
+      await setDoc(treeRef, { familyName: nameObj || {ar:'',en:''}, lang: 'ar', rootId: null, people: {}, createdBy: currentUid, updatedAt: serverTimestamp() });
+      await setDoc(doc(db, 'trees', newId, 'members', currentUid), { email: (auth.currentUser&&auth.currentUser.email)||'', role: 'owner', joinedAt: serverTimestamp() });
+      await writeMembership(newId, 'owner', nameObj || {ar:'',en:''});
+      currentMemberships.push({ treeId: newId, role: 'owner', familyName: nameObj || {ar:'',en:''} });
+      await switchFamily(newId);
+    }catch(e){ console.error('createFamily failed', e && e.code, e); alert(writeErrMsg(e, t('errJoinFailed'))); }
+  }
+
+  // Join another family from inside the app via an invite link (no new auth
+  // account). Reuses the existing invite member-create rule (role != owner).
+  async function joinFamily(linkText){
+    if(!currentUid) return;
+    var raw = String(linkText || '').trim();
+    var hashIdx = raw.indexOf('#join='); if(hashIdx !== -1) raw = raw.slice(hashIdx + '#join='.length);
+    try{ raw = decodeURIComponent(raw); }catch(e){}
+    raw = raw.trim();
+    var dot = raw.indexOf('.');
+    if(dot < 1){ alert(t('errBadInvite')); return; }
+    var jTree = raw.slice(0, dot), jTok = raw.slice(dot + 1);
+    if(!jTree || !jTok || jTree.indexOf('/') !== -1 || jTok.indexOf('/') !== -1){ alert(t('errBadInvite')); return; }
+    if(currentMemberships.some(function(m){ return m.treeId === jTree; })){ await switchFamily(jTree); return; }
+    try{
+      var inv = await getDoc(doc(db, 'trees', jTree, 'invites', jTok));
+      if(!inv.exists()){ alert(t('errBadInvite')); return; }
+      var invRole = inv.data().role;
+      await setDoc(doc(db, 'trees', jTree, 'members', currentUid), { email: (auth.currentUser&&auth.currentUser.email)||'', role: invRole, viaInvite: jTok, joinedAt: serverTimestamp() });
+      var treeDoc = await getDoc(doc(db, 'trees', jTree));
+      var fam = treeDoc.exists() ? (treeDoc.data().familyName || {ar:'',en:''}) : {ar:'',en:''};
+      await writeMembership(jTree, invRole, fam);
+      currentMemberships.push({ treeId: jTree, role: invRole, familyName: fam });
+      await switchFamily(jTree);
+    }catch(e){ console.error('joinFamily failed', e && e.code, e); alert(writeErrMsg(e, t('errJoinFailed'))); }
+  }
+
   function subscribeTree(treeId){
     if(unsubTree) unsubTree();
     unsubTree = onSnapshot(doc(db, 'trees', treeId), function(snap){
@@ -859,7 +900,12 @@
     createInvite: createInvite,
     showMembers: showMembers,
     signOut: function(){ signOut(auth); },
-    getTreeId: function(){ return currentTreeId; }
+    getTreeId: function(){ return currentTreeId; },
+    getActiveTreeId: function(){ return currentTreeId; },
+    listMemberships: function(){ return currentMemberships.slice(); },
+    createFamily: createFamily,
+    joinFamily: joinFamily,
+    switchFamily: switchFamily
   };
 
   async function pushToCloud(state){

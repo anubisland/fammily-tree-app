@@ -382,6 +382,7 @@
     if(!memberSnap.exists()){ alert(t('errNoMembership')); return; }
     if(unsubTree){ unsubTree(); unsubTree = null; }
     remoteLoaded = false;
+    currentLinks = [];   // drop the old tree's links until the new tree's load
     currentTreeId = treeId;
     currentRole = memberSnap.data().role || 'viewer';
     window.__ftSetEditable(currentRole !== 'viewer');
@@ -408,6 +409,7 @@
       // so no per-doc signal) — drop the photo cache so it re-reads fresh.
       if(window.__ftPhotos && window.__ftPhotos.invalidateCache) window.__ftPhotos.invalidateCache();
       maybeMigratePhotos();
+      loadLinks();
     }, function(){
       cloudBtn.dataset.status = 'offline';
     });
@@ -930,6 +932,46 @@
     }catch(e){ console.error('requestLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkRequestFail'))); }
   }
 
+  var currentLinks = [];   // [{linkId, ...link}] for the active tree
+
+  async function readLinkRequest(reqTreeId, token){
+    var snap = await getDoc(doc(db, 'trees', reqTreeId, 'linkRequests', token));
+    if(!snap.exists()) return null;
+    return Object.assign({ treeId: reqTreeId, token: token }, snap.data());
+  }
+
+  // Owner B approves: one shared linkId, mirrored on both trees. B's own copy is
+  // written first (by ownership); A's copy second (authorised by the pending
+  // request). If the second write fails, one revocable copy remains — never a
+  // silent half-state.
+  async function approveLink(req, remotePersonId, remoteFamilyName){
+    if(!currentTreeId || currentRole !== 'owner'){ alert(t('linkOwnerOnly')); return; }
+    try{
+      var linkId = (doc(collection(db, 'trees', currentTreeId, 'links'))).id;
+      var pair = window.ftLinks.buildLinkPair(req, currentTreeId, remotePersonId, remoteFamilyName, currentUid, linkId);
+      await setDoc(doc(db, 'trees', currentTreeId, 'links', linkId), Object.assign({ createdAt: serverTimestamp() }, pair.bSide));
+      await setDoc(doc(db, 'trees', req.treeId, 'links', linkId), Object.assign({ createdAt: serverTimestamp() }, pair.aSide));
+      loadLinks();
+      toast(t('linkApproved'));
+    }catch(e){ console.error('approveLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkApproveFail'))); }
+  }
+
+  function loadLinks(){
+    if(!currentTreeId){ currentLinks = []; return; }
+    getDocs(collection(db, 'trees', currentTreeId, 'links')).then(function(snap){
+      currentLinks = []; snap.forEach(function(d){ currentLinks.push(Object.assign({ linkId: d.id }, d.data())); });
+      if(window.__ftRenderHome) window.__ftRenderHome();
+    }, function(){ currentLinks = []; });
+  }
+
+  async function revokeLink(linkId){
+    try{
+      await deleteDoc(doc(db, 'trees', currentTreeId, 'links', linkId));
+      currentLinks = currentLinks.filter(function(l){ return l.linkId !== linkId; });
+      toast(t('linkRevoked'));
+    }catch(e){ console.error('revokeLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkRevokeFail'))); }
+  }
+
   window.__ftCloud = {
     onLocalSave: function(state){
       // Never push before the first cloud snapshot: local state is still the empty
@@ -956,6 +998,10 @@
     joinFamily: joinFamily,
     switchFamily: switchFamily,
     requestLink: requestLink,
+    readLinkRequest: readLinkRequest,
+    approveLink: approveLink,
+    revokeLink: revokeLink,
+    listLinks: function(){ return currentLinks.slice(); },
     isOwner: function(){ return currentRole === 'owner'; }
   };
 

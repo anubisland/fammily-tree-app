@@ -57,6 +57,15 @@ async function seed(ctx) {
   await setDoc(doc(db, 'trees', TREE, 'activity', 'a1'), { byUid: OWNER, kind: 'created' });
   // A photo doc (base64 in `data`) for the photos-subcollection checks.
   await setDoc(doc(db, 'trees', TREE, 'photos', 'p_x'), { data: 'data:image/jpeg;base64,AAA' });
+  // A pending link request (minted by the owner) for the link-protocol checks.
+  await setDoc(doc(db, 'trees', TREE, 'linkRequests', 'req1'),
+    { localPersonId: 'pX', localPersonName: { ar: 'ف', en: 'F' }, localFamilyName: { ar: 'الوزير', en: 'W' },
+      requestedBy: OWNER, kind: 'same_person' });
+  // A pre-existing accepted link so read/update/delete checks hit a real doc.
+  await setDoc(doc(db, 'trees', TREE, 'links', 'L_own'),
+    { localPersonId: 'pX', remoteTreeId: 'tB', remotePersonId: 'pY', kind: 'same_person',
+      status: 'accepted', grantedScope: 'view_tree', requestedBy: OWNER, approvedBy: OWNER,
+      remoteFamilyName: { ar: '', en: '' } });
 
   // A legacy tree from the pre-createdBy era: no `createdBy` field at all.
   // Reuses OWNER/EDITOR as its members so the existing authenticated
@@ -427,6 +436,75 @@ await check('user cannot read ANOTHER user\'s membership index', () =>
 
 await check('signed-out cannot write a membership index', () =>
   assertFails(setDoc(doc(testEnv.unauthenticatedContext().firestore(), 'users', OWNER, 'memberships', TREE), { role: 'owner' })));
+
+// ── Link protocol: linkRequests (project 2) ──────────────────────────────
+// OUTSIDER stands in for another tree's owner: a non-member of TREE, so the
+// external-approver path must rest on a matching pending request, never on
+// membership of TREE.
+await check('owner can create a link request', () =>
+  assertSucceeds(setDoc(doc(ownerDb, 'trees', TREE, 'linkRequests', 'req2'),
+    { kind: 'same_person', localPersonId: 'pA', requestedBy: OWNER })));
+
+await check('editor cannot create a link request (owner only)', () =>
+  assertFails(setDoc(doc(editorDb, 'trees', TREE, 'linkRequests', 'req3'),
+    { kind: 'same_person', localPersonId: 'pA', requestedBy: EDITOR })));
+
+await check('link request must carry kind same_person', () =>
+  assertFails(setDoc(doc(ownerDb, 'trees', TREE, 'linkRequests', 'req4'),
+    { kind: 'marriage', localPersonId: 'pA', requestedBy: OWNER })));
+
+await check('any signed-in user can read a link request by token', () =>
+  assertSucceeds(getDoc(doc(outsiderDb, 'trees', TREE, 'linkRequests', 'req1'))));
+
+await check('outsider cannot enumerate link requests', () =>
+  assertFails(getDocs(collection(outsiderDb, 'trees', TREE, 'linkRequests'))));
+
+await check('a link request cannot be edited', () =>
+  assertFails(updateDoc(doc(ownerDb, 'trees', TREE, 'linkRequests', 'req1'), { localPersonId: 'z' })));
+
+await check('owner can delete (cancel) their link request', () =>
+  assertSucceeds(deleteDoc(doc(ownerDb, 'trees', TREE, 'linkRequests', 'req1'))));
+
+// ── Link protocol: links (mirrored, owner-or-pending-request) ────────────
+const LINK = { kind: 'same_person', status: 'accepted', grantedScope: 'view_tree',
+  requestedBy: OWNER, approvedBy: OWNER, remoteTreeId: 'tB', remotePersonId: 'pY',
+  remoteFamilyName: { ar: '', en: '' } };
+
+await check('owner can create their own link copy', () =>
+  assertSucceeds(setDoc(doc(ownerDb, 'trees', TREE, 'links', 'L_ownnew'),
+    Object.assign({ localPersonId: 'pX' }, LINK))));
+
+await check('remote approver can create A-side link via a matching pending request', () =>
+  assertSucceeds(setDoc(doc(outsiderDb, 'trees', TREE, 'links', 'L_via'),
+    Object.assign({ localPersonId: 'pX', viaRequest: 'req1' }, LINK))));
+
+await check('link create FAILS with a non-existent request', () =>
+  assertFails(setDoc(doc(outsiderDb, 'trees', TREE, 'links', 'L_bad'),
+    Object.assign({ localPersonId: 'pX', viaRequest: 'nope' }, LINK))));
+
+await check('link create FAILS when localPersonId does not match the request', () =>
+  assertFails(setDoc(doc(outsiderDb, 'trees', TREE, 'links', 'L_mismatch'),
+    Object.assign({ localPersonId: 'WRONG', viaRequest: 'req1' }, LINK))));
+
+await check('link create FAILS with a forged grantedScope', () =>
+  assertFails(setDoc(doc(outsiderDb, 'trees', TREE, 'links', 'L_scope'),
+    Object.assign({ localPersonId: 'pX', viaRequest: 'req1', grantedScope: 'edit' },
+      { kind: 'same_person', status: 'accepted', requestedBy: OWNER, approvedBy: OWNER,
+        remoteTreeId: 'tB', remotePersonId: 'pY' }))));
+
+await check('member can read links', () =>
+  assertSucceeds(getDoc(doc(viewerDb, 'trees', TREE, 'links', 'L_own'))));
+
+await check('outsider cannot read links', () =>
+  assertFails(getDoc(doc(outsiderDb, 'trees', TREE, 'links', 'L_own'))));
+
+await check('a link cannot be edited', () =>
+  assertFails(updateDoc(doc(ownerDb, 'trees', TREE, 'links', 'L_own'), { remoteTreeId: 'evil' })));
+
+await check('owner can revoke (delete) a link; editor cannot', async () => {
+  await assertFails(deleteDoc(doc(editorDb, 'trees', TREE, 'links', 'L_own')));
+  await assertSucceeds(deleteDoc(doc(ownerDb, 'trees', TREE, 'links', 'L_own')));
+});
 
 await testEnv.cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);

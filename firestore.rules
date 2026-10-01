@@ -28,6 +28,9 @@ service cloud.firestore {
     function inviteDoc(treeId, token) {
       return /databases/$(database)/documents/trees/$(treeId)/invites/$(token);
     }
+    function linkRequestDoc(treeId, token) {
+      return /databases/$(database)/documents/trees/$(treeId)/linkRequests/$(token);
+    }
 
     // users/{uid}: self only. Never a source of permission.
     match /users/{userId} {
@@ -129,6 +132,40 @@ service cloud.firestore {
         allow read:          if isMember(treeId);
         allow create, update: if canEdit(treeId);
         allow delete:        if canEdit(treeId);
+      }
+
+      // Family link protocol (project 2). A pending link request is minted by the
+      // owner of THIS tree and shared out-of-band as a token (same trust model as
+      // invites). The mirrored `links` docs are written on both trees at approval:
+      // the approver writes their own copy by ownership, and the requester's copy
+      // is authorised ONLY by a matching pending request in that tree. A link
+      // grants `view_tree` and nothing more — never write, never a member doc.
+      match /linkRequests/{token} {
+        allow get:    if signedIn();                 // approver reads the request by token
+        allow list:   if isOwner(treeId);            // only the owner enumerates their requests
+        allow create: if isOwner(treeId) && request.resource.data.kind == 'same_person';
+        allow delete: if isOwner(treeId);            // owner cancels a pending request
+        allow update: if false;
+      }
+
+      match /links/{linkId} {
+        allow read:   if isMember(treeId);
+        allow create: if signedIn()
+                      && request.resource.data.kind == 'same_person'
+                      && request.resource.data.status == 'accepted'
+                      && request.resource.data.grantedScope == 'view_tree'
+                      && (
+                        // (a) this tree's owner writes their own mirror copy
+                        isOwner(treeId)
+                        ||
+                        // (b) an external approver writes THIS tree's copy, authorised
+                        //     by a matching pending request that its owner minted here
+                        ( exists(linkRequestDoc(treeId, request.resource.data.viaRequest))
+                          && get(linkRequestDoc(treeId, request.resource.data.viaRequest)).data.localPersonId
+                               == request.resource.data.localPersonId )
+                      );
+        allow delete: if isOwner(treeId);            // any owner revokes their own copy
+        allow update: if false;                      // immutable; revoke = delete
       }
     }
   }

@@ -32,6 +32,12 @@ service cloud.firestore {
     // users/{uid}: self only. Never a source of permission.
     match /users/{userId} {
       allow read, write: if signedIn() && uid() == userId;
+      // Self-written index of the trees this user belongs to (role + cached
+      // familyName for display). NOT authority — trees/{t}/members/{uid} is.
+      // A user can only ever touch their OWN memberships.
+      match /memberships/{treeId} {
+        allow read, write: if signedIn() && uid() == userId;
+      }
     }
 
     match /trees/{treeId} {

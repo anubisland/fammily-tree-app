@@ -231,6 +231,17 @@
     familyPrefix:{ar:'عائلة ', en:''},
     familySuffix:{ar:'', en:' Family'},
     errBadInvite:{ar:'رابط الدعوة غير صحيح أو انتهت صلاحيته', en:'The invite link is invalid or has expired'},
+    errJoinFailed:{ar:'تعذّر الانضمام — تحقّق من الرابط والاتصال', en:'Join failed — check the link and your connection'},
+    myFamiliesTitle:{ar:'عائلاتي', en:'My families'},
+    createFamilyBtn:{ar:'إنشاء عائلة جديدة', en:'Create a new family'},
+    joinFamilyBtn:{ar:'الانضمام برابط دعوة', en:'Join via invite link'},
+    role_owner:{ar:'مالك', en:'Owner'}, role_editor:{ar:'محرِّر', en:'Editor'}, role_viewer:{ar:'مشاهد', en:'Viewer'},
+    familyNameArLabel:{ar:'اسم العائلة (عربي)', en:'Family name (Arabic)'},
+    familyNameEnLabel:{ar:'اسم العائلة (إنجليزي)', en:'Family name (English)'},
+    inviteLinkLabel:{ar:'رابط الدعوة', en:'Invite link'},
+    inviteLinkPlaceholder:{ar:'الصق رابط الدعوة هنا', en:'Paste the invite link here'},
+    creatingFamily:{ar:'جارِ إنشاء العائلة…', en:'Creating family…'},
+    joiningFamily:{ar:'جارِ الانضمام…', en:'Joining…'},
     menuInvite:{ar:'➕ دعوة فرد للعائلة', en:'➕ Invite a family member'},
     inviteCopied:{ar:'تم نسخ رابط الدعوة', en:'Invite link copied'},
     joinCodePh:{ar:'الصق رابط الدعوة هنا', en:'Paste the invite link here'},
@@ -383,7 +394,25 @@
   }
 
   /* ============== State ============== */
-  var STORAGE_KEY = "family-tree:data";
+  var STORAGE_BASE = "family-tree:data";
+  var STORAGE_KEY = STORAGE_BASE;   // becomes per-tree once the active tree is known
+  // Point the local store at a specific tree's slot and reload. Called by cloud.js
+  // on auth-load and on family switch, so each tree keeps its own offline copy.
+  window.__ftSetActiveTree = function(treeId){
+    if(!treeId) return;
+    var newKey = STORAGE_BASE + ':' + treeId;
+    try{
+      // One-time migration of the legacy shared slot into this tree's slot.
+      if(!localStorage.getItem(newKey) && localStorage.getItem(STORAGE_BASE)){
+        localStorage.setItem(newKey, localStorage.getItem(STORAGE_BASE));
+        localStorage.removeItem(STORAGE_BASE);
+      }
+    }catch(e){}
+    STORAGE_KEY = newKey;
+    load();     // reload state from this tree's local slot (cloud snapshot will refine)
+    render();
+    if(window.__ftRenderHome) window.__ftRenderHome();
+  };
   var state = { rootId: null, familyName: "", people: {}, lang: 'ar' };
   var zoom = 1;
   var saveTimer = null;
@@ -1378,7 +1407,7 @@
     host.innerHTML =
       '<div class="masthead">' +
         '<div class="app-title">'+t('appName')+'</div>' +
-        '<div class="fam-row"><span class="crest">🌳</span><span class="family-name">'+escapeHtml(fam)+'</span></div>' +
+        '<div class="fam-row" id="familySwitcher"'+(window.__ftCloud&&window.__ftCloud.listMemberships?' role="button" tabindex="0"':'')+'><span class="crest">🌳</span><span class="family-name">'+escapeHtml(fam)+'</span>'+(window.__ftCloud&&window.__ftCloud.listMemberships?'<span class="fam-caret">⌄</span>':'')+'</div>' +
         '<div class="tadhib"><span class="dia">◆</span><span class="rule"></span><span class="dia">◆</span></div>' +
         '<div class="home-stat-row">' +
           '<div class="home-stat"><b>'+localeDigits(count)+'</b><span>'+t('statMembers')+'</span></div>' +
@@ -1420,6 +1449,11 @@
     if(meterCard){
       meterCard.onclick = function(){ showCompleteness(); };
       meterCard.onkeydown = function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); showCompleteness(); } };
+    }
+    var fsw = document.getElementById('familySwitcher');
+    if(fsw && window.__ftCloud && window.__ftCloud.listMemberships){
+      fsw.onclick = showMyFamilies;
+      fsw.onkeydown = function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); showMyFamilies(); } };
     }
     wireOccasionsCard(host);
 
@@ -1553,6 +1587,55 @@
     }
     return '<div class="charts-wrap">'+out+'</div>';
   }
+  // ---- Multi-family: "my families" sheet (list / switch / create / join) ----
+  function famLabel(fam){ var n = fam && (fam[state.lang] || fam.ar || fam.en); return (n && n.trim()) ? n : t('unnamedFamily'); }
+  function showMyFamilies(){
+    if(!(window.__ftCloud && window.__ftCloud.listMemberships)) return;
+    var mems = window.__ftCloud.listMemberships();
+    var active = window.__ftCloud.getActiveTreeId();
+    var rows = mems.map(function(m){
+      var isActive = m.treeId === active;
+      return '<button class="fam-item'+(isActive?' active':'')+'" data-tree="'+escapeHtml(m.treeId)+'">' +
+               '<span class="fam-item-name">'+escapeHtml(famLabel(m.familyName))+'</span>' +
+               '<span class="fam-item-role">'+t('role_'+m.role)+'</span>' +
+               (isActive?'<span class="fam-item-active">●</span>':'') +
+             '</button>';
+    }).join('');
+    openSheet('<h3>'+t('myFamiliesTitle')+'</h3>' +
+      '<div class="fam-list">'+rows+'</div>' +
+      '<button class="primary-btn" id="fam_create" style="margin-top:12px;">＋ '+t('createFamilyBtn')+'</button>' +
+      '<button class="primary-btn" id="fam_join" style="margin-top:10px; background:var(--teal);">🔗 '+t('joinFamilyBtn')+'</button>');
+    var sheet = document.getElementById('sheet');
+    sheet.querySelectorAll('.fam-item').forEach(function(b){
+      b.onclick = function(){ var tid = b.getAttribute('data-tree'); if(tid !== active){ closeSheet(); window.__ftCloud.switchFamily(tid); } };
+    });
+    document.getElementById('fam_create').onclick = showCreateFamily;
+    document.getElementById('fam_join').onclick = showJoinFamily;
+  }
+  function showCreateFamily(){
+    openSheet('<h3>'+t('createFamilyBtn')+'</h3>' +
+      '<div class="field"><label>'+t('familyNameArLabel')+'</label><input type="text" id="cfam_ar"></div>' +
+      '<div class="field"><label>'+t('familyNameEnLabel')+'</label><input type="text" id="cfam_en"></div>' +
+      '<button class="primary-btn" id="cfam_go">'+t('createFamilyBtn')+'</button>');
+    document.getElementById('cfam_go').onclick = function(){
+      var ar = document.getElementById('cfam_ar').value.trim(), en = document.getElementById('cfam_en').value.trim();
+      if(!ar){ toast(t('toastNameRequired')); return; }
+      closeSheet(); toast(t('creatingFamily'));
+      window.__ftCloud.createFamily({ ar: ar, en: en || ar });
+    };
+  }
+  function showJoinFamily(){
+    openSheet('<h3>'+t('joinFamilyBtn')+'</h3>' +
+      '<div class="field"><label>'+t('inviteLinkLabel')+'</label><input type="text" id="jfam_link" placeholder="'+escapeHtml(t('inviteLinkPlaceholder'))+'"></div>' +
+      '<button class="primary-btn" id="jfam_go">'+t('joinFamilyBtn')+'</button>');
+    document.getElementById('jfam_go').onclick = function(){
+      var link = document.getElementById('jfam_link').value.trim();
+      if(!link){ toast(t('errBadInvite')); return; }
+      closeSheet(); toast(t('joiningFamily'));
+      window.__ftCloud.joinFamily(link);
+    };
+  }
+
   function showStats(){
     if(!window.ftStats){ toast(t('comingSoon')); return; }
     var s = window.ftStats(state.people || {}, new Date());

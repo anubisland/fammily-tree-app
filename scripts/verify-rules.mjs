@@ -411,6 +411,23 @@ await check('signed-out user cannot read a photo doc', () =>
 await check('signed-out user cannot write a photo doc', () =>
   assertFails(setDoc(doc(anonDb, 'trees', TREE, 'photos', 'p_anon'), { data: 'x' })));
 
+// ── Memberships index (self-written; not authority) ──────────────────────
+await check('user can write their own membership index', () =>
+  assertSucceeds(setDoc(doc(ownerDb, 'users', OWNER, 'memberships', TREE),
+    { role: 'owner', familyName: { ar: 'الوزير', en: 'W' } })));
+
+await check('user can read their own membership index', () =>
+  assertSucceeds(getDoc(doc(ownerDb, 'users', OWNER, 'memberships', TREE))));
+
+await check('user cannot write ANOTHER user\'s membership index', () =>
+  assertFails(setDoc(doc(outsiderDb, 'users', OWNER, 'memberships', TREE), { role: 'owner' })));
+
+await check('user cannot read ANOTHER user\'s membership index', () =>
+  assertFails(getDoc(doc(outsiderDb, 'users', OWNER, 'memberships', TREE))));
+
+await check('signed-out cannot write a membership index', () =>
+  assertFails(setDoc(doc(testEnv.unauthenticatedContext().firestore(), 'users', OWNER, 'memberships', TREE), { role: 'owner' })));
+
 await testEnv.cleanup();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

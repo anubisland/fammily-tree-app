@@ -39,6 +39,7 @@
   var currentUid = null;
   var currentTreeId = null;
   var currentRole = null;
+  var currentMemberships = [];   // [{treeId, role, familyName}] — the "my families" list
   var unsubTree = null;
   var applyingRemote = false;
   var remoteLoaded = false;   // true once the first cloud snapshot has arrived
@@ -182,7 +183,9 @@
         // Membership create is authorised by the invite path in the rules.
         await setDoc(doc(db, 'trees', joinTreeId, 'members', cred.user.uid),
           { email: email, role: invRole, viaInvite: joinToken, joinedAt: serverTimestamp() });
-        await setDoc(doc(db, 'users', cred.user.uid), { email: email, treeId: joinTreeId });
+        await setDoc(doc(db, 'users', cred.user.uid), { email: email, treeId: joinTreeId, activeTreeId: joinTreeId });
+        await setDoc(doc(db, 'users', cred.user.uid, 'memberships', joinTreeId),
+          { role: invRole, familyName: { ar: '', en: '' }, joinedAt: serverTimestamp() });
         joined = true; // membership committed — the account is now valid, no rollback
         currentUid = cred.user.uid; currentTreeId = joinTreeId;
         currentRole = invRole;
@@ -205,7 +208,9 @@
         // Tree doc FIRST: the members bootstrap rule reads trees/{id}.createdBy.
         await setDoc(treeRef, { familyName:{ar:'',en:''}, lang:'ar', rootId:null, people:{}, createdBy: cred2.user.uid, updatedAt: serverTimestamp() });
         await setDoc(doc(db, 'trees', newCode, 'members', cred2.user.uid), { email: email, role: 'owner', joinedAt: serverTimestamp() });
-        await setDoc(doc(db, 'users', cred2.user.uid), { email: email, treeId: newCode });
+        await setDoc(doc(db, 'users', cred2.user.uid), { email: email, treeId: newCode, activeTreeId: newCode });
+        await setDoc(doc(db, 'users', cred2.user.uid, 'memberships', newCode),
+          { role: 'owner', familyName: { ar: '', en: '' }, joinedAt: serverTimestamp() });
         joined = true; // owner membership committed — no rollback
         currentUid = cred2.user.uid; currentTreeId = newCode;
         currentRole = 'owner';
@@ -250,12 +255,35 @@
     setLoading(true);
     try{
       var userSnap = await getDoc(doc(db, 'users', user.uid));
-      if(!userSnap.exists() || !userSnap.data().treeId){
+      var userData = userSnap.exists() ? userSnap.data() : {};
+      // Load the membership index (the user's trees).
+      var memSnap = await getDocs(collection(db, 'users', user.uid, 'memberships'));
+      currentMemberships = [];
+      memSnap.forEach(function(d){ currentMemberships.push(Object.assign({ treeId: d.id }, d.data())); });
+      var memIds = currentMemberships.map(function(m){ return m.treeId; });
+
+      // Legacy auto-migration: a pre-multi-family user has users/{uid}.treeId but
+      // no memberships. Seed one from their member doc so nothing breaks.
+      var seedId = window.ftMembership.needsLegacySeed(userData, memIds);
+      if(seedId){
+        var legacyMember = await getDoc(doc(db, 'trees', seedId, 'members', user.uid));
+        var legacyTree = await getDoc(doc(db, 'trees', seedId));
+        var seedRole = legacyMember.exists() ? (legacyMember.data().role || 'viewer') : 'viewer';
+        var seedFam = legacyTree.exists() ? (legacyTree.data().familyName || { ar:'', en:'' }) : { ar:'', en:'' };
+        await writeMembership(seedId, seedRole, seedFam);
+        await setDoc(doc(db, 'users', user.uid), { activeTreeId: seedId }, { merge: true });
+        currentMemberships = [{ treeId: seedId, role: seedRole, familyName: seedFam }];
+        memIds = [seedId];
+        userData.activeTreeId = seedId;
+      }
+
+      var activeId = window.ftMembership.resolveActiveTree(userData, memIds);
+      if(!activeId){
         setLoading(false);
         showErr('تعذّر العثور على عائلة مرتبطة بحسابك. تواصل مع الدعم.');
         return;
       }
-      currentTreeId = userSnap.data().treeId;
+      currentTreeId = activeId;
       var memberSnap = await getDoc(doc(db, 'trees', currentTreeId, 'members', user.uid));
       if(!memberSnap.exists()){
         // No membership => no access. Never fall through to a default role;
@@ -267,6 +295,7 @@
       }
       currentRole = memberSnap.data().role || 'viewer'; // missing role => least privilege
       window.__ftSetEditable(currentRole !== 'viewer');
+      if(window.__ftSetActiveTree) window.__ftSetActiveTree(currentTreeId);   // per-tree local store (Task 7)
       subscribeTree(currentTreeId);
       authGate.classList.add('hidden');
       cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
@@ -288,6 +317,79 @@
       showErr('تعذّر تحميل بيانات الحساب: ' + (err.message||err.code));
     }
   });
+
+  // Self-written index entry so the "my families" sheet can list this tree.
+  async function writeMembership(treeId, role, familyName){
+    await setDoc(doc(db, 'users', currentUid, 'memberships', treeId),
+      { role: role, familyName: familyName || { ar: '', en: '' }, joinedAt: serverTimestamp() });
+  }
+
+  // Create a brand-new family the signed-in user owns (no new auth account). Uses
+  // the existing bootstrap-owner rule (trees/{id}.createdBy == uid && !member).
+  async function createFamily(nameObj){
+    if(!currentUid) return;
+    try{
+      var treeRef = doc(collection(db, 'trees'));
+      var newId = treeRef.id;
+      await setDoc(treeRef, { familyName: nameObj || {ar:'',en:''}, lang: 'ar', rootId: null, people: {}, createdBy: currentUid, updatedAt: serverTimestamp() });
+      await setDoc(doc(db, 'trees', newId, 'members', currentUid), { email: (auth.currentUser&&auth.currentUser.email)||'', role: 'owner', joinedAt: serverTimestamp() });
+      await writeMembership(newId, 'owner', nameObj || {ar:'',en:''});
+      currentMemberships.push({ treeId: newId, role: 'owner', familyName: nameObj || {ar:'',en:''} });
+      await switchFamily(newId);
+    }catch(e){ console.error('createFamily failed', e && e.code, e); alert(writeErrMsg(e, t('errJoinFailed'))); }
+  }
+
+  // Join another family from inside the app via an invite link (no new auth
+  // account). Reuses the existing invite member-create rule (role != owner).
+  async function joinFamily(linkText){
+    if(!currentUid) return;
+    var raw = String(linkText || '').trim();
+    var hashIdx = raw.indexOf('#join='); if(hashIdx !== -1) raw = raw.slice(hashIdx + '#join='.length);
+    try{ raw = decodeURIComponent(raw); }catch(e){}
+    raw = raw.trim();
+    var dot = raw.indexOf('.');
+    if(dot < 1){ alert(t('errBadInvite')); return; }
+    var jTree = raw.slice(0, dot), jTok = raw.slice(dot + 1);
+    if(!jTree || !jTok || jTree.indexOf('/') !== -1 || jTok.indexOf('/') !== -1){ alert(t('errBadInvite')); return; }
+    if(currentMemberships.some(function(m){ return m.treeId === jTree; })){ await switchFamily(jTree); return; }
+    try{
+      var inv = await getDoc(doc(db, 'trees', jTree, 'invites', jTok));
+      if(!inv.exists()){ alert(t('errBadInvite')); return; }
+      var invRole = inv.data().role;
+      await setDoc(doc(db, 'trees', jTree, 'members', currentUid), { email: (auth.currentUser&&auth.currentUser.email)||'', role: invRole, viaInvite: jTok, joinedAt: serverTimestamp() });
+      var treeDoc = await getDoc(doc(db, 'trees', jTree));
+      var fam = treeDoc.exists() ? (treeDoc.data().familyName || {ar:'',en:''}) : {ar:'',en:''};
+      await writeMembership(jTree, invRole, fam);
+      currentMemberships.push({ treeId: jTree, role: invRole, familyName: fam });
+      await switchFamily(jTree);
+    }catch(e){ console.error('joinFamily failed', e && e.code, e); alert(writeErrMsg(e, t('errJoinFailed'))); }
+  }
+
+  async function setActiveTree(treeId){
+    try{ await setDoc(doc(db, 'users', currentUid), { activeTreeId: treeId }, { merge: true }); }
+    catch(e){ try{ console.warn('setActiveTree failed', e && e.code); }catch(_){} }
+  }
+  // Switch the active family: re-point authority/role from the new tree's member
+  // doc, swap the local store, resubscribe, and persist the choice.
+  async function switchFamily(treeId){
+    if(!treeId || treeId === currentTreeId) return;
+    // Read the new tree's member doc for authority. If the user was removed from
+    // that tree (stale index entry), the read is denied — surface it instead of a
+    // silent unhandled rejection, and stay on the current tree.
+    var memberSnap;
+    try{ memberSnap = await getDoc(doc(db, 'trees', treeId, 'members', currentUid)); }
+    catch(e){ console.error('switchFamily member read failed', e && e.code, e); alert(t('errNoMembership')); return; }
+    if(!memberSnap.exists()){ alert(t('errNoMembership')); return; }
+    if(unsubTree){ unsubTree(); unsubTree = null; }
+    remoteLoaded = false;
+    currentTreeId = treeId;
+    currentRole = memberSnap.data().role || 'viewer';
+    window.__ftSetEditable(currentRole !== 'viewer');
+    if(window.__ftSetActiveTree) window.__ftSetActiveTree(treeId);   // swap local store + reload
+    subscribeTree(treeId);
+    await setActiveTree(treeId);
+    if(window.__ftShowTab) window.__ftShowTab('home');
+  }
 
   function subscribeTree(treeId){
     if(unsubTree) unsubTree();
@@ -817,18 +919,28 @@
       if(!currentTreeId || applyingRemote || !remoteLoaded) return;
       clearTimeout(pushTimer);
       cloudBtn.dataset.status = 'syncing';
-      pushTimer = setTimeout(function(){ pushToCloud(state); }, 500);
+      // Bind the TARGET tree + authority at schedule time. A family switch before
+      // this debounce fires must not redirect A's edit onto tree B (cross-tree
+      // overwrite) — the push always lands on the tree that was active when edited.
+      var pushTree = currentTreeId;
+      var pushCanEdit = currentRole !== 'viewer';
+      pushTimer = setTimeout(function(){ pushToCloud(pushTree, pushCanEdit, state); }, 500);
     },
     logActivity: logActivity,
     showActivityLog: showActivityLog,
     createInvite: createInvite,
     showMembers: showMembers,
     signOut: function(){ signOut(auth); },
-    getTreeId: function(){ return currentTreeId; }
+    getTreeId: function(){ return currentTreeId; },
+    getActiveTreeId: function(){ return currentTreeId; },
+    listMemberships: function(){ return currentMemberships.slice(); },
+    createFamily: createFamily,
+    joinFamily: joinFamily,
+    switchFamily: switchFamily
   };
 
-  async function pushToCloud(state){
-    if(!currentTreeId || currentRole === 'viewer') return;
+  async function pushToCloud(treeId, canPush, state){
+    if(!treeId || !canPush) return;
     var payload = {
       familyName: state.familyName || '', lang: state.lang || 'ar',
       rootId: state.rootId || null, people: state.people || {},
@@ -836,7 +948,7 @@
     };
     var size = new Blob([JSON.stringify(payload)]).size;
     if(size > MAX_DOC_BYTES){
-      cloudBtn.dataset.status = 'offline';
+      if(treeId === currentTreeId) cloudBtn.dataset.status = 'offline';
       alert('حجم بيانات الشجرة كبير جدًا للمزامنة السحابية — قد تحتاج لتقليل حجم الصور أو عدد الأفراد. تم الحفظ محليًا فقط.');
       return;
     }
@@ -845,12 +957,13 @@
       // deleted people were kept in the cloud and synced back -- the tree could
       // never shrink. updateDoc replaces the `people`/`rootId`/… fields wholesale
       // (removed IDs are truly deleted) while leaving `createdBy` untouched, which
-      // the security rules require to stay unchanged on update.
-      await updateDoc(doc(db, 'trees', currentTreeId), payload);
-      cloudBtn.dataset.status = 'online';
+      // the security rules require to stay unchanged on update. Writes to the BOUND
+      // treeId, never the currently-active one (see onLocalSave).
+      await updateDoc(doc(db, 'trees', treeId), payload);
+      if(treeId === currentTreeId) cloudBtn.dataset.status = 'online';   // only reflect status for the active tree
       syncErrorAlerted = false;   // recovered — allow a future error to alert again
     }catch(err){
-      cloudBtn.dataset.status = 'offline';
+      if(treeId === currentTreeId) cloudBtn.dataset.status = 'offline';
       console.error('pushToCloud failed', err && (err.code || err.message), err);
       // A permanent error (permissions / missing doc) will never clear on its own,
       // so tell the user their change is only local rather than leaving them to

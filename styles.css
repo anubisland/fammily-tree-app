@@ -645,6 +645,15 @@ html.dark{ --t-stats:rgba(62,154,164,.20); --t-places:rgba(169,107,68,.22); --cl
 #tab-home .fam-row{ display:flex; align-items:center; justify-content:center; gap:9px; margin-top:8px; position:relative; z-index:1; }
 #tab-home .fam-row .crest{ width:34px; height:34px; font-size:19px; border-radius:10px; }
 #tab-home .fam-row .family-name{ font-family:var(--f-head); font-size:22px; font-weight:700; color:#DFC998; margin:0; }
+#tab-home .fam-row[role="button"]{ cursor:pointer; }
+#tab-home .fam-row .fam-caret{ color:#DFC998; font-size:14px; opacity:.85; }
+/* "My families" sheet */
+.fam-list{ display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.fam-item{ display:flex; align-items:center; gap:10px; width:100%; text-align:start; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 13px; cursor:pointer; font-family:var(--f-body); }
+.fam-item.active{ border-color:var(--emerald); background:var(--paper); }
+.fam-item-name{ flex:1; font-size:14px; font-weight:600; color:var(--ink); }
+.fam-item-role{ font-size:11.5px; color:var(--ink-soft); background:var(--paper-deep); border-radius:20px; padding:2px 9px; }
+.fam-item-active{ color:var(--emerald); font-size:12px; }
 
 /* Distinct, calm colors for the Stats and Places cards */
 #tab-home .leaf.stats{ background:var(--t-stats); border-top-color:var(--teal); }

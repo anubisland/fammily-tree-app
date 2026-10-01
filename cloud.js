@@ -39,6 +39,7 @@
   var currentUid = null;
   var currentTreeId = null;
   var currentRole = null;
+  var currentMemberships = [];   // [{treeId, role, familyName}] — the "my families" list
   var unsubTree = null;
   var applyingRemote = false;
   var remoteLoaded = false;   // true once the first cloud snapshot has arrived
@@ -254,12 +255,35 @@
     setLoading(true);
     try{
       var userSnap = await getDoc(doc(db, 'users', user.uid));
-      if(!userSnap.exists() || !userSnap.data().treeId){
+      var userData = userSnap.exists() ? userSnap.data() : {};
+      // Load the membership index (the user's trees).
+      var memSnap = await getDocs(collection(db, 'users', user.uid, 'memberships'));
+      currentMemberships = [];
+      memSnap.forEach(function(d){ currentMemberships.push(Object.assign({ treeId: d.id }, d.data())); });
+      var memIds = currentMemberships.map(function(m){ return m.treeId; });
+
+      // Legacy auto-migration: a pre-multi-family user has users/{uid}.treeId but
+      // no memberships. Seed one from their member doc so nothing breaks.
+      var seedId = window.ftMembership.needsLegacySeed(userData, memIds);
+      if(seedId){
+        var legacyMember = await getDoc(doc(db, 'trees', seedId, 'members', user.uid));
+        var legacyTree = await getDoc(doc(db, 'trees', seedId));
+        var seedRole = legacyMember.exists() ? (legacyMember.data().role || 'viewer') : 'viewer';
+        var seedFam = legacyTree.exists() ? (legacyTree.data().familyName || { ar:'', en:'' }) : { ar:'', en:'' };
+        await writeMembership(seedId, seedRole, seedFam);
+        await setDoc(doc(db, 'users', user.uid), { activeTreeId: seedId }, { merge: true });
+        currentMemberships = [{ treeId: seedId, role: seedRole, familyName: seedFam }];
+        memIds = [seedId];
+        userData.activeTreeId = seedId;
+      }
+
+      var activeId = window.ftMembership.resolveActiveTree(userData, memIds);
+      if(!activeId){
         setLoading(false);
         showErr('تعذّر العثور على عائلة مرتبطة بحسابك. تواصل مع الدعم.');
         return;
       }
-      currentTreeId = userSnap.data().treeId;
+      currentTreeId = activeId;
       var memberSnap = await getDoc(doc(db, 'trees', currentTreeId, 'members', user.uid));
       if(!memberSnap.exists()){
         // No membership => no access. Never fall through to a default role;
@@ -271,6 +295,7 @@
       }
       currentRole = memberSnap.data().role || 'viewer'; // missing role => least privilege
       window.__ftSetEditable(currentRole !== 'viewer');
+      if(window.__ftSetActiveTree) window.__ftSetActiveTree(currentTreeId);   // per-tree local store (Task 7)
       subscribeTree(currentTreeId);
       authGate.classList.add('hidden');
       cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';

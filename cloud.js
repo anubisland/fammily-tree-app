@@ -372,8 +372,13 @@
   // Switch the active family: re-point authority/role from the new tree's member
   // doc, swap the local store, resubscribe, and persist the choice.
   async function switchFamily(treeId){
-    if(!treeId) return;
-    var memberSnap = await getDoc(doc(db, 'trees', treeId, 'members', currentUid));
+    if(!treeId || treeId === currentTreeId) return;
+    // Read the new tree's member doc for authority. If the user was removed from
+    // that tree (stale index entry), the read is denied — surface it instead of a
+    // silent unhandled rejection, and stay on the current tree.
+    var memberSnap;
+    try{ memberSnap = await getDoc(doc(db, 'trees', treeId, 'members', currentUid)); }
+    catch(e){ console.error('switchFamily member read failed', e && e.code, e); alert(t('errNoMembership')); return; }
     if(!memberSnap.exists()){ alert(t('errNoMembership')); return; }
     if(unsubTree){ unsubTree(); unsubTree = null; }
     remoteLoaded = false;
@@ -914,7 +919,12 @@
       if(!currentTreeId || applyingRemote || !remoteLoaded) return;
       clearTimeout(pushTimer);
       cloudBtn.dataset.status = 'syncing';
-      pushTimer = setTimeout(function(){ pushToCloud(state); }, 500);
+      // Bind the TARGET tree + authority at schedule time. A family switch before
+      // this debounce fires must not redirect A's edit onto tree B (cross-tree
+      // overwrite) — the push always lands on the tree that was active when edited.
+      var pushTree = currentTreeId;
+      var pushCanEdit = currentRole !== 'viewer';
+      pushTimer = setTimeout(function(){ pushToCloud(pushTree, pushCanEdit, state); }, 500);
     },
     logActivity: logActivity,
     showActivityLog: showActivityLog,
@@ -929,8 +939,8 @@
     switchFamily: switchFamily
   };
 
-  async function pushToCloud(state){
-    if(!currentTreeId || currentRole === 'viewer') return;
+  async function pushToCloud(treeId, canPush, state){
+    if(!treeId || !canPush) return;
     var payload = {
       familyName: state.familyName || '', lang: state.lang || 'ar',
       rootId: state.rootId || null, people: state.people || {},
@@ -938,7 +948,7 @@
     };
     var size = new Blob([JSON.stringify(payload)]).size;
     if(size > MAX_DOC_BYTES){
-      cloudBtn.dataset.status = 'offline';
+      if(treeId === currentTreeId) cloudBtn.dataset.status = 'offline';
       alert('حجم بيانات الشجرة كبير جدًا للمزامنة السحابية — قد تحتاج لتقليل حجم الصور أو عدد الأفراد. تم الحفظ محليًا فقط.');
       return;
     }
@@ -947,12 +957,13 @@
       // deleted people were kept in the cloud and synced back -- the tree could
       // never shrink. updateDoc replaces the `people`/`rootId`/… fields wholesale
       // (removed IDs are truly deleted) while leaving `createdBy` untouched, which
-      // the security rules require to stay unchanged on update.
-      await updateDoc(doc(db, 'trees', currentTreeId), payload);
-      cloudBtn.dataset.status = 'online';
+      // the security rules require to stay unchanged on update. Writes to the BOUND
+      // treeId, never the currently-active one (see onLocalSave).
+      await updateDoc(doc(db, 'trees', treeId), payload);
+      if(treeId === currentTreeId) cloudBtn.dataset.status = 'online';   // only reflect status for the active tree
       syncErrorAlerted = false;   // recovered — allow a future error to alert again
     }catch(err){
-      cloudBtn.dataset.status = 'offline';
+      if(treeId === currentTreeId) cloudBtn.dataset.status = 'offline';
       console.error('pushToCloud failed', err && (err.code || err.message), err);
       // A permanent error (permissions / missing doc) will never clear on its own,
       // so tell the user their change is only local rather than leaving them to

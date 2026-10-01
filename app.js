@@ -2273,8 +2273,11 @@
     var myLinks = (window.__ftCloud && window.__ftCloud.listLinks)
       ? window.__ftCloud.listLinks().filter(function(l){ return l.localPersonId === id; }) : [];
     var linkBadges = myLinks.map(function(l){
-      return '<div class="prof-link-badge">🔗 '+t('linkedToFamily')+' «'+escapeHtml(famLabel(l.remoteFamilyName))+'»'+
-             (isOwnerCloud ? ' <button class="prof-link-revoke" data-link="'+escapeHtml(l.linkId)+'">'+t('linkRevokeBtn')+'</button>' : '')+'</div>';
+      return '<div class="prof-link-badge" data-view-tree="'+escapeHtml(l.remoteTreeId)+'" data-view-person="'+escapeHtml(l.remotePersonId)+'">'+
+             '🔗 '+t('linkedToFamily')+' «'+escapeHtml(famLabel(l.remoteFamilyName))+'» '+
+             '<span class="prof-link-view">'+t('linkViewBtn')+' ›</span>'+
+             (isOwnerCloud ? ' <button class="prof-link-revoke" data-link="'+escapeHtml(l.linkId)+'">'+t('linkRevokeBtn')+'</button>' : '')+
+             '</div>';
     }).join('');
     var linkBtn = isOwnerCloud
       ? '<button class="primary-btn" id="prof_link" style="background:var(--teal);">🔗 '+t('linkToFamilyBtn')+'</button>' : '';
@@ -2318,6 +2321,14 @@
     if(plink) plink.onclick = function(){ window.__ftCloud.requestLink(id, p.name, state.familyName); };
     sheetBody.querySelectorAll('.prof-link-revoke').forEach(function(b){
       b.onclick = function(){ if(confirm(t('linkRevokeConfirm'))){ window.__ftCloud.revokeLink(b.getAttribute('data-link')); closeSheet(); } };
+    });
+    sheetBody.querySelectorAll('.prof-link-badge[data-view-tree]').forEach(function(badge){
+      badge.addEventListener('click', function(e){
+        if(e.target.closest('.prof-link-revoke')) return;   // revoke handled separately
+        var tid = badge.getAttribute('data-view-tree'), pid = badge.getAttribute('data-view-person');
+        closeSheet();
+        if(window.__ftCloud && window.__ftCloud.viewLinkedTree) window.__ftCloud.viewLinkedTree(tid, pid);
+      });
     });
   }
 

@@ -172,6 +172,7 @@
   .lm-main{ font-size:13px; } .lm-sub{ color:var(--ink-soft); font-size:11px; margin-top:2px; }
   .lm-section-h{ font-size:12px; font-weight:700; color:var(--emerald); margin-bottom:4px; }
   .lm-empty{ color:var(--ink-soft); font-size:12.5px; padding:6px 0; }
+  .lm-row .mini-btn{ width:auto; height:auto; white-space:nowrap; padding:6px 11px; font-size:12px; font-weight:600; font-family:var(--f-body); flex-shrink:0; cursor:pointer; }
   .prof-body{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
   .prof-line{ font-size:13.5px; color:var(--ink); }
   .prof-dim{ color:var(--ink-soft); font-size:12px; }

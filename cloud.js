@@ -912,6 +912,24 @@
     catch(e){ prompt(t('inviteCopied'), link); }
   }
 
+  // Family link protocol (project 2). Owner A mints a pending request carrying
+  // person X's id plus denormalized display names (the approver cannot read A's
+  // people) and hands out a `#link=` token, same trust model as an invite.
+  async function requestLink(personId, personName, familyName){
+    if(!currentTreeId || currentRole !== 'owner'){ alert(t('linkOwnerOnly')); return; }
+    try{
+      var token = (doc(collection(db, 'trees', currentTreeId, 'linkRequests'))).id;
+      await setDoc(doc(db, 'trees', currentTreeId, 'linkRequests', token), {
+        localPersonId: personId, localPersonName: personName || {ar:'',en:''},
+        localFamilyName: familyName || {ar:'',en:''}, requestedBy: currentUid,
+        kind: 'same_person', createdAt: serverTimestamp()
+      });
+      var link = location.origin + location.pathname + '#link=' + currentTreeId + '.' + token;
+      try{ await navigator.clipboard.writeText(link); toast(t('linkRequestCopied')); }
+      catch(e){ prompt(t('linkRequestCopied'), link); }
+    }catch(e){ console.error('requestLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkRequestFail'))); }
+  }
+
   window.__ftCloud = {
     onLocalSave: function(state){
       // Never push before the first cloud snapshot: local state is still the empty
@@ -936,7 +954,9 @@
     listMemberships: function(){ return currentMemberships.slice(); },
     createFamily: createFamily,
     joinFamily: joinFamily,
-    switchFamily: switchFamily
+    switchFamily: switchFamily,
+    requestLink: requestLink,
+    isOwner: function(){ return currentRole === 'owner'; }
   };
 
   async function pushToCloud(treeId, canPush, state){

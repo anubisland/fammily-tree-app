@@ -266,6 +266,8 @@
     linkViewGone:{ar:'لم يعد متاحاً — ربما أُلغي الربط من الطرف الآخر', en:'No longer available — the link may have been removed by the other side'},
     linkViewOffline:{ar:'تعذّر التحميل — تحقّق من اتصالك وأعد المحاولة', en:'Couldn\'t load — check your connection and try again'},
     linkRevokePartial:{ar:'أُزيل الرابط، لكن تعذّر إلغاء وصول الطرف الآخر بالكامل — أعد المحاولة', en:'Link removed, but the other family\'s access could not be fully revoked — try again'},
+    linkReqDeleteFail:{ar:'تعذّر حذف الطلب', en:'Could not delete the request'},
+    viewerRevokeFail:{ar:'تعذّر إلغاء الوصول', en:'Could not revoke access'},
     linkViewBannerPrefix:{ar:'عرض: عائلة', en:'Viewing: family'},
     linkViewReadonly:{ar:'قراءة فقط', en:'read-only'},
     linkViewBack:{ar:'رجوع لشجرتي', en:'Back to my tree'},

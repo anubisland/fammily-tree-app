@@ -985,6 +985,7 @@
       });
       currentLinks = arr;
       if(window.__ftRenderHome) window.__ftRenderHome();
+      gcLinkRequests();   // owner-only cleanup of consumed requests
     }, function(e){
       // A transient read (offline/permission) must NOT blank existing links —
       // that made badges flicker in and out with no trace. Keep what we have and
@@ -1016,6 +1017,41 @@
       if(grantFailed) alert(t('linkRevokePartial'));   // don't claim full severance when it half-failed
       else toast(t('linkRevoked'));
     }catch(e){ console.error('revokeLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkRevokeFail'))); }
+  }
+
+  // ── Links management (project 3c), owner-only ────────────────────────────
+  async function listLinkRequests(){
+    if(currentRole !== 'owner' || !currentTreeId) return [];
+    var snap = await getDocs(collection(db, 'trees', currentTreeId, 'linkRequests'));
+    var arr = []; snap.forEach(function(d){ arr.push(Object.assign({ token: d.id }, d.data())); });
+    return arr;
+  }
+  async function deleteLinkRequest(token){
+    try{ await deleteDoc(doc(db, 'trees', currentTreeId, 'linkRequests', token)); }
+    catch(e){ console.error('deleteLinkRequest failed', e && e.code, e); alert(writeErrMsg(e, t('linkReqDeleteFail'))); throw e; }
+  }
+  async function listTreeViewers(){
+    if(currentRole !== 'owner' || !currentTreeId) return [];
+    var snap = await getDocs(collection(db, 'trees', currentTreeId, 'viewers'));
+    var arr = []; snap.forEach(function(d){ arr.push(Object.assign({ uid: d.id }, d.data())); });
+    return arr;
+  }
+  async function revokeViewer(viewerUid){
+    try{ await deleteDoc(doc(db, 'trees', currentTreeId, 'viewers', viewerUid)); }
+    catch(e){ console.error('revokeViewer failed', e && e.code, e); alert(writeErrMsg(e, t('viewerRevokeFail'))); throw e; }
+  }
+  // Drop pending requests that already produced a link (token did its job) so a
+  // re-opened #link= can't keep minting duplicate link docs. Owner-only, best-effort.
+  function gcLinkRequests(){
+    if(currentRole !== 'owner' || !currentTreeId || !window.ftLinks) return;
+    getDocs(collection(db, 'trees', currentTreeId, 'linkRequests')).then(function(snap){
+      var reqs = []; snap.forEach(function(d){ reqs.push({ token: d.id }); });
+      var tokens = window.ftLinks.requestsToGC(reqs, currentLinks);
+      tokens.forEach(function(tok){
+        deleteDoc(doc(db, 'trees', currentTreeId, 'linkRequests', tok))
+          .catch(function(e){ console.error('gc request failed', e && e.code); });
+      });
+    }, function(e){ console.error('gc list failed', e && e.code); });
   }
 
   // Open a linked tree read-only (project 3a): read it once (the viewer grant
@@ -1093,6 +1129,10 @@
     approveLink: approveLink,
     revokeLink: revokeLink,
     viewLinkedTree: viewLinkedTree,
+    listLinkRequests: listLinkRequests,
+    deleteLinkRequest: deleteLinkRequest,
+    listTreeViewers: listTreeViewers,
+    revokeViewer: revokeViewer,
     listLinks: function(){ return currentLinks.slice(); },
     isOwner: function(){ return currentRole === 'owner'; }
   };

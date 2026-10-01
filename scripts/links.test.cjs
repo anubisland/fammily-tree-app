@@ -21,4 +21,11 @@ ok(p.bSide.viaRequest===undefined, 'B side has no viaRequest');
 ok(p.bSide.remoteFamilyName.ar==='الوزير', 'B side shows A family name');
 ok(p.aSide.kind==='same_person' && p.aSide.status==='accepted' && p.aSide.grantedScope==='view_tree', 'A side constants');
 ok(p.bSide.approvedBy==='uidB' && p.bSide.requestedBy==='uidA', 'both record approver+requester');
+// buildViewerGrants
+var g = L.buildViewerGrants({ treeId:'A', token:'tk', requestedBy:'uidA' }, 'B', 'uidB');
+ok(g.onRequestTree.treeId==='A' && g.onRequestTree.uid==='uidB', 'request-tree grant: on A, for B');
+ok(g.onRequestTree.data.viaRequest==='tk' && g.onRequestTree.data.remoteTreeId==='B', 'request-tree grant carries viaRequest + remote=B');
+ok(g.onApproveTree.treeId==='B' && g.onApproveTree.uid==='uidA', 'approve-tree grant: on B, for A');
+ok(g.onApproveTree.data.viaRequest===undefined && g.onApproveTree.data.remoteTreeId==='A', 'approve-tree grant has no viaRequest, remote=A');
+ok(g.onApproveTree.data.grantedBy==='uidB' && g.onRequestTree.data.grantedBy==='uidB', 'both record approver as grantedBy');
 console.log(pass+' passed, '+fail+' failed'); process.exit(fail?1:0);

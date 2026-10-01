@@ -2278,6 +2278,34 @@
     });
   }
 
+  // Approver sheet (project 2): owner B sees who A wants to link, searches their
+  // own tree for the matching person Y, confirms, and approveLink mirrors both
+  // sides. Called by cloud.js when a signed-in owner opens a `#link=` token.
+  window.__ftOpenLinkApproval = function(req){
+    if(!(window.__ftCloud && window.__ftCloud.isOwner && window.__ftCloud.isOwner())){ toast(t('linkOwnerOnly')); return; }
+    openSheet('<h3>'+t('linkApproveTitle')+'</h3>'+
+      '<div class="context">'+tf('linkApproveIntro', { name: escapeHtml(famLabel(req.localPersonName)), family: escapeHtml(famLabel(req.localFamilyName)) })+'</div>'+
+      '<div class="field"><input type="text" id="lk_search" placeholder="'+escapeHtml(t('linkPickPerson'))+'"></div>'+
+      '<div class="lk-results" id="lk_results"></div>');
+    var input = document.getElementById('lk_search'), results = document.getElementById('lk_results');
+    input.addEventListener('input', function(){
+      var q = this.value.trim().toLowerCase(); results.innerHTML = '';
+      if(!q) return;
+      var ids = Object.keys(state.people).filter(function(pid){ return fullNameOf(state.people[pid]).toLowerCase().indexOf(q) !== -1; }).slice(0, 8);
+      results.innerHTML = ids.map(function(pid){ return '<button class="lk-result" data-id="'+escapeHtml(pid)+'">'+escapeHtml(fullNameOf(state.people[pid]))+'</button>'; }).join('');
+      results.querySelectorAll('.lk-result').forEach(function(b){
+        b.onclick = function(){
+          var yid = b.getAttribute('data-id');
+          if(!confirm(tf('linkConfirm', { y: fullNameOf(state.people[yid]), x: famLabel(req.localPersonName) }))) return;
+          closeSheet();
+          window.__ftCloud.approveLink(req, yid, state.familyName);
+          try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}   // clear #link=
+        };
+      });
+    });
+    input.focus();
+  };
+
   // Copy a person's full name (already the nasab as typed) + family name for
   // sharing (e.g. in WhatsApp). Clipboard API with a hidden-textarea fallback for
   // older in-app webviews where navigator.clipboard is unavailable.

@@ -301,6 +301,7 @@
       cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
       showAppShell();
       setLoading(false);
+      maybeHandleLinkHash();   // a #link= opened while signed out, now that we're in
       /* Log a login at most once per member per day — onAuthStateChanged also
          fires on hourly token refresh, which would otherwise spam the log. */
       (function(){
@@ -971,6 +972,25 @@
       toast(t('linkRevoked'));
     }catch(e){ console.error('revokeLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkRevokeFail'))); }
   }
+
+  // Approver side: a logged-in owner opens a `#link=` → read the pending request
+  // by token → hand it to the app's approval sheet. Guarded so the hourly
+  // onAuthStateChanged token refresh (which re-runs the success block) can't
+  // re-open the sheet for a hash already handled.
+  var lastLinkHashHandled = null;
+  function maybeHandleLinkHash(){
+    if(!currentUid) return;
+    var h = location.hash || '';
+    var p = window.ftLinks ? window.ftLinks.parseLinkHash(h) : null;
+    if(!p || h === lastLinkHashHandled) return;
+    lastLinkHashHandled = h;
+    readLinkRequest(p.treeId, p.token).then(function(req){
+      if(!req){ alert(t('linkReqNotFound')); return; }
+      if(req.treeId === currentTreeId){ alert(t('linkSameTree')); return; }
+      if(window.__ftOpenLinkApproval) window.__ftOpenLinkApproval(req);
+    }, function(e){ console.error('readLinkRequest failed', e && e.code, e); alert(t('linkReqNotFound')); });
+  }
+  window.addEventListener('hashchange', maybeHandleLinkHash);
 
   window.__ftCloud = {
     onLocalSave: function(state){

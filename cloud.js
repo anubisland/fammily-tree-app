@@ -1027,6 +1027,7 @@
     return arr;
   }
   async function deleteLinkRequest(token){
+    if(currentRole !== 'owner' || !currentTreeId) return;   // server enforces isOwner too
     try{ await deleteDoc(doc(db, 'trees', currentTreeId, 'linkRequests', token)); }
     catch(e){ console.error('deleteLinkRequest failed', e && e.code, e); alert(writeErrMsg(e, t('linkReqDeleteFail'))); throw e; }
   }
@@ -1037,6 +1038,7 @@
     return arr;
   }
   async function revokeViewer(viewerUid){
+    if(currentRole !== 'owner' || !currentTreeId) return;   // server enforces isOwner too
     try{ await deleteDoc(doc(db, 'trees', currentTreeId, 'viewers', viewerUid)); }
     catch(e){ console.error('revokeViewer failed', e && e.code, e); alert(writeErrMsg(e, t('viewerRevokeFail'))); throw e; }
   }

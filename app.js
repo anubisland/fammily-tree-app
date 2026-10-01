@@ -2884,7 +2884,8 @@
       (canEditCloud ? '<button class="primary-btn" id="mn_hidden" style="margin-bottom:10px; background:var(--plum);">'+t('menuHidden')+'</button>' : '') +
       (canEditCloud ? '<button class="primary-btn" id="mn_deceased" style="margin-bottom:10px; background:var(--ink-soft);">'+t('menuMarkDeceased')+'</button>' : '') +
       (canEditCloud ? '<button class="primary-btn" id="mn_reset" style="background:var(--danger);">'+t('menuReset')+'</button>' : '') +
-      (canEditCloud && window.__ftCloud ? '<button class="primary-btn" id="mn_invite" style="margin-top:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '')
+      (canEditCloud && window.__ftCloud ? '<button class="primary-btn" id="mn_invite" style="margin-top:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '') +
+      (window.__ftCloud && window.__ftCloud.isOwner && window.__ftCloud.isOwner() ? '<button class="primary-btn" id="mn_links" style="margin-top:10px; background:var(--plum);">🔗 '+t('linksMgrTitle')+'</button>' : '')
     );
     document.getElementById('mn_image').onclick = function(){ exportTreeImage(); };
     document.getElementById('mn_export').onclick = function(){ closeSheet(); document.getElementById('exportBtn').click(); };
@@ -2898,6 +2899,8 @@
       var invBtn = document.getElementById('mn_invite');
       if(invBtn) invBtn.onclick = function(){ closeSheet(); window.__ftCloud.createInvite('editor'); };
     }
+    var lmBtn = document.getElementById('mn_links');
+    if(lmBtn) lmBtn.onclick = function(){ if(window.__ftCloud && window.__ftCloud.showLinksManager) window.__ftCloud.showLinksManager(); };
   });
 
   function applyZoom(){

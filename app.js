@@ -394,7 +394,25 @@
   }
 
   /* ============== State ============== */
-  var STORAGE_KEY = "family-tree:data";
+  var STORAGE_BASE = "family-tree:data";
+  var STORAGE_KEY = STORAGE_BASE;   // becomes per-tree once the active tree is known
+  // Point the local store at a specific tree's slot and reload. Called by cloud.js
+  // on auth-load and on family switch, so each tree keeps its own offline copy.
+  window.__ftSetActiveTree = function(treeId){
+    if(!treeId) return;
+    var newKey = STORAGE_BASE + ':' + treeId;
+    try{
+      // One-time migration of the legacy shared slot into this tree's slot.
+      if(!localStorage.getItem(newKey) && localStorage.getItem(STORAGE_BASE)){
+        localStorage.setItem(newKey, localStorage.getItem(STORAGE_BASE));
+        localStorage.removeItem(STORAGE_BASE);
+      }
+    }catch(e){}
+    STORAGE_KEY = newKey;
+    load();     // reload state from this tree's local slot (cloud snapshot will refine)
+    render();
+    if(window.__ftRenderHome) window.__ftRenderHome();
+  };
   var state = { rootId: null, familyName: "", people: {}, lang: 'ar' };
   var zoom = 1;
   var saveTimer = null;

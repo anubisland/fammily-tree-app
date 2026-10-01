@@ -365,6 +365,27 @@
     }catch(e){ console.error('joinFamily failed', e && e.code, e); alert(writeErrMsg(e, t('errJoinFailed'))); }
   }
 
+  async function setActiveTree(treeId){
+    try{ await setDoc(doc(db, 'users', currentUid), { activeTreeId: treeId }, { merge: true }); }
+    catch(e){ try{ console.warn('setActiveTree failed', e && e.code); }catch(_){} }
+  }
+  // Switch the active family: re-point authority/role from the new tree's member
+  // doc, swap the local store, resubscribe, and persist the choice.
+  async function switchFamily(treeId){
+    if(!treeId) return;
+    var memberSnap = await getDoc(doc(db, 'trees', treeId, 'members', currentUid));
+    if(!memberSnap.exists()){ alert(t('errNoMembership')); return; }
+    if(unsubTree){ unsubTree(); unsubTree = null; }
+    remoteLoaded = false;
+    currentTreeId = treeId;
+    currentRole = memberSnap.data().role || 'viewer';
+    window.__ftSetEditable(currentRole !== 'viewer');
+    if(window.__ftSetActiveTree) window.__ftSetActiveTree(treeId);   // swap local store + reload
+    subscribeTree(treeId);
+    await setActiveTree(treeId);
+    if(window.__ftShowTab) window.__ftShowTab('home');
+  }
+
   function subscribeTree(treeId){
     if(unsubTree) unsubTree();
     unsubTree = onSnapshot(doc(db, 'trees', treeId), function(snap){

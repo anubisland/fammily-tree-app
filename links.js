@@ -40,7 +40,17 @@
     };
   }
 
-  var api = { parseLinkHash: parseLinkHash, buildLinkPair: buildLinkPair, buildViewerGrants: buildViewerGrants };
+  // Owner-side cleanup (project 3c): tokens of pending requests that already
+  // produced a link (link.viaRequest === request.token), so they can be deleted
+  // to stop a re-opened #link= from minting duplicate link docs.
+  function requestsToGC(requests, links){
+    requests = requests || []; links = links || [];
+    var used = {};
+    links.forEach(function(l){ if(l && l.viaRequest) used[l.viaRequest] = true; });
+    return requests.filter(function(r){ return r && used[r.token]; }).map(function(r){ return r.token; });
+  }
+
+  var api = { parseLinkHash: parseLinkHash, buildLinkPair: buildLinkPair, buildViewerGrants: buildViewerGrants, requestsToGC: requestsToGC };
   if(typeof module !== 'undefined' && module.exports) module.exports = api;
   global.ftLinks = api;
 })(typeof window !== 'undefined' ? window : globalThis);

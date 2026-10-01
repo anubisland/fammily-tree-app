@@ -6,7 +6,7 @@
   import {
     getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
     doc, getDoc, setDoc, onSnapshot, serverTimestamp,
-    collection, addDoc, getDocs, query, orderBy, limit, deleteDoc, updateDoc
+    collection, addDoc, getDocs, query, orderBy, limit, deleteDoc, updateDoc, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
   import { makePhotoApi } from "./photos.js";
 
@@ -51,6 +51,9 @@
      Falls back to the key so a missing bridge never throws. */
   function t(key){ return (window.__ftT ? window.__ftT(key) : key); }
   function tf(key, vars){ return (window.__ftTf ? window.__ftTf(key, vars) : key); }
+  // toast lives in app.js's IIFE; bridge it so a bare toast() here never throws
+  // (an unhandled ReferenceError after a successful write would read as a failure).
+  function toast(msg){ if(window.__ftToast) window.__ftToast(msg); }
 
   var authGate = document.getElementById('authGate');
   /* The banner cloud/sync button was removed (its account + sync actions live in
@@ -941,28 +944,46 @@
     return Object.assign({ treeId: reqTreeId, token: token }, snap.data());
   }
 
-  // Owner B approves: one shared linkId, mirrored on both trees. B's own copy is
-  // written first (by ownership); A's copy second (authorised by the pending
-  // request). If the second write fails, one revocable copy remains — never a
-  // silent half-state.
+  // Owner B approves: one shared linkId, mirrored on both trees. Both copies are
+  // written in a single atomic writeBatch — Firestore commits all-or-nothing and
+  // evaluates each write against its own rule (B's by ownership, A's by the
+  // pending request), so a partial/one-sided link can never persist. Returns a
+  // success boolean so the caller only clears the #link= hash on success.
   async function approveLink(req, remotePersonId, remoteFamilyName){
-    if(!currentTreeId || currentRole !== 'owner'){ alert(t('linkOwnerOnly')); return; }
+    if(!currentTreeId || currentRole !== 'owner'){ alert(t('linkOwnerOnly')); return false; }
+    if(!window.ftLinks){ console.error('approveLink: ftLinks unavailable'); alert(t('linkApproveFail')); return false; }
     try{
       var linkId = (doc(collection(db, 'trees', currentTreeId, 'links'))).id;
       var pair = window.ftLinks.buildLinkPair(req, currentTreeId, remotePersonId, remoteFamilyName, currentUid, linkId);
-      await setDoc(doc(db, 'trees', currentTreeId, 'links', linkId), Object.assign({ createdAt: serverTimestamp() }, pair.bSide));
-      await setDoc(doc(db, 'trees', req.treeId, 'links', linkId), Object.assign({ createdAt: serverTimestamp() }, pair.aSide));
+      var batch = writeBatch(db);
+      batch.set(doc(db, 'trees', currentTreeId, 'links', linkId), Object.assign({ createdAt: serverTimestamp() }, pair.bSide));
+      batch.set(doc(db, 'trees', req.treeId, 'links', linkId), Object.assign({ createdAt: serverTimestamp() }, pair.aSide));
+      await batch.commit();
       loadLinks();
       toast(t('linkApproved'));
-    }catch(e){ console.error('approveLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkApproveFail'))); }
+      return true;
+    }catch(e){ console.error('approveLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkApproveFail'))); return false; }
   }
 
   function loadLinks(){
     if(!currentTreeId){ currentLinks = []; return; }
     getDocs(collection(db, 'trees', currentTreeId, 'links')).then(function(snap){
-      currentLinks = []; snap.forEach(function(d){ currentLinks.push(Object.assign({ linkId: d.id }, d.data())); });
+      // Dedup by the relationship (same person ↔ same remote person/tree): a
+      // re-approved request can mint extra link docs with new ids; show one badge.
+      var seen = {}, arr = [];
+      snap.forEach(function(d){
+        var l = Object.assign({ linkId: d.id }, d.data());
+        var k = l.localPersonId + '|' + l.remoteTreeId + '|' + l.remotePersonId;
+        if(seen[k]) return; seen[k] = true; arr.push(l);
+      });
+      currentLinks = arr;
       if(window.__ftRenderHome) window.__ftRenderHome();
-    }, function(){ currentLinks = []; });
+    }, function(e){
+      // A transient read (offline/permission) must NOT blank existing links —
+      // that made badges flicker in and out with no trace. Keep what we have and
+      // log; switchFamily already resets currentLinks on a real tree change.
+      console.error('loadLinks failed', e && e.code, e);
+    });
   }
 
   async function revokeLink(linkId){
@@ -983,12 +1004,18 @@
     var h = location.hash || '';
     var p = window.ftLinks ? window.ftLinks.parseLinkHash(h) : null;
     if(!p || h === lastLinkHashHandled) return;
-    lastLinkHashHandled = h;
     readLinkRequest(p.treeId, p.token).then(function(req){
+      lastLinkHashHandled = h;   // mark handled only once the read actually resolved
       if(!req){ alert(t('linkReqNotFound')); return; }
       if(req.treeId === currentTreeId){ alert(t('linkSameTree')); return; }
       if(window.__ftOpenLinkApproval) window.__ftOpenLinkApproval(req);
-    }, function(e){ console.error('readLinkRequest failed', e && e.code, e); alert(t('linkReqNotFound')); });
+    }, function(e){
+      // Transient failure (offline/permission): do NOT set the guard, so a retry
+      // (hashchange or the next auth refresh) can re-attempt. "Not found" would be
+      // a lie here, so surface the offline/permission message instead.
+      console.error('readLinkRequest failed', e && e.code, e);
+      alert(writeErrMsg(e, t('linkReqNotFound')));
+    });
   }
   window.addEventListener('hashchange', maybeHandleLinkHash);
 

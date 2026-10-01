@@ -377,6 +377,7 @@
   }
   // Expose translation to the cloud.js ES module (which can't see this IIFE scope).
   window.__ftT = t; window.__ftTf = tf;
+  window.__ftToast = function(m){ toast(m); };   // cloud.js (ES module) can't see this IIFE scope
   function genLabel(depth){
     var arr = genLabelsMap[state.lang];
     return arr[depth] || (t('statGenerations') + ' ' + (depth+1));
@@ -2297,9 +2298,14 @@
         b.onclick = function(){
           var yid = b.getAttribute('data-id');
           if(!confirm(tf('linkConfirm', { y: fullNameOf(state.people[yid]), x: famLabel(req.localPersonName) }))) return;
-          closeSheet();
-          window.__ftCloud.approveLink(req, yid, state.familyName);
-          try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}   // clear #link=
+          // Only close the sheet and clear #link= once the write actually succeeds;
+          // on failure approveLink has already alerted and the sheet stays open to retry.
+          window.__ftCloud.approveLink(req, yid, state.familyName).then(function(ok){
+            if(ok){
+              closeSheet();
+              try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}
+            }
+          });
         };
       });
     });

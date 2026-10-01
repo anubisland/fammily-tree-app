@@ -244,6 +244,24 @@
     joiningFamily:{ar:'جارِ الانضمام…', en:'Joining…'},
     menuInvite:{ar:'➕ دعوة فرد للعائلة', en:'➕ Invite a family member'},
     inviteCopied:{ar:'تم نسخ رابط الدعوة', en:'Invite link copied'},
+    // ── Family link protocol (project 2) ──────────────────────────────────
+    linkOwnerOnly:{ar:'الربط بعائلة أخرى متاح لمالك الشجرة فقط', en:'Only the tree owner can link to another family'},
+    linkRequestCopied:{ar:'نُسخ رابط طلب الربط — أرسله لمالك العائلة الأخرى', en:'Link request copied — send it to the other family\'s owner'},
+    linkRequestFail:{ar:'تعذّر إنشاء طلب الربط', en:'Could not create the link request'},
+    linkApproved:{ar:'تمّ الربط ✓', en:'Linked ✓'},
+    linkApproveFail:{ar:'تعذّرت الموافقة على الربط', en:'Could not approve the link'},
+    linkRevoked:{ar:'أُلغي الربط', en:'Link removed'},
+    linkRevokeFail:{ar:'تعذّر إلغاء الربط', en:'Could not remove the link'},
+    linkToFamilyBtn:{ar:'ربط بعائلة أخرى', en:'Link to another family'},
+    linkedToFamily:{ar:'مرتبط بعائلة', en:'Linked to family'},
+    linkRevokeBtn:{ar:'إلغاء', en:'Unlink'},
+    linkRevokeConfirm:{ar:'إلغاء هذا الربط؟', en:'Remove this link?'},
+    linkReqNotFound:{ar:'طلب الربط غير موجود أو انتهى', en:'Link request not found or expired'},
+    linkSameTree:{ar:'هذا الطلب من شجرتك نفسها', en:'This request is from your own tree'},
+    linkApproveTitle:{ar:'طلب ربط عائلة', en:'Family link request'},
+    linkApproveIntro:{ar:'عائلة «{family}» تطلب ربط «{name}» بشخص في شجرتك. اختر الشخص المقابل:', en:'Family "{family}" asks to link "{name}" to someone in your tree. Pick the matching person:'},
+    linkPickPerson:{ar:'ابحث عن الشخص المقابل…', en:'Search for the matching person…'},
+    linkConfirm:{ar:'ربط «{y}» في شجرتك بـ«{x}» في العائلة الأخرى؟', en:'Link "{y}" in your tree to "{x}" in the other family?'},
     joinCodePh:{ar:'الصق رابط الدعوة هنا', en:'Paste the invite link here'},
     inviteShareHint:{ar:'لدعوة أحد أفراد العائلة، أنشئ رابط دعوة وأرسله له', en:'To add a family member, generate an invite link and send it to them'},
     errNoMembership:{ar:'حسابك ليس عضوًا في هذه العائلة. اطلب رابط دعوة من مالك الشجرة.', en:'Your account is not a member of this family. Ask the tree owner for an invite link.'},
@@ -359,6 +377,7 @@
   }
   // Expose translation to the cloud.js ES module (which can't see this IIFE scope).
   window.__ftT = t; window.__ftTf = tf;
+  window.__ftToast = function(m){ toast(m); };   // cloud.js (ES module) can't see this IIFE scope
   function genLabel(depth){
     var arr = genLabelsMap[state.lang];
     return arr[depth] || (t('statGenerations') + ' ' + (depth+1));
@@ -2206,6 +2225,17 @@
     if(p.bio) lines += '<div class="prof-bio">'+escapeHtml(p.bio)+'</div>';
     var spouses = (p.spouseIds||[]).map(getPerson);
     var children = (p.childrenIds||[]).map(getPerson);
+    // Family links (project 2): owner-only create + revoke; a linked badge shows
+    // which other family this person is tied to, for every member to see.
+    var isOwnerCloud = !!(window.__ftCloud && window.__ftCloud.isOwner && window.__ftCloud.isOwner());
+    var myLinks = (window.__ftCloud && window.__ftCloud.listLinks)
+      ? window.__ftCloud.listLinks().filter(function(l){ return l.localPersonId === id; }) : [];
+    var linkBadges = myLinks.map(function(l){
+      return '<div class="prof-link-badge">🔗 '+t('linkedToFamily')+' «'+escapeHtml(famLabel(l.remoteFamilyName))+'»'+
+             (isOwnerCloud ? ' <button class="prof-link-revoke" data-link="'+escapeHtml(l.linkId)+'">'+t('linkRevokeBtn')+'</button>' : '')+'</div>';
+    }).join('');
+    var linkBtn = isOwnerCloud
+      ? '<button class="primary-btn" id="prof_link" style="background:var(--teal);">🔗 '+t('linkToFamilyBtn')+'</button>' : '';
     var actions = canEditCloud
       ? '<button class="primary-btn" id="prof_edit">✎ '+t('profileEdit')+'</button>'+
         '<button class="primary-btn" id="prof_addchild" style="background:var(--teal);">＋ '+t('profileAddChild')+'</button>'
@@ -2220,6 +2250,7 @@
           '<button class="prof-nasab-copy" id="prof_copy">📋 '+t('nasabCopyBtn')+'</button></div>'+
         '<div class="prof-nasab-text" id="prof_nasab_text">'+escapeHtml(nasabChain(id))+'</div>'+
       '</div>'+
+      (linkBadges ? '<div class="prof-links">'+linkBadges+'</div>' : '')+
       '<div class="prof-body">'+ (lines||'') +
         relRow('relFather', [fatherOfPerson(p)]) +
         relRow('relMother', [motherOfPerson(p)]) +
@@ -2230,6 +2261,7 @@
         '<button class="primary-btn" id="prof_center" style="background:var(--emerald);">🎯 '+t('profileCenter')+'</button>'+
         '<button class="primary-btn" id="prof_kin" style="background:var(--plum);">🔗 '+t('profileKinship')+'</button>'+
         '<button class="primary-btn" id="prof_share" style="background:var(--gold);">📤 '+t('profileShare')+'</button>'+
+        linkBtn+
       '</div>'
     );
     fillPhotoRefs(document.getElementById('sheet'));   // resolve profile avatar + relatives' Storage photos
@@ -2240,7 +2272,45 @@
     var pc = document.getElementById('prof_center'); if(pc) pc.onclick = function(){ centerTreeOn(id); };
     document.getElementById('prof_kin').onclick = function(){ closeSheet(); startKinship(); };
     document.getElementById('prof_share').onclick = function(){ shareProfileImage(id); };
+    var plink = document.getElementById('prof_link');
+    if(plink) plink.onclick = function(){ window.__ftCloud.requestLink(id, p.name, state.familyName); };
+    sheetBody.querySelectorAll('.prof-link-revoke').forEach(function(b){
+      b.onclick = function(){ if(confirm(t('linkRevokeConfirm'))){ window.__ftCloud.revokeLink(b.getAttribute('data-link')); closeSheet(); } };
+    });
   }
+
+  // Approver sheet (project 2): owner B sees who A wants to link, searches their
+  // own tree for the matching person Y, confirms, and approveLink mirrors both
+  // sides. Called by cloud.js when a signed-in owner opens a `#link=` token.
+  window.__ftOpenLinkApproval = function(req){
+    if(!(window.__ftCloud && window.__ftCloud.isOwner && window.__ftCloud.isOwner())){ toast(t('linkOwnerOnly')); return; }
+    openSheet('<h3>'+t('linkApproveTitle')+'</h3>'+
+      '<div class="context">'+tf('linkApproveIntro', { name: escapeHtml(famLabel(req.localPersonName)), family: escapeHtml(famLabel(req.localFamilyName)) })+'</div>'+
+      '<div class="field"><input type="text" id="lk_search" placeholder="'+escapeHtml(t('linkPickPerson'))+'"></div>'+
+      '<div class="lk-results" id="lk_results"></div>');
+    var input = document.getElementById('lk_search'), results = document.getElementById('lk_results');
+    input.addEventListener('input', function(){
+      var q = this.value.trim().toLowerCase(); results.innerHTML = '';
+      if(!q) return;
+      var ids = Object.keys(state.people).filter(function(pid){ return fullNameOf(state.people[pid]).toLowerCase().indexOf(q) !== -1; }).slice(0, 8);
+      results.innerHTML = ids.map(function(pid){ return '<button class="lk-result" data-id="'+escapeHtml(pid)+'">'+escapeHtml(fullNameOf(state.people[pid]))+'</button>'; }).join('');
+      results.querySelectorAll('.lk-result').forEach(function(b){
+        b.onclick = function(){
+          var yid = b.getAttribute('data-id');
+          if(!confirm(tf('linkConfirm', { y: fullNameOf(state.people[yid]), x: famLabel(req.localPersonName) }))) return;
+          // Only close the sheet and clear #link= once the write actually succeeds;
+          // on failure approveLink has already alerted and the sheet stays open to retry.
+          window.__ftCloud.approveLink(req, yid, state.familyName).then(function(ok){
+            if(ok){
+              closeSheet();
+              try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}
+            }
+          });
+        };
+      });
+    });
+    input.focus();
+  };
 
   // Copy a person's full name (already the nasab as typed) + family name for
   // sharing (e.g. in WhatsApp). Clipboard API with a hidden-textarea fallback for

@@ -6,7 +6,7 @@
   import {
     getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
     doc, getDoc, setDoc, onSnapshot, serverTimestamp,
-    collection, addDoc, getDocs, query, orderBy, limit, deleteDoc, updateDoc
+    collection, addDoc, getDocs, query, orderBy, limit, deleteDoc, updateDoc, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
   import { makePhotoApi } from "./photos.js";
 
@@ -51,6 +51,9 @@
      Falls back to the key so a missing bridge never throws. */
   function t(key){ return (window.__ftT ? window.__ftT(key) : key); }
   function tf(key, vars){ return (window.__ftTf ? window.__ftTf(key, vars) : key); }
+  // toast lives in app.js's IIFE; bridge it so a bare toast() here never throws
+  // (an unhandled ReferenceError after a successful write would read as a failure).
+  function toast(msg){ if(window.__ftToast) window.__ftToast(msg); }
 
   var authGate = document.getElementById('authGate');
   /* The banner cloud/sync button was removed (its account + sync actions live in
@@ -301,6 +304,7 @@
       cloudBtn.style.display = 'flex'; cloudBtn.title = (auth.currentUser && auth.currentUser.email) || ''; document.getElementById('momentsOpenBtn').style.display = 'flex';
       showAppShell();
       setLoading(false);
+      maybeHandleLinkHash();   // a #link= opened while signed out, now that we're in
       /* Log a login at most once per member per day — onAuthStateChanged also
          fires on hourly token refresh, which would otherwise spam the log. */
       (function(){
@@ -382,6 +386,7 @@
     if(!memberSnap.exists()){ alert(t('errNoMembership')); return; }
     if(unsubTree){ unsubTree(); unsubTree = null; }
     remoteLoaded = false;
+    currentLinks = [];   // drop the old tree's links until the new tree's load
     currentTreeId = treeId;
     currentRole = memberSnap.data().role || 'viewer';
     window.__ftSetEditable(currentRole !== 'viewer');
@@ -408,6 +413,7 @@
       // so no per-doc signal) — drop the photo cache so it re-reads fresh.
       if(window.__ftPhotos && window.__ftPhotos.invalidateCache) window.__ftPhotos.invalidateCache();
       maybeMigratePhotos();
+      loadLinks();
     }, function(){
       cloudBtn.dataset.status = 'offline';
     });
@@ -912,6 +918,107 @@
     catch(e){ prompt(t('inviteCopied'), link); }
   }
 
+  // Family link protocol (project 2). Owner A mints a pending request carrying
+  // person X's id plus denormalized display names (the approver cannot read A's
+  // people) and hands out a `#link=` token, same trust model as an invite.
+  async function requestLink(personId, personName, familyName){
+    if(!currentTreeId || currentRole !== 'owner'){ alert(t('linkOwnerOnly')); return; }
+    try{
+      var token = (doc(collection(db, 'trees', currentTreeId, 'linkRequests'))).id;
+      await setDoc(doc(db, 'trees', currentTreeId, 'linkRequests', token), {
+        localPersonId: personId, localPersonName: personName || {ar:'',en:''},
+        localFamilyName: familyName || {ar:'',en:''}, requestedBy: currentUid,
+        kind: 'same_person', createdAt: serverTimestamp()
+      });
+      var link = location.origin + location.pathname + '#link=' + currentTreeId + '.' + token;
+      try{ await navigator.clipboard.writeText(link); toast(t('linkRequestCopied')); }
+      catch(e){ prompt(t('linkRequestCopied'), link); }
+    }catch(e){ console.error('requestLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkRequestFail'))); }
+  }
+
+  var currentLinks = [];   // [{linkId, ...link}] for the active tree
+
+  async function readLinkRequest(reqTreeId, token){
+    var snap = await getDoc(doc(db, 'trees', reqTreeId, 'linkRequests', token));
+    if(!snap.exists()) return null;
+    return Object.assign({ treeId: reqTreeId, token: token }, snap.data());
+  }
+
+  // Owner B approves: one shared linkId, mirrored on both trees. Both copies are
+  // written in a single atomic writeBatch — Firestore commits all-or-nothing and
+  // evaluates each write against its own rule (B's by ownership, A's by the
+  // pending request), so a partial/one-sided link can never persist. Returns a
+  // success boolean so the caller only clears the #link= hash on success.
+  async function approveLink(req, remotePersonId, remoteFamilyName){
+    if(!currentTreeId || currentRole !== 'owner'){ alert(t('linkOwnerOnly')); return false; }
+    if(!window.ftLinks){ console.error('approveLink: ftLinks unavailable'); alert(t('linkApproveFail')); return false; }
+    try{
+      var linkId = (doc(collection(db, 'trees', currentTreeId, 'links'))).id;
+      var pair = window.ftLinks.buildLinkPair(req, currentTreeId, remotePersonId, remoteFamilyName, currentUid, linkId);
+      var batch = writeBatch(db);
+      batch.set(doc(db, 'trees', currentTreeId, 'links', linkId), Object.assign({ createdAt: serverTimestamp() }, pair.bSide));
+      batch.set(doc(db, 'trees', req.treeId, 'links', linkId), Object.assign({ createdAt: serverTimestamp() }, pair.aSide));
+      await batch.commit();
+      loadLinks();
+      toast(t('linkApproved'));
+      return true;
+    }catch(e){ console.error('approveLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkApproveFail'))); return false; }
+  }
+
+  function loadLinks(){
+    if(!currentTreeId){ currentLinks = []; return; }
+    getDocs(collection(db, 'trees', currentTreeId, 'links')).then(function(snap){
+      // Dedup by the relationship (same person ↔ same remote person/tree): a
+      // re-approved request can mint extra link docs with new ids; show one badge.
+      var seen = {}, arr = [];
+      snap.forEach(function(d){
+        var l = Object.assign({ linkId: d.id }, d.data());
+        var k = l.localPersonId + '|' + l.remoteTreeId + '|' + l.remotePersonId;
+        if(seen[k]) return; seen[k] = true; arr.push(l);
+      });
+      currentLinks = arr;
+      if(window.__ftRenderHome) window.__ftRenderHome();
+    }, function(e){
+      // A transient read (offline/permission) must NOT blank existing links —
+      // that made badges flicker in and out with no trace. Keep what we have and
+      // log; switchFamily already resets currentLinks on a real tree change.
+      console.error('loadLinks failed', e && e.code, e);
+    });
+  }
+
+  async function revokeLink(linkId){
+    try{
+      await deleteDoc(doc(db, 'trees', currentTreeId, 'links', linkId));
+      currentLinks = currentLinks.filter(function(l){ return l.linkId !== linkId; });
+      toast(t('linkRevoked'));
+    }catch(e){ console.error('revokeLink failed', e && e.code, e); alert(writeErrMsg(e, t('linkRevokeFail'))); }
+  }
+
+  // Approver side: a logged-in owner opens a `#link=` → read the pending request
+  // by token → hand it to the app's approval sheet. Guarded so the hourly
+  // onAuthStateChanged token refresh (which re-runs the success block) can't
+  // re-open the sheet for a hash already handled.
+  var lastLinkHashHandled = null;
+  function maybeHandleLinkHash(){
+    if(!currentUid) return;
+    var h = location.hash || '';
+    var p = window.ftLinks ? window.ftLinks.parseLinkHash(h) : null;
+    if(!p || h === lastLinkHashHandled) return;
+    readLinkRequest(p.treeId, p.token).then(function(req){
+      lastLinkHashHandled = h;   // mark handled only once the read actually resolved
+      if(!req){ alert(t('linkReqNotFound')); return; }
+      if(req.treeId === currentTreeId){ alert(t('linkSameTree')); return; }
+      if(window.__ftOpenLinkApproval) window.__ftOpenLinkApproval(req);
+    }, function(e){
+      // Transient failure (offline/permission): do NOT set the guard, so a retry
+      // (hashchange or the next auth refresh) can re-attempt. "Not found" would be
+      // a lie here, so surface the offline/permission message instead.
+      console.error('readLinkRequest failed', e && e.code, e);
+      alert(writeErrMsg(e, t('linkReqNotFound')));
+    });
+  }
+  window.addEventListener('hashchange', maybeHandleLinkHash);
+
   window.__ftCloud = {
     onLocalSave: function(state){
       // Never push before the first cloud snapshot: local state is still the empty
@@ -936,7 +1043,13 @@
     listMemberships: function(){ return currentMemberships.slice(); },
     createFamily: createFamily,
     joinFamily: joinFamily,
-    switchFamily: switchFamily
+    switchFamily: switchFamily,
+    requestLink: requestLink,
+    readLinkRequest: readLinkRequest,
+    approveLink: approveLink,
+    revokeLink: revokeLink,
+    listLinks: function(){ return currentLinks.slice(); },
+    isOwner: function(){ return currentRole === 'owner'; }
   };
 
   async function pushToCloud(treeId, canPush, state){

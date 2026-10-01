@@ -438,6 +438,9 @@
     if(window.__ftRenderHome) window.__ftRenderHome();
   };
   var state = { rootId: null, familyName: "", people: {}, lang: 'ar' };
+  // When non-null, we are viewing ANOTHER tree read-only; the user's real state is
+  // parked in linkedView.savedState and must never be written over or persisted.
+  var linkedView = null;
   var zoom = 1;
   var saveTimer = null;
   var pendingPhoto = null;
@@ -477,9 +480,10 @@
   }
 
   /* ============== Persistence ============== */
-  function scheduleSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(save, 350); }
+  function scheduleSave(){ if(linkedView) return; clearTimeout(saveTimer); saveTimer = setTimeout(save, 350); }
 
   function save(){
+    if(linkedView) return;   // never persist/sync another tree over the user's own
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       hideStorageWarn();
@@ -507,6 +511,9 @@
      when a remote update arrives; we don't re-push it back up (avoids echo loops). */
   window.__ftApplyRemote = function(remoteState){
     if(!remoteState || !remoteState.people) return;
+    // Viewing another tree: don't clobber it with the user's own snapshot — stash
+    // the latest so __ftExitLinkedView restores the freshest version.
+    if(linkedView){ linkedView.savedState = remoteState; return; }
     state = remoteState;
     state.lang = state.lang || 'ar';
     Object.keys(state.people).forEach(function(id){ migratePerson(state.people[id]); });
@@ -530,6 +537,35 @@
      Set by the cloud module after it resolves the signed-in user's role. */
   var canEditCloud = true;
   window.__ftSetEditable = function(val){ canEditCloud = !!val; render(); };
+
+  /* Linked-view (project 3a): render ANOTHER tree read-only without touching this
+     user's state, localStorage, or cloud. save()/scheduleSave() are no-ops while
+     active, and an incoming own-tree snapshot is stashed (not applied) until exit. */
+  window.__ftEnterLinkedView = function(viewState, meta){
+    if(linkedView) return;
+    linkedView = { savedState: state, savedCanEdit: canEditCloud, meta: meta || {} };
+    state = viewState; state.lang = state.lang || 'ar';
+    Object.keys(state.people).forEach(function(id){ migratePerson(state.people[id]); });
+    migrateNames(state);
+    canEditCloud = false;
+    var fam = state.familyName;
+    var label = (fam && (fam[state.lang] || fam.ar || fam.en)) || t('unnamedFamily');
+    document.getElementById('linkedViewLabel').textContent = t('linkViewBannerPrefix') + ' «' + label + '» — ' + t('linkViewReadonly');
+    document.getElementById('linkedViewBack').textContent = '‹ ' + t('linkViewBack');
+    document.getElementById('linkedViewBar').style.display = 'flex';
+    applyLang(); render();
+    if(window.__ftShowTab) window.__ftShowTab('tree');
+    if(meta && meta.focusPersonId && state.people[meta.focusPersonId]) focusPerson(meta.focusPersonId);
+  };
+  window.__ftExitLinkedView = function(){
+    if(!linkedView) return;
+    var saved = linkedView;
+    linkedView = null;
+    document.getElementById('linkedViewBar').style.display = 'none';
+    canEditCloud = saved.savedCanEdit;
+    state = saved.savedState;
+    applyLang(); render();
+  };
 
   function showStorageWarn(){ var w = document.getElementById('storageWarn'); w.textContent = t('storageWarn'); w.style.display = 'block'; }
   function hideStorageWarn(){ document.getElementById('storageWarn').style.display = 'none'; }
@@ -618,6 +654,7 @@
     if(name === 'tree' && typeof drawLinks === 'function') requestAnimationFrame(function(){ drawLinks(); centerStage(); });
   }
   window.__ftShowTab = showTab;
+  document.getElementById('linkedViewBack').onclick = function(){ window.__ftExitLinkedView(); };
   document.querySelectorAll('.bottom-nav .nav-item').forEach(function(b){
     b.addEventListener('click', function(){
       // Two nav slots are ACTIONS (open a sheet / start a mode), not view tabs.

@@ -28,4 +28,13 @@ ok(g.onRequestTree.data.viaRequest==='tk' && g.onRequestTree.data.remoteTreeId==
 ok(g.onApproveTree.treeId==='B' && g.onApproveTree.uid==='uidA', 'approve-tree grant: on B, for A');
 ok(g.onApproveTree.data.viaRequest===undefined && g.onApproveTree.data.remoteTreeId==='A', 'approve-tree grant has no viaRequest, remote=A');
 ok(g.onApproveTree.data.grantedBy==='uidB' && g.onRequestTree.data.grantedBy==='uidB', 'both record approver as grantedBy');
+// requestsToGC
+var reqs = [{token:'t1'},{token:'t2'},{token:'t3'}];
+var lks = [{viaRequest:'t1'},{viaRequest:'t3'},{localPersonId:'x'}];
+var gc = L.requestsToGC(reqs, lks);
+ok(gc.length===2 && gc.indexOf('t1')!==-1 && gc.indexOf('t3')!==-1, 'GC picks tokens with a matching link');
+ok(gc.indexOf('t2')===-1, 'GC leaves a request with no link');
+ok(JSON.stringify(L.requestsToGC([], lks))==='[]', 'GC empty requests -> []');
+ok(JSON.stringify(L.requestsToGC(reqs, []))==='[]', 'GC no links -> []');
+ok(JSON.stringify(L.requestsToGC(null, null))==='[]', 'GC null-safe');
 console.log(pass+' passed, '+fail+' failed'); process.exit(fail?1:0);

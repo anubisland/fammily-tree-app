@@ -266,6 +266,20 @@
     linkViewGone:{ar:'لم يعد متاحاً — ربما أُلغي الربط من الطرف الآخر', en:'No longer available — the link may have been removed by the other side'},
     linkViewOffline:{ar:'تعذّر التحميل — تحقّق من اتصالك وأعد المحاولة', en:'Couldn\'t load — check your connection and try again'},
     linkRevokePartial:{ar:'أُزيل الرابط، لكن تعذّر إلغاء وصول الطرف الآخر بالكامل — أعد المحاولة', en:'Link removed, but the other family\'s access could not be fully revoked — try again'},
+    linkReqDeleteFail:{ar:'تعذّر حذف الطلب', en:'Could not delete the request'},
+    viewerRevokeFail:{ar:'تعذّر إلغاء الوصول', en:'Could not revoke access'},
+    linksMgrTitle:{ar:'إدارة روابط العائلة', en:'Family links'},
+    linksMgrLoading:{ar:'جارِ التحميل…', en:'Loading…'},
+    linksMgrError:{ar:'تعذّر التحميل', en:'Could not load'},
+    linksMgrRequestsH:{ar:'طلبات ربط معلّقة', en:'Pending link requests'},
+    linksMgrViewersH:{ar:'من يمكنه رؤية شجرتك', en:'Who can view your tree'},
+    linksMgrNoRequests:{ar:'لا طلبات معلّقة', en:'No pending requests'},
+    linksMgrNoViewers:{ar:'لا أحد يرى شجرتك', en:'No one can view your tree'},
+    linkReqCancel:{ar:'إلغاء الطلب', en:'Cancel'},
+    linkReqCancelConfirm:{ar:'إلغاء هذا الطلب المعلّق؟', en:'Cancel this pending request?'},
+    linkedFamilyGeneric:{ar:'عائلة مرتبطة', en:'A linked family'},
+    viewerRevokeBtn:{ar:'إلغاء الوصول', en:'Revoke'},
+    viewerRevokeConfirm:{ar:'إلغاء وصول هذه العائلة لرؤية شجرتك؟', en:'Revoke this family\'s access to view your tree?'},
     linkViewBannerPrefix:{ar:'عرض: عائلة', en:'Viewing: family'},
     linkViewReadonly:{ar:'قراءة فقط', en:'read-only'},
     linkViewBack:{ar:'رجوع لشجرتي', en:'Back to my tree'},
@@ -524,6 +538,7 @@
     applyLang(); render();
   };
   window.__ftGetState = function(){ return state; };
+  window.__ftFamLabel = function(o){ return famLabel(o); };   // for the cloud.js links-manager sheet
   window.__ftResizeImage = resizeImage;
   window.__ftEscapeHtml = escapeHtml;
   window.__ftTimeAgo = function(dateObj){
@@ -2869,7 +2884,8 @@
       (canEditCloud ? '<button class="primary-btn" id="mn_hidden" style="margin-bottom:10px; background:var(--plum);">'+t('menuHidden')+'</button>' : '') +
       (canEditCloud ? '<button class="primary-btn" id="mn_deceased" style="margin-bottom:10px; background:var(--ink-soft);">'+t('menuMarkDeceased')+'</button>' : '') +
       (canEditCloud ? '<button class="primary-btn" id="mn_reset" style="background:var(--danger);">'+t('menuReset')+'</button>' : '') +
-      (canEditCloud && window.__ftCloud ? '<button class="primary-btn" id="mn_invite" style="margin-top:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '')
+      (canEditCloud && window.__ftCloud ? '<button class="primary-btn" id="mn_invite" style="margin-top:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '') +
+      (window.__ftCloud && window.__ftCloud.isOwner && window.__ftCloud.isOwner() ? '<button class="primary-btn" id="mn_links" style="margin-top:10px; background:var(--plum);">🔗 '+t('linksMgrTitle')+'</button>' : '')
     );
     document.getElementById('mn_image').onclick = function(){ exportTreeImage(); };
     document.getElementById('mn_export').onclick = function(){ closeSheet(); document.getElementById('exportBtn').click(); };
@@ -2883,6 +2899,8 @@
       var invBtn = document.getElementById('mn_invite');
       if(invBtn) invBtn.onclick = function(){ closeSheet(); window.__ftCloud.createInvite('editor'); };
     }
+    var lmBtn = document.getElementById('mn_links');
+    if(lmBtn) lmBtn.onclick = function(){ if(window.__ftCloud && window.__ftCloud.showLinksManager) window.__ftCloud.showLinksManager(); };
   });
 
   function applyZoom(){

@@ -50,7 +50,25 @@
     return requests.filter(function(r){ return r && used[r.token]; }).map(function(r){ return r.token; });
   }
 
-  var api = { parseLinkHash: parseLinkHash, buildLinkPair: buildLinkPair, buildViewerGrants: buildViewerGrants, requestsToGC: requestsToGC };
+  // Group a tree's links by the family they point to (project: home surfacing), so
+  // one linked family shows once with a count, tappable to open its tree read-only.
+  function groupLinksByTree(links){
+    links = links || [];
+    var order = [], byTree = {};
+    links.forEach(function(l){
+      if(!l || !l.remoteTreeId) return;
+      var g = byTree[l.remoteTreeId];
+      if(!g){
+        g = { remoteTreeId: l.remoteTreeId, remoteFamilyName: l.remoteFamilyName || {ar:'',en:''},
+              count: 0, firstRemotePersonId: l.remotePersonId || null };
+        byTree[l.remoteTreeId] = g; order.push(g);
+      }
+      g.count++;
+    });
+    return order;
+  }
+
+  var api = { parseLinkHash: parseLinkHash, buildLinkPair: buildLinkPair, buildViewerGrants: buildViewerGrants, requestsToGC: requestsToGC, groupLinksByTree: groupLinksByTree };
   if(typeof module !== 'undefined' && module.exports) module.exports = api;
   global.ftLinks = api;
 })(typeof window !== 'undefined' ? window : globalThis);

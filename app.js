@@ -280,6 +280,8 @@
     linkedFamilyGeneric:{ar:'عائلة مرتبطة', en:'A linked family'},
     viewerRevokeBtn:{ar:'إلغاء الوصول', en:'Revoke'},
     viewerRevokeConfirm:{ar:'إلغاء وصول هذه العائلة لرؤية شجرتك؟', en:'Revoke this family\'s access to view your tree?'},
+    linkedFamiliesTitle:{ar:'العائلات المرتبطة', en:'Linked families'},
+    linkedFamiliesCount:{ar:'{n} فرد مرتبط', en:'{n} linked'},
     linkViewBannerPrefix:{ar:'عرض: عائلة', en:'Viewing: family'},
     linkViewReadonly:{ar:'قراءة فقط', en:'read-only'},
     linkViewBack:{ar:'رجوع لشجرتي', en:'Back to my tree'},
@@ -1490,6 +1492,32 @@
     if(addBtn) addBtn.onclick = function(){ showAddDates(); };
   }
 
+  // Linked-families card (home surfacing): one row per linked family, tappable to
+  // open that tree read-only. Owner-only (the grant holder) and only when links exist.
+  function linkedFamiliesCardHtml(){
+    if(linkedView) return '';   // not while already viewing another tree
+    if(!(window.__ftCloud && window.__ftCloud.isOwner && window.__ftCloud.isOwner())) return '';
+    if(!(window.ftLinks && window.__ftCloud.listLinks)) return '';
+    var groups = window.ftLinks.groupLinksByTree(window.__ftCloud.listLinks());
+    if(!groups.length) return '';
+    var rows = groups.map(function(g){
+      return '<div class="lf-row" data-lf-tree="'+escapeHtml(g.remoteTreeId)+'" data-lf-person="'+escapeHtml(g.firstRemotePersonId||'')+'">'+
+        '<span class="lf-crest">🌳</span>'+
+        '<div class="lf-main"><b>'+escapeHtml(famLabel(g.remoteFamilyName))+'</b>'+
+          '<span class="lf-sub">'+tf('linkedFamiliesCount', { n: localeDigits(g.count) })+'</span></div>'+
+        '<span class="lf-go">›</span></div>';
+    }).join('');
+    return '<div class="lf-card"><div class="lf-head">🔗 '+t('linkedFamiliesTitle')+'</div>'+rows+'</div>';
+  }
+  function wireLinkedFamiliesCard(host){
+    host.querySelectorAll('.lf-row[data-lf-tree]').forEach(function(row){
+      row.onclick = function(){
+        var tid = row.getAttribute('data-lf-tree'), pid = row.getAttribute('data-lf-person');
+        if(window.__ftCloud && window.__ftCloud.viewLinkedTree) window.__ftCloud.viewLinkedTree(tid, pid);
+      };
+    });
+  }
+
   function renderHome(){
     var host = document.getElementById('tab-home');
     if(!host) return;
@@ -1518,6 +1546,7 @@
       '</div>' +
       '<div class="home-body">' +
         occasionsCardHtml() +
+        linkedFamiliesCardHtml() +
         '<div class="section-eyebrow"><span class="dia">◆</span><span>'+t('homeSectionsEyebrow')+'</span></div>' +
         '<div class="grid">' +
           '<div class="leaf tree" data-go="tree"><span class="corner">۞</span><div class="ic">🌳</div><h3>'+t('cardTree')+'</h3><p>'+t('cardTreeSub')+'</p></div>' +
@@ -1557,6 +1586,7 @@
       fsw.onkeydown = function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); showMyFamilies(); } };
     }
     wireOccasionsCard(host);
+    wireLinkedFamiliesCard(host);
 
     // Live people search: type a name → matching people → tap to jump to the card.
     var searchInput = document.getElementById('homeSearch');

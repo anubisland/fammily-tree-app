@@ -37,4 +37,17 @@ ok(gc.indexOf('t2')===-1, 'GC leaves a request with no link');
 ok(JSON.stringify(L.requestsToGC([], lks))==='[]', 'GC empty requests -> []');
 ok(JSON.stringify(L.requestsToGC(reqs, []))==='[]', 'GC no links -> []');
 ok(JSON.stringify(L.requestsToGC(null, null))==='[]', 'GC null-safe');
+// groupLinksByTree
+var gl = L.groupLinksByTree([
+  { remoteTreeId:'A', remoteFamilyName:{ar:'آل أ'}, remotePersonId:'a1' },
+  { remoteTreeId:'A', remoteFamilyName:{ar:'آل أ'}, remotePersonId:'a2' },
+  { remoteTreeId:'B', remoteFamilyName:{ar:'آل ب'}, remotePersonId:'b1' }
+]);
+ok(gl.length===2, 'groups by remoteTreeId (2 trees)');
+var gA = gl.filter(function(g){ return g.remoteTreeId==='A'; })[0];
+ok(gA && gA.count===2, 'group A counts its 2 links');
+ok(gA && gA.firstRemotePersonId==='a1', 'group A keeps first remote person');
+ok(gA && gA.remoteFamilyName.ar==='آل أ', 'group A keeps family name');
+ok(JSON.stringify(L.groupLinksByTree([]))==='[]', 'empty -> []');
+ok(JSON.stringify(L.groupLinksByTree(null))==='[]', 'null-safe');
 console.log(pass+' passed, '+fail+' failed'); process.exit(fail?1:0);

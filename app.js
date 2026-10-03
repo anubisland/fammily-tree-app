@@ -281,7 +281,7 @@
     viewerRevokeBtn:{ar:'إلغاء الوصول', en:'Revoke'},
     viewerRevokeConfirm:{ar:'إلغاء وصول هذه العائلة لرؤية شجرتك؟', en:'Revoke this family\'s access to view your tree?'},
     linkedFamiliesTitle:{ar:'العائلات المرتبطة', en:'Linked families'},
-    linkedFamiliesCount:{ar:'{n} أفراد مرتبطون', en:'{n} linked'},
+    linkedFamiliesCount:{ar:'{n} فرد مرتبط', en:'{n} linked'},
     linkViewBannerPrefix:{ar:'عرض: عائلة', en:'Viewing: family'},
     linkViewReadonly:{ar:'قراءة فقط', en:'read-only'},
     linkViewBack:{ar:'رجوع لشجرتي', en:'Back to my tree'},

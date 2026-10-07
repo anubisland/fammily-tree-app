@@ -451,28 +451,23 @@
   }
 
   function actionLabel(action){
-    if(action === 'add') return 'أضاف';
-    if(action === 'edit') return 'عدّل';
-    if(action === 'delete') return 'حذف';
-    if(action === 'login') return 'سجّل الدخول';
-    if(action === 'join') return 'انضم للعائلة';
-    if(action === 'create_family') return 'أنشأ العائلة';
-    return action;
+    var map = { add:'actAdd', edit:'actEdit', delete:'actDelete', login:'actLogin', join:'actJoin', create_family:'actCreateFamily' };
+    return map[action] ? t(map[action]) : action;
   }
   function timeAgo(dateObj){
     if(!dateObj) return '';
     var diffSec = Math.round((Date.now() - dateObj.getTime())/1000);
-    if(diffSec < 60) return 'الآن';
-    var m = Math.round(diffSec/60); if(m < 60) return 'منذ ' + m + ' دقيقة';
-    var h = Math.round(m/60); if(h < 24) return 'منذ ' + h + ' ساعة';
-    var d = Math.round(h/24); return 'منذ ' + d + ' يوم';
+    if(diffSec < 60) return t('timeNow');
+    var m = Math.round(diffSec/60); if(m < 60) return tf('timeMinutes', { n: m });
+    var h = Math.round(m/60); if(h < 24) return tf('timeHours', { n: h });
+    var d = Math.round(h/24); return tf('timeDays', { n: d });
   }
 
   async function showActivityLog(){
     var overlay = document.getElementById('overlay');
     var sheet = document.getElementById('sheet');
     var body = document.getElementById('sheetBody');
-    body.innerHTML = '<h3>📋 سجل النشاط</h3><div class="context">جارِ التحميل…</div>';
+    body.innerHTML = '<h3>'+t('activityTitle')+'</h3><div class="context">'+t('loadingText')+'</div>';
     overlay.classList.add('open'); sheet.classList.add('open');
     try{
       var esc = window.__ftEscapeHtml || function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
@@ -480,7 +475,7 @@
       var lang = (window.__ftGetState && window.__ftGetState() && window.__ftGetState().lang) || 'ar';
       var dateStr = new Date().toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-EG',
         { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-      var header = '<h3>📋 سجل النشاط</h3>' +
+      var header = '<h3>'+t('activityTitle')+'</h3>' +
         '<div style="text-align:center; font-family:var(--f-head); font-weight:700; color:var(--emerald); font-size:14px; margin:2px 0 12px;">📅 ' + esc(dateStr) + '</div>';
       var todayStart = new Date(); todayStart.setHours(0,0,0,0);
       var q = query(collection(db, 'trees', currentTreeId, 'activity'), orderBy('at', 'desc'), limit(80));
@@ -498,15 +493,15 @@
         }
         var isPersonAction = (v.action === 'add' || v.action === 'edit' || v.action === 'delete');
         rows += '<div style="padding:9px 0; border-bottom:1px solid var(--paper-deep); font-size:13px;">' +
-          '<b>' + esc(v.byEmail || '؟') + '</b> ' + esc(actionLabel(v.action)) +
+          '<b>' + esc(v.byEmail || t('unknownShort')) + '</b> ' + esc(actionLabel(v.action)) +
           (isPersonAction ? ' «' + esc(v.personName || '') + '»' : '') +
           (v.detail ? ' <span style="color:var(--ink-soft);">(' + esc(v.detail) + ')</span>' : '') +
           '<div style="color:var(--ink-soft); font-size:11px; margin-top:2px;">' + (at ? timeAgo(at) : '') + '</div>' +
         '</div>';
       });
-      body.innerHTML = rows ? (header + rows) : (header + '<div class="context">لا يوجد نشاط اليوم.</div>');
+      body.innerHTML = rows ? (header + rows) : (header + '<div class="context">'+t('activityEmpty')+'</div>');
     }catch(e){
-      body.innerHTML = '<h3>📋 سجل النشاط</h3><div class="context">تعذّر تحميل السجل.</div>';
+      body.innerHTML = '<h3>'+t('activityTitle')+'</h3><div class="context">'+t('activityError')+'</div>';
     }
   }
 

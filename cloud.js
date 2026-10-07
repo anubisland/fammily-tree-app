@@ -82,24 +82,24 @@
 
   function friendlyAuthError(code){
     var map = {
-      'auth/invalid-email':'صيغة البريد الإلكتروني غير صحيحة',
-      'auth/user-not-found':'لا يوجد حساب بهذا البريد',
-      'auth/wrong-password':'كلمة المرور غير صحيحة',
-      'auth/invalid-credential':'البريد أو كلمة المرور غير صحيحة',
-      'auth/email-already-in-use':'هذا البريد مستخدم بالفعل — جرّب تسجيل الدخول',
-      'auth/weak-password':'كلمة المرور ضعيفة جدًا (6 أحرف على الأقل)',
-      'auth/network-request-failed':'تعذّر الاتصال بالإنترنت',
-      'auth/too-many-requests':'محاولات كثيرة — انتظر قليلاً ثم أعد المحاولة',
+      'auth/invalid-email': t('authErrInvalidEmail'),
+      'auth/user-not-found': t('authErrUserNotFound'),
+      'auth/wrong-password': t('authErrWrongPassword'),
+      'auth/invalid-credential': t('authErrInvalidCredential'),
+      'auth/email-already-in-use': t('authErrEmailInUse'),
+      'auth/weak-password': t('authErrWeakPassword'),
+      'auth/network-request-failed': t('authErrNetwork'),
+      'auth/too-many-requests': t('authErrTooManyRequests'),
       // Firestore codes that can surface during create/join
-      'permission-denied':'ليست لديك صلاحية لهذا الإجراء',
-      'unavailable':'تعذّر الاتصال بالخادم — تحقّق من الإنترنت وأعد المحاولة',
-      'deadline-exceeded':'انتهت مهلة الاتصال — أعد المحاولة',
-      'not-found':'العنصر المطلوب غير موجود'
+      'permission-denied': t('authErrPermission'),
+      'unavailable': t('authErrUnavailable'),
+      'deadline-exceeded': t('authErrDeadline'),
+      'not-found': t('authErrNotFound')
     };
     // Never surface a raw internal code to the user; fall back to a generic
     // translated message and keep the code in the console for debugging.
     if(!map[code] && code){ try { console.error('[auth] unmapped error code:', code); } catch(e){} }
-    return map[code] || 'حدث خطأ غير متوقّع — أعد المحاولة، وإن استمر تواصل مع الدعم';
+    return map[code] || t('authErrGeneric');
   }
 
   var mode = 'login';
@@ -116,7 +116,7 @@
     tabSignup.classList.toggle('active', mode==='signup');
     signupModeBox.style.display = mode==='signup' ? 'block' : 'none';
     joinCodeField.style.display = (mode==='signup' && signupMode==='join') ? 'block' : 'none';
-    authSubmitBtn.textContent = mode==='login' ? 'دخول' : (signupMode==='create' ? 'إنشاء الحساب والعائلة' : 'إنشاء الحساب والانضمام');
+    authSubmitBtn.textContent = mode==='login' ? t('authBtnLogin') : (signupMode==='create' ? t('authBtnCreateFamily') : t('authBtnCreateJoin'));
     clearErr();
   }
   tabLogin.onclick = function(){ mode='login'; refreshAuthUI(); };
@@ -143,7 +143,7 @@
     clearErr();
     var email = document.getElementById('authEmail').value.trim();
     var pass = document.getElementById('authPass').value;
-    if(!email || !pass){ showErr('يرجى إدخال البريد وكلمة المرور'); return; }
+    if(!email || !pass){ showErr(t('authErrNeedEmailPass')); return; }
     setLoading(true);
     // Set true only once membership is fully committed; until then a thrown
     // error must roll back the just-created account so none is left orphaned.
@@ -283,7 +283,7 @@
       var activeId = window.ftMembership.resolveActiveTree(userData, memIds);
       if(!activeId){
         setLoading(false);
-        showErr('تعذّر العثور على عائلة مرتبطة بحسابك. تواصل مع الدعم.');
+        showErr(t('authErrNoFamily'));
         return;
       }
       currentTreeId = activeId;
@@ -318,7 +318,7 @@
       })();
     }catch(err){
       setLoading(false);
-      showErr('تعذّر تحميل بيانات الحساب: ' + (err.message||err.code));
+      showErr(t('authErrLoadAccount') + (err.message||err.code));
     }
   });
 

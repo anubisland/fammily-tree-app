@@ -575,14 +575,15 @@
   // Structured moment types: turn a free-text feed into a legible one. Each type
   // has an icon, an Arabic label (this feed is inline-Arabic like the rest of the
   // moments UI), and a CSS accent class. 'news' is the neutral default.
+  // labelKey resolves through t() at render time so the chips/badges are bilingual.
   var MOMENT_TYPES = [
-    { id: 'news',        icon: '📰', label: 'خبر' },
-    { id: 'birth',       icon: '👶', label: 'مولود' },
-    { id: 'marriage',    icon: '💍', label: 'زواج' },
-    { id: 'graduation',  icon: '🎓', label: 'تخرّج' },
-    { id: 'travel',      icon: '✈️', label: 'سفر' },
-    { id: 'achievement', icon: '🏆', label: 'إنجاز' },
-    { id: 'memorial',    icon: '🕊', label: 'في ذمة الله' }
+    { id: 'news',        icon: '📰', labelKey: 'momentTypeNews' },
+    { id: 'birth',       icon: '👶', labelKey: 'momentTypeBirth' },
+    { id: 'marriage',    icon: '💍', labelKey: 'momentTypeMarriage' },
+    { id: 'graduation',  icon: '🎓', labelKey: 'momentTypeGraduation' },
+    { id: 'travel',      icon: '✈️', labelKey: 'momentTypeTravel' },
+    { id: 'achievement', icon: '🏆', labelKey: 'momentTypeAchievement' },
+    { id: 'memorial',    icon: '🕊', labelKey: 'momentTypeMemorial' }
   ];
   var MOMENT_TYPE_BY_ID = {};
   MOMENT_TYPES.forEach(function(tp){ MOMENT_TYPE_BY_ID[tp.id] = tp; });
@@ -593,7 +594,7 @@
     if(!host) return;
     host.innerHTML = MOMENT_TYPES.map(function(tp){
       return '<button type="button" class="mtype-chip mtype-' + tp.id + (tp.id === selectedMomentType ? ' active' : '') +
-             '" data-type="' + tp.id + '">' + tp.icon + ' ' + tp.label + '</button>';
+             '" data-type="' + tp.id + '">' + tp.icon + ' ' + t(tp.labelKey) + '</button>';
     }).join('');
     host.querySelectorAll('.mtype-chip').forEach(function(chip){
       chip.onclick = function(){
@@ -616,9 +617,9 @@
   // for a dropped connection sends a non-technical family member chasing the
   // wrong fix. permission-denied is the rules case; unavailable is the network.
   function writeErrMsg(e, base){
-    if(e && e.code === 'permission-denied') return base + ' — تأكد من تحديث قواعد الأمان (Firestore Rules).';
-    if(e && e.code === 'unavailable')       return 'تعذّر الاتصال — تحقّق من الإنترنت وحاول مجدداً.';
-    return base + '، حاول مرة أخرى.';
+    if(e && e.code === 'permission-denied') return base + t('writeErrRulesHint');
+    if(e && e.code === 'unavailable')       return t('writeErrOffline');
+    return base + t('writeErrRetry');
   }
 
   function renderMoments(docs){
@@ -629,22 +630,22 @@
     var liveIds = {}; docs.forEach(function(d){ liveIds[d.id] = 1; });
     Object.keys(openComments).forEach(function(k){ if(!liveIds[k]) delete openComments[k]; });
     if(!docs.length){
-      list.innerHTML = '<div class="moments-empty">لا توجد لحظات بعد — كن أول من يشارك خبرًا مع العائلة!</div>';
+      list.innerHTML = '<div class="moments-empty">'+t('momentsEmpty')+'</div>';
       return;
     }
     var timeAgoFn = window.__ftTimeAgo || function(){ return ''; };
     var html = '';
     docs.forEach(function(d){
       var v = d.data();
-      var when = v.at && v.at.toDate ? timeAgoFn(v.at.toDate()) : 'الآن';
+      var when = v.at && v.at.toDate ? timeAgoFn(v.at.toDate()) : t('timeNow');
       var canDelete = v.byUid === currentUid || currentRole === 'owner';
       var open = !!openComments[d.id];
       // A moment without a stored type is a legacy 'news' post — default cleanly.
       var tp = MOMENT_TYPE_BY_ID[v.type] || MOMENT_TYPE_BY_ID.news;
       html += '<div class="moment-card mtype-' + tp.id + '">' +
         '<div class="moment-head">' +
-          '<span class="moment-author">' + esc(v.byEmail || '؟') + '</span>' +
-          '<span class="moment-type-badge">' + tp.icon + ' ' + tp.label + '</span>' +
+          '<span class="moment-author">' + esc(v.byEmail || t('unknownShort')) + '</span>' +
+          '<span class="moment-type-badge">' + tp.icon + ' ' + t(tp.labelKey) + '</span>' +
           '<span class="moment-time">' + when + '</span></div>' +
         (v.text ? '<div class="moment-text">' + esc(v.text) + '</div>' : '') +
         (function(){
@@ -661,8 +662,8 @@
         '<div class="moment-comments" id="comments-' + d.id + '"' + (open ? '' : ' style="display:none;"') + '>' +
           '<div class="comments-list" id="comments-list-' + d.id + '"></div>' +
           '<div class="comment-compose">' +
-            '<input class="comment-input" id="comment-input-' + d.id + '" placeholder="أضف تعليقًا…" maxlength="500">' +
-            '<button class="comment-send" data-mid="' + d.id + '">إرسال</button>' +
+            '<input class="comment-input" id="comment-input-' + d.id + '" placeholder="'+esc(t('commentPlaceholder'))+'" maxlength="500">' +
+            '<button class="comment-send" data-mid="' + d.id + '">'+t('commentSend')+'</button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -671,13 +672,13 @@
     if(window.__ftFillPhotoRefs) window.__ftFillPhotoRefs(list);   // resolve Storage moment photos
     list.querySelectorAll('.moment-del').forEach(function(btn){
       btn.onclick = async function(){
-        if(!confirm('حذف هذه اللحظة؟')) return;
+        if(!confirm(t('momentDeleteConfirm'))) return;
         try{
           await deleteDoc(doc(db, 'trees', currentTreeId, 'moments', btn.dataset.id));
           // Best-effort remove the moment's Storage photo too (no-op if none).
           if(window.__ftPhotos && window.ftPhotoPaths) window.__ftPhotos.deletePhoto(window.ftPhotoPaths.moment(currentTreeId, btn.dataset.id)).catch(function(){});
         }
-        catch(e){ console.error('moment delete failed', e && e.code, e); alert(writeErrMsg(e, 'تعذّر الحذف')); }
+        catch(e){ console.error('moment delete failed', e && e.code, e); alert(writeErrMsg(e, t('momentDeleteFail'))); }
       };
     });
     docs.forEach(function(d){ wireMomentSocial(d.id); });
@@ -709,7 +710,7 @@
       console.error('reactions listener failed', mid, err && err.code, err);
       if(reactBtn){
         var rcx = reactBtn.querySelector('.react-count'); if(rcx) rcx.textContent = '—';
-        reactBtn.title = 'تعذّر تحميل التفاعلات';
+        reactBtn.title = t('reactLoadFail');
       }
     });
 
@@ -725,7 +726,7 @@
       console.error('comments listener failed', mid, err && err.code, err);
       if(commentBtn){ var ccx = commentBtn.querySelector('.comment-count'); if(ccx) ccx.textContent = '—'; }
       var listErr = document.getElementById('comments-list-' + mid);
-      if(listErr) listErr.innerHTML = '<div class="comments-empty">تعذّر تحميل التعليقات.</div>';
+      if(listErr) listErr.innerHTML = '<div class="comments-empty">'+t('commentsError')+'</div>';
     });
 
     momentSubs[mid] = [rUnsub, cUnsub];
@@ -749,29 +750,29 @@
       var when = v.at && v.at.toDate ? timeAgoFn(v.at.toDate()) : '';
       var canDel = v.byUid === currentUid || currentRole === 'owner';
       return '<div class="comment-row">' +
-        '<div class="comment-meta"><span class="comment-author">' + esc(v.byEmail || '؟') + '</span>' +
+        '<div class="comment-meta"><span class="comment-author">' + esc(v.byEmail || t('unknownShort')) + '</span>' +
         (when ? '<span class="comment-time">' + esc(when) + '</span>' : '') + '</div>' +
         '<div class="comment-text">' + esc(v.text || '') + '</div>' +
-        (canDel ? '<button class="comment-del" data-mid="' + mid + '" data-cid="' + it.id + '">حذف</button>' : '') +
+        (canDel ? '<button class="comment-del" data-mid="' + mid + '" data-cid="' + it.id + '">'+t('commentDelete')+'</button>' : '') +
       '</div>';
     }).join('');
     listEl.querySelectorAll('.comment-del').forEach(function(btn){
       btn.onclick = async function(){
         try{ await deleteDoc(doc(db, 'trees', currentTreeId, 'moments', btn.dataset.mid, 'comments', btn.dataset.cid)); }
-        catch(e){ console.error('comment delete failed', e && e.code, e); alert(writeErrMsg(e, 'تعذّر حذف التعليق')); }
+        catch(e){ console.error('comment delete failed', e && e.code, e); alert(writeErrMsg(e, t('commentDeleteFail'))); }
       };
     });
   }
 
   async function toggleReaction(mid, currentlyReacted){
-    if(!currentTreeId || !currentUid){ alert('يجب تسجيل الدخول أولاً'); return; }
+    if(!currentTreeId || !currentUid){ alert(t('needSignIn')); return; }
     var ref = doc(db, 'trees', currentTreeId, 'moments', mid, 'reactions', currentUid);
     try{
       if(currentlyReacted) await deleteDoc(ref);
       else await setDoc(ref, { byUid: currentUid, emoji: '❤️', at: serverTimestamp() });
     }catch(e){
       console.error('toggleReaction failed', mid, e && e.code, e);
-      alert(writeErrMsg(e, 'تعذّر تسجيل التفاعل'));
+      alert(writeErrMsg(e, t('reactFail')));
     }
   }
 
@@ -779,7 +780,7 @@
     if(!input) return;
     var text = input.value.trim();
     if(!text) return;
-    if(!currentTreeId || !currentUid){ alert('يجب تسجيل الدخول أولاً'); return; }
+    if(!currentTreeId || !currentUid){ alert(t('needSignIn')); return; }
     input.disabled = true;
     try{
       await addDoc(collection(db, 'trees', currentTreeId, 'moments', mid, 'comments'), {
@@ -790,7 +791,7 @@
       input.value = '';
     }catch(e){
       console.error('postComment failed', mid, e && e.code, e);
-      alert(writeErrMsg(e, 'تعذّر إضافة التعليق'));
+      alert(writeErrMsg(e, t('commentAddFail')));
     }
     input.disabled = false;
     input.focus();
@@ -807,13 +808,13 @@
       // Feed read failed: release any per-moment listeners from a prior good
       // render so they don't keep running against DOM that's about to vanish.
       teardownMomentSubs();
-      document.getElementById('momentsList').innerHTML = '<div class="moments-empty">تعذّر تحميل اللحظات.</div>';
+      document.getElementById('momentsList').innerHTML = '<div class="moments-empty">'+t('momentsError')+'</div>';
     });
   }
 
   function openMoments(){
     document.getElementById('momentsScreen').classList.add('open');
-    document.getElementById('momentsList').innerHTML = '<div class="moments-empty">جارِ التحميل…</div>';
+    document.getElementById('momentsList').innerHTML = '<div class="moments-empty">'+t('loadingText')+'</div>';
     renderMomentTypeChips();
     subscribeMoments();
   }
@@ -858,8 +859,8 @@
   document.getElementById('momentPostBtn').addEventListener('click', async function(){
     var textEl = document.getElementById('momentText');
     var text = textEl.value.trim();
-    if(!text && !pendingMomentPhoto){ alert('اكتب شيئًا أو أضف صورة أولاً'); return; }
-    if(!currentTreeId || !currentUid){ alert('يجب تسجيل الدخول أولاً'); return; }
+    if(!text && !pendingMomentPhoto){ alert(t('momentNeedContent')); return; }
+    if(!currentTreeId || !currentUid){ alert(t('needSignIn')); return; }
     var btn = document.getElementById('momentPostBtn');
     btn.disabled = true;
     try{
@@ -873,7 +874,7 @@
           await window.__ftPhotos.uploadPhoto(photoPath, pendingMomentPhoto.dataUrl);
         }catch(upErr){
           console.error('moment photo upload failed', upErr && upErr.code, upErr);
-          alert(writeErrMsg(upErr, 'تعذّر رفع صورة اللحظة'));
+          alert(writeErrMsg(upErr, t('momentPhotoUploadFail')));
           btn.disabled = false; return;
         }
       }
@@ -897,7 +898,7 @@
       prev.style.display = 'none'; prev.innerHTML = '';
     }catch(e){
       console.error('moment post failed', e && e.code, e);
-      alert(writeErrMsg(e, 'تعذّر النشر'));
+      alert(writeErrMsg(e, t('momentPostFail')));
     }
     btn.disabled = false;
   });

@@ -1188,7 +1188,7 @@
     var size = new Blob([JSON.stringify(payload)]).size;
     if(size > MAX_DOC_BYTES){
       if(treeId === currentTreeId) cloudBtn.dataset.status = 'offline';
-      alert('حجم بيانات الشجرة كبير جدًا للمزامنة السحابية — قد تحتاج لتقليل حجم الصور أو عدد الأفراد. تم الحفظ محليًا فقط.');
+      alert(t('syncTooLarge'));
       return;
     }
     try{
@@ -1210,7 +1210,7 @@
       // which would spam a downgraded editor). Transient/network errors stay a quiet dot.
       if(err && (err.code === 'permission-denied' || err.code === 'not-found') && !syncErrorAlerted){
         syncErrorAlerted = true;
-        alert('تعذّرت مزامنة التغيير مع السحابة (صلاحيات أو مستند مفقود) — تم الحفظ محليًا فقط. تواصل مع مالك العائلة.');
+        alert(t('syncFail'));
       }
     }
   }
@@ -1221,16 +1221,16 @@
     var body = document.getElementById('sheetBody');
     var esc = window.__ftEscapeHtml || function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
     var currentEmail = (auth.currentUser && auth.currentUser.email) || '';
-    var roleLabel = currentRole === 'owner' ? 'مالك العائلة' : (currentRole === 'viewer' ? 'مشاهدة فقط' : 'محرِّر');
+    var roleLabel = currentRole === 'owner' ? t('accountRoleOwner') : (currentRole === 'viewer' ? t('memberRoleViewer') : t('memberRoleEditor'));
     body.innerHTML =
-      '<h3>المزامنة السحابية</h3>' +
-      '<div class="context">مسجّل الدخول باسم: <strong>' + esc(currentEmail) + '</strong> (' + roleLabel + ')</div>' +
+      '<h3>'+t('accountTitle')+'</h3>' +
+      '<div class="context">'+t('accountSignedInAs')+'<strong>' + esc(currentEmail) + '</strong> (' + roleLabel + ')</div>' +
       (canEditCloud ? (
         '<div class="context">' + t('inviteShareHint') + '</div>' +
         (window.__ftCloud && window.__ftCloud.createInvite ? '<button class="primary-btn" id="cf_invite" style="margin-bottom:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '')
       ) : '') +
-      '<button class="primary-btn" id="cf_members" style="margin-bottom:10px; background:var(--teal);">👥 أفراد العائلة</button>' +
-      '<button class="primary-btn" id="cf_signout" style="background:var(--danger);">تسجيل الخروج</button>';
+      '<button class="primary-btn" id="cf_members" style="margin-bottom:10px; background:var(--teal);">'+t('membersTitle')+'</button>' +
+      '<button class="primary-btn" id="cf_signout" style="background:var(--danger);">'+t('accountSignout')+'</button>';
     document.getElementById('cf_members').onclick = function(){ showMembers(); };
     if(canEditCloud && window.__ftCloud && window.__ftCloud.createInvite){
       var invBtn = document.getElementById('cf_invite');

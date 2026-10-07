@@ -509,7 +509,7 @@
     var overlay = document.getElementById('overlay');
     var sheet = document.getElementById('sheet');
     var body = document.getElementById('sheetBody');
-    body.innerHTML = '<h3>👥 أفراد العائلة</h3><div class="context">جارِ التحميل…</div>';
+    body.innerHTML = '<h3>'+t('membersTitle')+'</h3><div class="context">'+t('loadingText')+'</div>';
     overlay.classList.add('open'); sheet.classList.add('open');
     try{
       var snap = await getDocs(collection(db, 'trees', currentTreeId, 'members'));
@@ -519,16 +519,16 @@
         var v = d.data();
         var uid = d.id;
         var role = v.role || 'editor';
-        var roleLabel = role === 'owner' ? 'مالك' : (role === 'viewer' ? 'مشاهدة فقط' : 'محرِّر');
+        var roleLabel = role === 'owner' ? t('memberRoleOwner') : (role === 'viewer' ? t('memberRoleViewer') : t('memberRoleEditor'));
         var isSelf = uid === currentUid;
         rows += '<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 0; border-bottom:1px solid var(--paper-deep);">' +
-          '<div style="font-size:12.5px;"><b>' + esc(v.email || uid) + '</b>' + (isSelf ? ' (أنت)' : '') +
+          '<div style="font-size:12.5px;"><b>' + esc(v.email || uid) + '</b>' + (isSelf ? ' ('+t('memberYou')+')' : '') +
           '<div style="color:var(--ink-soft); font-size:11px;">' + roleLabel + '</div></div>' +
           (currentRole === 'owner' && !isSelf ? (
             '<div style="display:flex; gap:5px;">' +
-              (role !== 'viewer' ? '<button class="mini-btn" data-uid="'+uid+'" data-newrole="viewer" data-mact="role" title="تخفيض لمشاهد">👁</button>' : '') +
-              (role !== 'editor' ? '<button class="mini-btn" data-uid="'+uid+'" data-newrole="editor" data-mact="role" title="ترقية لمحرِّر">✎</button>' : '') +
-              '<button class="mini-btn danger" data-uid="'+uid+'" data-mact="remove" title="إزالة من العائلة">🗑</button>' +
+              (role !== 'viewer' ? '<button class="mini-btn" data-uid="'+uid+'" data-newrole="viewer" data-mact="role" title="'+esc(t('memberDemote'))+'">👁</button>' : '') +
+              (role !== 'editor' ? '<button class="mini-btn" data-uid="'+uid+'" data-newrole="editor" data-mact="role" title="'+esc(t('memberPromote'))+'">✎</button>' : '') +
+              '<button class="mini-btn danger" data-uid="'+uid+'" data-mact="remove" title="'+esc(t('memberRemove'))+'">🗑</button>' +
             '</div>'
           ) : '') +
         '</div>';
@@ -536,7 +536,7 @@
       var inviteBtn = (currentRole === 'owner' && createInvite)
         ? '<button class="primary-btn" id="mem_invite" style="margin-top:14px; background:var(--teal);">＋ '+t('menuInvite')+'</button>'
         : '';
-      body.innerHTML = '<h3>👥 أفراد العائلة (' + snap.size + ')</h3>' + rows + inviteBtn;
+      body.innerHTML = '<h3>'+t('membersTitle')+' (' + snap.size + ')</h3>' + rows + inviteBtn;
       var mi = document.getElementById('mem_invite');
       if(mi) mi.onclick = function(){ createInvite('editor'); };
       body.querySelectorAll('[data-mact="role"]').forEach(function(btn){
@@ -545,21 +545,21 @@
           try{
             await updateDoc(doc(db, 'trees', currentTreeId, 'members', uid), { role: newRole });
             showMembers();
-          }catch(e){ alert('تعذّر تغيير الصلاحية.'); }
+          }catch(e){ alert(t('memberRoleChangeFail')); }
         };
       });
       body.querySelectorAll('[data-mact="remove"]').forEach(function(btn){
         btn.onclick = async function(){
           var uid = btn.dataset.uid;
-          if(!confirm('إزالة هذا الفرد من العائلة؟ لن يعود بإمكانه رؤية الشجرة.')) return;
+          if(!confirm(t('memberRemoveConfirm'))) return;
           try{
             await deleteDoc(doc(db, 'trees', currentTreeId, 'members', uid));
             showMembers();
-          }catch(e){ alert('تعذّر إزالة العضو.'); }
+          }catch(e){ alert(t('memberRemoveFail')); }
         };
       });
     }catch(e){
-      body.innerHTML = '<h3>👥 أفراد العائلة</h3><div class="context">تعذّر تحميل القائمة.</div>';
+      body.innerHTML = '<h3>'+t('membersTitle')+'</h3><div class="context">'+t('membersError')+'</div>';
     }
   }
 

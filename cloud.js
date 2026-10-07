@@ -82,24 +82,24 @@
 
   function friendlyAuthError(code){
     var map = {
-      'auth/invalid-email':'صيغة البريد الإلكتروني غير صحيحة',
-      'auth/user-not-found':'لا يوجد حساب بهذا البريد',
-      'auth/wrong-password':'كلمة المرور غير صحيحة',
-      'auth/invalid-credential':'البريد أو كلمة المرور غير صحيحة',
-      'auth/email-already-in-use':'هذا البريد مستخدم بالفعل — جرّب تسجيل الدخول',
-      'auth/weak-password':'كلمة المرور ضعيفة جدًا (6 أحرف على الأقل)',
-      'auth/network-request-failed':'تعذّر الاتصال بالإنترنت',
-      'auth/too-many-requests':'محاولات كثيرة — انتظر قليلاً ثم أعد المحاولة',
+      'auth/invalid-email': t('authErrInvalidEmail'),
+      'auth/user-not-found': t('authErrUserNotFound'),
+      'auth/wrong-password': t('authErrWrongPassword'),
+      'auth/invalid-credential': t('authErrInvalidCredential'),
+      'auth/email-already-in-use': t('authErrEmailInUse'),
+      'auth/weak-password': t('authErrWeakPassword'),
+      'auth/network-request-failed': t('authErrNetwork'),
+      'auth/too-many-requests': t('authErrTooManyRequests'),
       // Firestore codes that can surface during create/join
-      'permission-denied':'ليست لديك صلاحية لهذا الإجراء',
-      'unavailable':'تعذّر الاتصال بالخادم — تحقّق من الإنترنت وأعد المحاولة',
-      'deadline-exceeded':'انتهت مهلة الاتصال — أعد المحاولة',
-      'not-found':'العنصر المطلوب غير موجود'
+      'permission-denied': t('authErrPermission'),
+      'unavailable': t('authErrUnavailable'),
+      'deadline-exceeded': t('authErrDeadline'),
+      'not-found': t('authErrNotFound')
     };
     // Never surface a raw internal code to the user; fall back to a generic
     // translated message and keep the code in the console for debugging.
     if(!map[code] && code){ try { console.error('[auth] unmapped error code:', code); } catch(e){} }
-    return map[code] || 'حدث خطأ غير متوقّع — أعد المحاولة، وإن استمر تواصل مع الدعم';
+    return map[code] || t('authErrGeneric');
   }
 
   var mode = 'login';
@@ -116,7 +116,7 @@
     tabSignup.classList.toggle('active', mode==='signup');
     signupModeBox.style.display = mode==='signup' ? 'block' : 'none';
     joinCodeField.style.display = (mode==='signup' && signupMode==='join') ? 'block' : 'none';
-    authSubmitBtn.textContent = mode==='login' ? 'دخول' : (signupMode==='create' ? 'إنشاء الحساب والعائلة' : 'إنشاء الحساب والانضمام');
+    authSubmitBtn.textContent = mode==='login' ? t('authBtnLogin') : (signupMode==='create' ? t('authBtnCreateFamily') : t('authBtnCreateJoin'));
     clearErr();
   }
   tabLogin.onclick = function(){ mode='login'; refreshAuthUI(); };
@@ -143,7 +143,7 @@
     clearErr();
     var email = document.getElementById('authEmail').value.trim();
     var pass = document.getElementById('authPass').value;
-    if(!email || !pass){ showErr('يرجى إدخال البريد وكلمة المرور'); return; }
+    if(!email || !pass){ showErr(t('authErrNeedEmailPass')); return; }
     setLoading(true);
     // Set true only once membership is fully committed; until then a thrown
     // error must roll back the just-created account so none is left orphaned.
@@ -283,7 +283,7 @@
       var activeId = window.ftMembership.resolveActiveTree(userData, memIds);
       if(!activeId){
         setLoading(false);
-        showErr('تعذّر العثور على عائلة مرتبطة بحسابك. تواصل مع الدعم.');
+        showErr(t('authErrNoFamily'));
         return;
       }
       currentTreeId = activeId;
@@ -318,7 +318,7 @@
       })();
     }catch(err){
       setLoading(false);
-      showErr('تعذّر تحميل بيانات الحساب: ' + (err.message||err.code));
+      showErr(t('authErrLoadAccount') + (err.message||err.code));
     }
   });
 
@@ -451,28 +451,23 @@
   }
 
   function actionLabel(action){
-    if(action === 'add') return 'أضاف';
-    if(action === 'edit') return 'عدّل';
-    if(action === 'delete') return 'حذف';
-    if(action === 'login') return 'سجّل الدخول';
-    if(action === 'join') return 'انضم للعائلة';
-    if(action === 'create_family') return 'أنشأ العائلة';
-    return action;
+    var map = { add:'actAdd', edit:'actEdit', delete:'actDelete', login:'actLogin', join:'actJoin', create_family:'actCreateFamily' };
+    return map[action] ? t(map[action]) : action;
   }
   function timeAgo(dateObj){
     if(!dateObj) return '';
     var diffSec = Math.round((Date.now() - dateObj.getTime())/1000);
-    if(diffSec < 60) return 'الآن';
-    var m = Math.round(diffSec/60); if(m < 60) return 'منذ ' + m + ' دقيقة';
-    var h = Math.round(m/60); if(h < 24) return 'منذ ' + h + ' ساعة';
-    var d = Math.round(h/24); return 'منذ ' + d + ' يوم';
+    if(diffSec < 60) return t('timeNow');
+    var m = Math.round(diffSec/60); if(m < 60) return tf('timeMinutes', { n: m });
+    var h = Math.round(m/60); if(h < 24) return tf('timeHours', { n: h });
+    var d = Math.round(h/24); return tf('timeDays', { n: d });
   }
 
   async function showActivityLog(){
     var overlay = document.getElementById('overlay');
     var sheet = document.getElementById('sheet');
     var body = document.getElementById('sheetBody');
-    body.innerHTML = '<h3>📋 سجل النشاط</h3><div class="context">جارِ التحميل…</div>';
+    body.innerHTML = '<h3>'+t('activityTitle')+'</h3><div class="context">'+t('loadingText')+'</div>';
     overlay.classList.add('open'); sheet.classList.add('open');
     try{
       var esc = window.__ftEscapeHtml || function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
@@ -480,7 +475,7 @@
       var lang = (window.__ftGetState && window.__ftGetState() && window.__ftGetState().lang) || 'ar';
       var dateStr = new Date().toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-EG',
         { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-      var header = '<h3>📋 سجل النشاط</h3>' +
+      var header = '<h3>'+t('activityTitle')+'</h3>' +
         '<div style="text-align:center; font-family:var(--f-head); font-weight:700; color:var(--emerald); font-size:14px; margin:2px 0 12px;">📅 ' + esc(dateStr) + '</div>';
       var todayStart = new Date(); todayStart.setHours(0,0,0,0);
       var q = query(collection(db, 'trees', currentTreeId, 'activity'), orderBy('at', 'desc'), limit(80));
@@ -498,15 +493,15 @@
         }
         var isPersonAction = (v.action === 'add' || v.action === 'edit' || v.action === 'delete');
         rows += '<div style="padding:9px 0; border-bottom:1px solid var(--paper-deep); font-size:13px;">' +
-          '<b>' + esc(v.byEmail || '؟') + '</b> ' + esc(actionLabel(v.action)) +
+          '<b>' + esc(v.byEmail || t('unknownShort')) + '</b> ' + esc(actionLabel(v.action)) +
           (isPersonAction ? ' «' + esc(v.personName || '') + '»' : '') +
           (v.detail ? ' <span style="color:var(--ink-soft);">(' + esc(v.detail) + ')</span>' : '') +
           '<div style="color:var(--ink-soft); font-size:11px; margin-top:2px;">' + (at ? timeAgo(at) : '') + '</div>' +
         '</div>';
       });
-      body.innerHTML = rows ? (header + rows) : (header + '<div class="context">لا يوجد نشاط اليوم.</div>');
+      body.innerHTML = rows ? (header + rows) : (header + '<div class="context">'+t('activityEmpty')+'</div>');
     }catch(e){
-      body.innerHTML = '<h3>📋 سجل النشاط</h3><div class="context">تعذّر تحميل السجل.</div>';
+      body.innerHTML = '<h3>'+t('activityTitle')+'</h3><div class="context">'+t('activityError')+'</div>';
     }
   }
 
@@ -514,7 +509,7 @@
     var overlay = document.getElementById('overlay');
     var sheet = document.getElementById('sheet');
     var body = document.getElementById('sheetBody');
-    body.innerHTML = '<h3>👥 أفراد العائلة</h3><div class="context">جارِ التحميل…</div>';
+    body.innerHTML = '<h3>'+t('membersTitle')+'</h3><div class="context">'+t('loadingText')+'</div>';
     overlay.classList.add('open'); sheet.classList.add('open');
     try{
       var snap = await getDocs(collection(db, 'trees', currentTreeId, 'members'));
@@ -524,16 +519,16 @@
         var v = d.data();
         var uid = d.id;
         var role = v.role || 'editor';
-        var roleLabel = role === 'owner' ? 'مالك' : (role === 'viewer' ? 'مشاهدة فقط' : 'محرِّر');
+        var roleLabel = role === 'owner' ? t('memberRoleOwner') : (role === 'viewer' ? t('memberRoleViewer') : t('memberRoleEditor'));
         var isSelf = uid === currentUid;
         rows += '<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 0; border-bottom:1px solid var(--paper-deep);">' +
-          '<div style="font-size:12.5px;"><b>' + esc(v.email || uid) + '</b>' + (isSelf ? ' (أنت)' : '') +
+          '<div style="font-size:12.5px;"><b>' + esc(v.email || uid) + '</b>' + (isSelf ? ' ('+t('memberYou')+')' : '') +
           '<div style="color:var(--ink-soft); font-size:11px;">' + roleLabel + '</div></div>' +
           (currentRole === 'owner' && !isSelf ? (
             '<div style="display:flex; gap:5px;">' +
-              (role !== 'viewer' ? '<button class="mini-btn" data-uid="'+uid+'" data-newrole="viewer" data-mact="role" title="تخفيض لمشاهد">👁</button>' : '') +
-              (role !== 'editor' ? '<button class="mini-btn" data-uid="'+uid+'" data-newrole="editor" data-mact="role" title="ترقية لمحرِّر">✎</button>' : '') +
-              '<button class="mini-btn danger" data-uid="'+uid+'" data-mact="remove" title="إزالة من العائلة">🗑</button>' +
+              (role !== 'viewer' ? '<button class="mini-btn" data-uid="'+uid+'" data-newrole="viewer" data-mact="role" title="'+esc(t('memberDemote'))+'">👁</button>' : '') +
+              (role !== 'editor' ? '<button class="mini-btn" data-uid="'+uid+'" data-newrole="editor" data-mact="role" title="'+esc(t('memberPromote'))+'">✎</button>' : '') +
+              '<button class="mini-btn danger" data-uid="'+uid+'" data-mact="remove" title="'+esc(t('memberRemove'))+'">🗑</button>' +
             '</div>'
           ) : '') +
         '</div>';
@@ -541,7 +536,7 @@
       var inviteBtn = (currentRole === 'owner' && createInvite)
         ? '<button class="primary-btn" id="mem_invite" style="margin-top:14px; background:var(--teal);">＋ '+t('menuInvite')+'</button>'
         : '';
-      body.innerHTML = '<h3>👥 أفراد العائلة (' + snap.size + ')</h3>' + rows + inviteBtn;
+      body.innerHTML = '<h3>'+t('membersTitle')+' (' + snap.size + ')</h3>' + rows + inviteBtn;
       var mi = document.getElementById('mem_invite');
       if(mi) mi.onclick = function(){ createInvite('editor'); };
       body.querySelectorAll('[data-mact="role"]').forEach(function(btn){
@@ -550,21 +545,21 @@
           try{
             await updateDoc(doc(db, 'trees', currentTreeId, 'members', uid), { role: newRole });
             showMembers();
-          }catch(e){ alert('تعذّر تغيير الصلاحية.'); }
+          }catch(e){ alert(t('memberRoleChangeFail')); }
         };
       });
       body.querySelectorAll('[data-mact="remove"]').forEach(function(btn){
         btn.onclick = async function(){
           var uid = btn.dataset.uid;
-          if(!confirm('إزالة هذا الفرد من العائلة؟ لن يعود بإمكانه رؤية الشجرة.')) return;
+          if(!confirm(t('memberRemoveConfirm'))) return;
           try{
             await deleteDoc(doc(db, 'trees', currentTreeId, 'members', uid));
             showMembers();
-          }catch(e){ alert('تعذّر إزالة العضو.'); }
+          }catch(e){ alert(t('memberRemoveFail')); }
         };
       });
     }catch(e){
-      body.innerHTML = '<h3>👥 أفراد العائلة</h3><div class="context">تعذّر تحميل القائمة.</div>';
+      body.innerHTML = '<h3>'+t('membersTitle')+'</h3><div class="context">'+t('membersError')+'</div>';
     }
   }
 
@@ -580,14 +575,15 @@
   // Structured moment types: turn a free-text feed into a legible one. Each type
   // has an icon, an Arabic label (this feed is inline-Arabic like the rest of the
   // moments UI), and a CSS accent class. 'news' is the neutral default.
+  // labelKey resolves through t() at render time so the chips/badges are bilingual.
   var MOMENT_TYPES = [
-    { id: 'news',        icon: '📰', label: 'خبر' },
-    { id: 'birth',       icon: '👶', label: 'مولود' },
-    { id: 'marriage',    icon: '💍', label: 'زواج' },
-    { id: 'graduation',  icon: '🎓', label: 'تخرّج' },
-    { id: 'travel',      icon: '✈️', label: 'سفر' },
-    { id: 'achievement', icon: '🏆', label: 'إنجاز' },
-    { id: 'memorial',    icon: '🕊', label: 'في ذمة الله' }
+    { id: 'news',        icon: '📰', labelKey: 'momentTypeNews' },
+    { id: 'birth',       icon: '👶', labelKey: 'momentTypeBirth' },
+    { id: 'marriage',    icon: '💍', labelKey: 'momentTypeMarriage' },
+    { id: 'graduation',  icon: '🎓', labelKey: 'momentTypeGraduation' },
+    { id: 'travel',      icon: '✈️', labelKey: 'momentTypeTravel' },
+    { id: 'achievement', icon: '🏆', labelKey: 'momentTypeAchievement' },
+    { id: 'memorial',    icon: '🕊', labelKey: 'momentTypeMemorial' }
   ];
   var MOMENT_TYPE_BY_ID = {};
   MOMENT_TYPES.forEach(function(tp){ MOMENT_TYPE_BY_ID[tp.id] = tp; });
@@ -598,7 +594,7 @@
     if(!host) return;
     host.innerHTML = MOMENT_TYPES.map(function(tp){
       return '<button type="button" class="mtype-chip mtype-' + tp.id + (tp.id === selectedMomentType ? ' active' : '') +
-             '" data-type="' + tp.id + '">' + tp.icon + ' ' + tp.label + '</button>';
+             '" data-type="' + tp.id + '">' + tp.icon + ' ' + t(tp.labelKey) + '</button>';
     }).join('');
     host.querySelectorAll('.mtype-chip').forEach(function(chip){
       chip.onclick = function(){
@@ -621,9 +617,9 @@
   // for a dropped connection sends a non-technical family member chasing the
   // wrong fix. permission-denied is the rules case; unavailable is the network.
   function writeErrMsg(e, base){
-    if(e && e.code === 'permission-denied') return base + ' — تأكد من تحديث قواعد الأمان (Firestore Rules).';
-    if(e && e.code === 'unavailable')       return 'تعذّر الاتصال — تحقّق من الإنترنت وحاول مجدداً.';
-    return base + '، حاول مرة أخرى.';
+    if(e && e.code === 'permission-denied') return base + t('writeErrRulesHint');
+    if(e && e.code === 'unavailable')       return t('writeErrOffline');
+    return base + t('writeErrRetry');
   }
 
   function renderMoments(docs){
@@ -634,22 +630,22 @@
     var liveIds = {}; docs.forEach(function(d){ liveIds[d.id] = 1; });
     Object.keys(openComments).forEach(function(k){ if(!liveIds[k]) delete openComments[k]; });
     if(!docs.length){
-      list.innerHTML = '<div class="moments-empty">لا توجد لحظات بعد — كن أول من يشارك خبرًا مع العائلة!</div>';
+      list.innerHTML = '<div class="moments-empty">'+t('momentsEmpty')+'</div>';
       return;
     }
     var timeAgoFn = window.__ftTimeAgo || function(){ return ''; };
     var html = '';
     docs.forEach(function(d){
       var v = d.data();
-      var when = v.at && v.at.toDate ? timeAgoFn(v.at.toDate()) : 'الآن';
+      var when = v.at && v.at.toDate ? timeAgoFn(v.at.toDate()) : t('timeNow');
       var canDelete = v.byUid === currentUid || currentRole === 'owner';
       var open = !!openComments[d.id];
       // A moment without a stored type is a legacy 'news' post — default cleanly.
       var tp = MOMENT_TYPE_BY_ID[v.type] || MOMENT_TYPE_BY_ID.news;
       html += '<div class="moment-card mtype-' + tp.id + '">' +
         '<div class="moment-head">' +
-          '<span class="moment-author">' + esc(v.byEmail || '؟') + '</span>' +
-          '<span class="moment-type-badge">' + tp.icon + ' ' + tp.label + '</span>' +
+          '<span class="moment-author">' + esc(v.byEmail || t('unknownShort')) + '</span>' +
+          '<span class="moment-type-badge">' + tp.icon + ' ' + t(tp.labelKey) + '</span>' +
           '<span class="moment-time">' + when + '</span></div>' +
         (v.text ? '<div class="moment-text">' + esc(v.text) + '</div>' : '') +
         (function(){
@@ -666,8 +662,8 @@
         '<div class="moment-comments" id="comments-' + d.id + '"' + (open ? '' : ' style="display:none;"') + '>' +
           '<div class="comments-list" id="comments-list-' + d.id + '"></div>' +
           '<div class="comment-compose">' +
-            '<input class="comment-input" id="comment-input-' + d.id + '" placeholder="أضف تعليقًا…" maxlength="500">' +
-            '<button class="comment-send" data-mid="' + d.id + '">إرسال</button>' +
+            '<input class="comment-input" id="comment-input-' + d.id + '" placeholder="'+esc(t('commentPlaceholder'))+'" maxlength="500">' +
+            '<button class="comment-send" data-mid="' + d.id + '">'+t('commentSend')+'</button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -676,13 +672,13 @@
     if(window.__ftFillPhotoRefs) window.__ftFillPhotoRefs(list);   // resolve Storage moment photos
     list.querySelectorAll('.moment-del').forEach(function(btn){
       btn.onclick = async function(){
-        if(!confirm('حذف هذه اللحظة؟')) return;
+        if(!confirm(t('momentDeleteConfirm'))) return;
         try{
           await deleteDoc(doc(db, 'trees', currentTreeId, 'moments', btn.dataset.id));
           // Best-effort remove the moment's Storage photo too (no-op if none).
           if(window.__ftPhotos && window.ftPhotoPaths) window.__ftPhotos.deletePhoto(window.ftPhotoPaths.moment(currentTreeId, btn.dataset.id)).catch(function(){});
         }
-        catch(e){ console.error('moment delete failed', e && e.code, e); alert(writeErrMsg(e, 'تعذّر الحذف')); }
+        catch(e){ console.error('moment delete failed', e && e.code, e); alert(writeErrMsg(e, t('momentDeleteFail'))); }
       };
     });
     docs.forEach(function(d){ wireMomentSocial(d.id); });
@@ -714,7 +710,7 @@
       console.error('reactions listener failed', mid, err && err.code, err);
       if(reactBtn){
         var rcx = reactBtn.querySelector('.react-count'); if(rcx) rcx.textContent = '—';
-        reactBtn.title = 'تعذّر تحميل التفاعلات';
+        reactBtn.title = t('reactLoadFail');
       }
     });
 
@@ -730,7 +726,7 @@
       console.error('comments listener failed', mid, err && err.code, err);
       if(commentBtn){ var ccx = commentBtn.querySelector('.comment-count'); if(ccx) ccx.textContent = '—'; }
       var listErr = document.getElementById('comments-list-' + mid);
-      if(listErr) listErr.innerHTML = '<div class="comments-empty">تعذّر تحميل التعليقات.</div>';
+      if(listErr) listErr.innerHTML = '<div class="comments-empty">'+t('commentsError')+'</div>';
     });
 
     momentSubs[mid] = [rUnsub, cUnsub];
@@ -754,29 +750,29 @@
       var when = v.at && v.at.toDate ? timeAgoFn(v.at.toDate()) : '';
       var canDel = v.byUid === currentUid || currentRole === 'owner';
       return '<div class="comment-row">' +
-        '<div class="comment-meta"><span class="comment-author">' + esc(v.byEmail || '؟') + '</span>' +
+        '<div class="comment-meta"><span class="comment-author">' + esc(v.byEmail || t('unknownShort')) + '</span>' +
         (when ? '<span class="comment-time">' + esc(when) + '</span>' : '') + '</div>' +
         '<div class="comment-text">' + esc(v.text || '') + '</div>' +
-        (canDel ? '<button class="comment-del" data-mid="' + mid + '" data-cid="' + it.id + '">حذف</button>' : '') +
+        (canDel ? '<button class="comment-del" data-mid="' + mid + '" data-cid="' + it.id + '">'+t('commentDelete')+'</button>' : '') +
       '</div>';
     }).join('');
     listEl.querySelectorAll('.comment-del').forEach(function(btn){
       btn.onclick = async function(){
         try{ await deleteDoc(doc(db, 'trees', currentTreeId, 'moments', btn.dataset.mid, 'comments', btn.dataset.cid)); }
-        catch(e){ console.error('comment delete failed', e && e.code, e); alert(writeErrMsg(e, 'تعذّر حذف التعليق')); }
+        catch(e){ console.error('comment delete failed', e && e.code, e); alert(writeErrMsg(e, t('commentDeleteFail'))); }
       };
     });
   }
 
   async function toggleReaction(mid, currentlyReacted){
-    if(!currentTreeId || !currentUid){ alert('يجب تسجيل الدخول أولاً'); return; }
+    if(!currentTreeId || !currentUid){ alert(t('needSignIn')); return; }
     var ref = doc(db, 'trees', currentTreeId, 'moments', mid, 'reactions', currentUid);
     try{
       if(currentlyReacted) await deleteDoc(ref);
       else await setDoc(ref, { byUid: currentUid, emoji: '❤️', at: serverTimestamp() });
     }catch(e){
       console.error('toggleReaction failed', mid, e && e.code, e);
-      alert(writeErrMsg(e, 'تعذّر تسجيل التفاعل'));
+      alert(writeErrMsg(e, t('reactFail')));
     }
   }
 
@@ -784,7 +780,7 @@
     if(!input) return;
     var text = input.value.trim();
     if(!text) return;
-    if(!currentTreeId || !currentUid){ alert('يجب تسجيل الدخول أولاً'); return; }
+    if(!currentTreeId || !currentUid){ alert(t('needSignIn')); return; }
     input.disabled = true;
     try{
       await addDoc(collection(db, 'trees', currentTreeId, 'moments', mid, 'comments'), {
@@ -795,7 +791,7 @@
       input.value = '';
     }catch(e){
       console.error('postComment failed', mid, e && e.code, e);
-      alert(writeErrMsg(e, 'تعذّر إضافة التعليق'));
+      alert(writeErrMsg(e, t('commentAddFail')));
     }
     input.disabled = false;
     input.focus();
@@ -812,13 +808,13 @@
       // Feed read failed: release any per-moment listeners from a prior good
       // render so they don't keep running against DOM that's about to vanish.
       teardownMomentSubs();
-      document.getElementById('momentsList').innerHTML = '<div class="moments-empty">تعذّر تحميل اللحظات.</div>';
+      document.getElementById('momentsList').innerHTML = '<div class="moments-empty">'+t('momentsError')+'</div>';
     });
   }
 
   function openMoments(){
     document.getElementById('momentsScreen').classList.add('open');
-    document.getElementById('momentsList').innerHTML = '<div class="moments-empty">جارِ التحميل…</div>';
+    document.getElementById('momentsList').innerHTML = '<div class="moments-empty">'+t('loadingText')+'</div>';
     renderMomentTypeChips();
     subscribeMoments();
   }
@@ -863,8 +859,8 @@
   document.getElementById('momentPostBtn').addEventListener('click', async function(){
     var textEl = document.getElementById('momentText');
     var text = textEl.value.trim();
-    if(!text && !pendingMomentPhoto){ alert('اكتب شيئًا أو أضف صورة أولاً'); return; }
-    if(!currentTreeId || !currentUid){ alert('يجب تسجيل الدخول أولاً'); return; }
+    if(!text && !pendingMomentPhoto){ alert(t('momentNeedContent')); return; }
+    if(!currentTreeId || !currentUid){ alert(t('needSignIn')); return; }
     var btn = document.getElementById('momentPostBtn');
     btn.disabled = true;
     try{
@@ -878,7 +874,7 @@
           await window.__ftPhotos.uploadPhoto(photoPath, pendingMomentPhoto.dataUrl);
         }catch(upErr){
           console.error('moment photo upload failed', upErr && upErr.code, upErr);
-          alert(writeErrMsg(upErr, 'تعذّر رفع صورة اللحظة'));
+          alert(writeErrMsg(upErr, t('momentPhotoUploadFail')));
           btn.disabled = false; return;
         }
       }
@@ -902,7 +898,7 @@
       prev.style.display = 'none'; prev.innerHTML = '';
     }catch(e){
       console.error('moment post failed', e && e.code, e);
-      alert(writeErrMsg(e, 'تعذّر النشر'));
+      alert(writeErrMsg(e, t('momentPostFail')));
     }
     btn.disabled = false;
   });
@@ -1192,7 +1188,7 @@
     var size = new Blob([JSON.stringify(payload)]).size;
     if(size > MAX_DOC_BYTES){
       if(treeId === currentTreeId) cloudBtn.dataset.status = 'offline';
-      alert('حجم بيانات الشجرة كبير جدًا للمزامنة السحابية — قد تحتاج لتقليل حجم الصور أو عدد الأفراد. تم الحفظ محليًا فقط.');
+      alert(t('syncTooLarge'));
       return;
     }
     try{
@@ -1214,7 +1210,7 @@
       // which would spam a downgraded editor). Transient/network errors stay a quiet dot.
       if(err && (err.code === 'permission-denied' || err.code === 'not-found') && !syncErrorAlerted){
         syncErrorAlerted = true;
-        alert('تعذّرت مزامنة التغيير مع السحابة (صلاحيات أو مستند مفقود) — تم الحفظ محليًا فقط. تواصل مع مالك العائلة.');
+        alert(t('syncFail'));
       }
     }
   }
@@ -1225,16 +1221,16 @@
     var body = document.getElementById('sheetBody');
     var esc = window.__ftEscapeHtml || function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
     var currentEmail = (auth.currentUser && auth.currentUser.email) || '';
-    var roleLabel = currentRole === 'owner' ? 'مالك العائلة' : (currentRole === 'viewer' ? 'مشاهدة فقط' : 'محرِّر');
+    var roleLabel = currentRole === 'owner' ? t('accountRoleOwner') : (currentRole === 'viewer' ? t('memberRoleViewer') : t('memberRoleEditor'));
     body.innerHTML =
-      '<h3>المزامنة السحابية</h3>' +
-      '<div class="context">مسجّل الدخول باسم: <strong>' + esc(currentEmail) + '</strong> (' + roleLabel + ')</div>' +
+      '<h3>'+t('accountTitle')+'</h3>' +
+      '<div class="context">'+t('accountSignedInAs')+'<strong>' + esc(currentEmail) + '</strong> (' + roleLabel + ')</div>' +
       (canEditCloud ? (
         '<div class="context">' + t('inviteShareHint') + '</div>' +
         (window.__ftCloud && window.__ftCloud.createInvite ? '<button class="primary-btn" id="cf_invite" style="margin-bottom:10px; background:var(--teal);">'+t('menuInvite')+'</button>' : '')
       ) : '') +
-      '<button class="primary-btn" id="cf_members" style="margin-bottom:10px; background:var(--teal);">👥 أفراد العائلة</button>' +
-      '<button class="primary-btn" id="cf_signout" style="background:var(--danger);">تسجيل الخروج</button>';
+      '<button class="primary-btn" id="cf_members" style="margin-bottom:10px; background:var(--teal);">'+t('membersTitle')+'</button>' +
+      '<button class="primary-btn" id="cf_signout" style="background:var(--danger);">'+t('accountSignout')+'</button>';
     document.getElementById('cf_members').onclick = function(){ showMembers(); };
     if(canEditCloud && window.__ftCloud && window.__ftCloud.createInvite){
       var invBtn = document.getElementById('cf_invite');

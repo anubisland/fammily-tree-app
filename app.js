@@ -2502,8 +2502,10 @@
     g.fillStyle = bg; g.fillRect(0,0,W,H);
     g.strokeStyle = 'rgba(184,134,45,0.55)'; g.lineWidth = 4; _roundRect(g,30,30,W-60,H-60,28); g.stroke();
     g.textAlign = 'center'; g.direction = 'rtl';
+    // famNameOf() already carries the "عائلة " prefix (baked in at creation) and is
+    // shown as-is everywhere else — prepending it again doubled the word ("عائلة عائلة …").
     var fam = famNameOf().trim();
-    g.fillStyle = '#8A6A2A'; g.font = "700 34px Amiri"; g.fillText(fam ? ('عائلة '+fam) : 'شجرة العائلة', cx, 112);
+    g.fillStyle = '#8A6A2A'; g.font = "700 34px Amiri"; g.fillText(fam || t('appName'), cx, 112);
     // portrait
     var cy = 330, r = 150;
     g.save(); g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.closePath();

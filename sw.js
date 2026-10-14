@@ -11,7 +11,7 @@
    ============================================================ */
 'use strict';
 
-var CACHE = 'family-tree-v33';
+var CACHE = 'family-tree-v34';
 // The shell we want available offline. Same-origin, no cache-buster here.
 var SHELL = [
   './',

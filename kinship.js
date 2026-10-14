@@ -1,8 +1,13 @@
 /* ============================================================
    Kinship engine — pure function, no DOM/Firebase dependency so it can be
    unit-tested in node. Given the people map (id -> {id,name,gender,parentId,
-   spouseIds,childrenIds}) it returns the Arabic term for how person B relates
-   to person A ("B هو/هي ___ لـ A").
+   spouseIds,childrenIds}) it returns how person B relates to person A
+   ("B is ___ to A"), in Arabic (default) or natural English (lang='en').
+
+   The traversal (shortest path through the lowest common ancestor) is
+   language-neutral; it yields a structured descriptor which is then formatted
+   per language. Arabic is rich (عم vs خال, ابن العم vs ابن الخال); natural
+   English collapses these to uncle/cousin and drops the paternal/maternal side.
 
    parentId links a person to ONE parent, which may be the father OR the mother
    (children of a woman in the tree are attached to her). We therefore read the
@@ -20,12 +25,11 @@
 
     // Father/mother resolved by the GENDER of the linked parent.
     function fatherOf(id){
-      var p = P(id); if(!p || !p.parentId) return firstSpouseFather(id);
+      var p = P(id); if(!p || !p.parentId) return null;
       var par = P(p.parentId); if(!par) return null;
       if(par.gender === 'm') return p.parentId;      // parent is the father
       return firstSpouse(p.parentId);                // parent is the mother -> father = her spouse
     }
-    function firstSpouseFather(){ return null; }
     function motherOf(id){
       var p = P(id); if(!p || !p.parentId) return null;
       var par = P(p.parentId); if(!par) return null;
@@ -68,77 +72,125 @@
     }
     function reaches(id, target){ return target in ancestorsMap(id); }
 
-    // ---------- naming ----------
-    function descTerm(d, g){                 // B is d levels below A
+    // ---------- structured blood descriptor (language-neutral) ----------
+    function bloodDesc(aId, bId){
+      if(aId === bId) return null;
+      var L = lca(aId, bId);
+      if(!L) return null;
+      var dA = L.dA, dB = L.dB, gB = gender(bId), sideA = L.pathA[0];
+
+      if(dA === 0) return { cat: 'desc', d: dB, g: gB };                 // B descends from A
+      if(dB === 0) return { cat: 'anc', d: dA, side: sideA, g: gB };     // B is A's ancestor
+
+      if(dA === 1 && dB === 1){                                          // siblings
+        var fA = fatherOf(aId), fB = fatherOf(bId), mA = motherOf(aId), mB = motherOf(bId);
+        var half = '';
+        // Only qualify as half-sibling when the OTHER parent is known to differ;
+        // an unrecorded mother must not turn full brothers into half-siblings.
+        if((fA && fB && fA === fB) && (mA && mB && mA !== mB)) half = 'father';
+        else if((mA && mB && mA === mB) && (fA && fB && fA !== fB)) half = 'mother';
+        return { cat: 'sib', g: gB, half: half };
+      }
+      if(dA === 1 && dB >= 2) return { cat: 'nib', k: dB - 1, g: gB, sg: gender(nodeBelowLca(bId, L.id)) };
+      if(dB === 1 && dA >= 2) return { cat: 'uncle', dA: dA, side: sideA, g: gB };
+      return { cat: 'cousin', dA: dA, dB: dB, side: sideA, g: gB, ug: gender(nodeBelowLca(bId, L.id)) };
+    }
+
+    // ---------- Arabic formatting ----------
+    function descTermAr(d, g){
       if(d === 1) return g === 'f' ? 'ابنة' : 'ابن';
       if(d === 2) return g === 'f' ? 'حفيدة' : 'حفيد';
       if(d === 3) return (g === 'f' ? 'بنت' : 'ابن') + ' الحفيد';
       if(d === 4) return (g === 'f' ? 'حفيدة' : 'حفيد') + ' الحفيد';
       return 'من الذرّية';
     }
-    function ancTerm(d, side, g){             // B is d levels above A
+    function ancTermAr(d, side, g){
       if(d === 1) return g === 'f' ? 'أم' : 'أب';
       if(d === 2) return g === 'f' ? 'جدة' : 'جد';
       if(d === 3) return (g === 'f' ? 'جدة' : 'جد') + ' ' + (side === 'm' ? 'الأم' : 'الأب');
       return (g === 'f' ? 'جدة' : 'جد') + ' الأعلى';
     }
-    function uncleTerm(dA, side, g){          // B is A's ancestor's sibling
+    function uncleTermAr(dA, side, g){
       var base = side === 'm' ? (g === 'f' ? 'خالة' : 'خال') : (g === 'f' ? 'عمة' : 'عم');
-      if(dA === 2) return base;              // parent's sibling
-      if(dA === 3) return base + ' ' + (side === 'm' ? 'الأم' : 'الأب'); // grandparent's sibling: عم الأب / خال الأم
+      if(dA === 2) return base;
+      if(dA === 3) return base + ' ' + (side === 'm' ? 'الأم' : 'الأب');
       if(dA === 4) return base + ' الجد';
       return base + ' الأعلى';
     }
-    function niblingTerm(k, g, sg){           // B is k levels below A's sibling
+    function niblingTermAr(k, g, sg){
       var sw = sg === 'f' ? 'الأخت' : 'الأخ';
-      if(k === 1) return (g === 'f' ? 'بنت' : 'ابن') + ' ' + sw;   // ابن الأخ / بنت الأخت
-      if(k === 2) return (g === 'f' ? 'حفيدة' : 'حفيد') + ' ' + sw; // حفيد الأخ
+      if(k === 1) return (g === 'f' ? 'بنت' : 'ابن') + ' ' + sw;
+      if(k === 2) return (g === 'f' ? 'حفيدة' : 'حفيد') + ' ' + sw;
       if(k === 3) return (g === 'f' ? 'بنت' : 'ابن') + ' حفيد ' + sw;
       return 'من ذرّية ' + sw;
     }
-    // The connecting relative, from A's view: A's (dA-1)-level ancestor's sibling.
-    function uncleForCousin(dA, side, ug){
+    function uncleForCousinAr(dA, side, ug){
       var base = side === 'm' ? (ug === 'f' ? 'خالة' : 'خال') : (ug === 'f' ? 'عمة' : 'عم');
-      if(dA === 2) return 'ال' + base;                                   // العم / الخالة
-      if(dA === 3) return base + ' ' + (side === 'm' ? 'الأم' : 'الأب'); // عم الأب / خال الأم
+      if(dA === 2) return 'ال' + base;
+      if(dA === 3) return base + ' ' + (side === 'm' ? 'الأم' : 'الأب');
       return base + ' الأعلى';
     }
-    function cousinTerm(dA, dB, side, g, ug){ // dA>=2, dB>=2 (uncle gender ug)
-      var unc = uncleForCousin(dA, side, ug);
-      var k = dB - 1;                          // B is k levels below that relative
+    function cousinTermAr(dA, dB, side, g, ug){
+      var unc = uncleForCousinAr(dA, side, ug);
+      var k = dB - 1;
       var desc = k === 1 ? (g === 'f' ? 'بنت' : 'ابن')
                : k === 2 ? (g === 'f' ? 'حفيدة' : 'حفيد')
                : (g === 'f' ? 'بنت' : 'ابن') + ' حفيد';
-      return desc + ' ' + unc;                 // ابن العم / حفيد العم / ابن عم الأب / حفيد عم الأب …
+      return desc + ' ' + unc;
+    }
+    function fmtAr(d){
+      switch(d.cat){
+        case 'desc':   return descTermAr(d.d, d.g);
+        case 'anc':    return ancTermAr(d.d, d.side, d.g);
+        case 'sib':    { var b = d.g === 'f' ? 'أخت' : 'أخ'; return d.half === 'father' ? b + ' لأب' : d.half === 'mother' ? b + ' لأم' : b; }
+        case 'nib':    return niblingTermAr(d.k, d.g, d.sg);
+        case 'uncle':  return uncleTermAr(d.dA, d.side, d.g);
+        case 'cousin': return cousinTermAr(d.dA, d.dB, d.side, d.g, d.ug);
+      }
+      return '';
     }
 
-    function bloodRelation(aId, bId){
-      if(aId === bId) return null;
-      var L = lca(aId, bId);
-      if(!L) return null;
-      var dA = L.dA, dB = L.dB, gB = gender(bId), sideA = L.pathA[0];
-
-      if(dA === 0) return descTerm(dB, gB);          // B descends from A
-      if(dB === 0) return ancTerm(dA, sideA, gB);    // B is A's ancestor
-
-      if(dA === 1 && dB === 1){                       // siblings
-        var fA = fatherOf(aId), fB = fatherOf(bId), mA = motherOf(aId), mB = motherOf(bId);
-        var base = gB === 'f' ? 'أخت' : 'أخ';
-        // Only qualify as half-sibling when the OTHER parent is known to differ;
-        // an unrecorded mother must not turn full brothers into "أخ لأب".
-        if((fA && fB && fA === fB) && (mA && mB && mA !== mB)) return base + ' لأب';
-        if((mA && mB && mA === mB) && (fA && fB && fA !== fB)) return base + ' لأم';
-        return base;
+    // ---------- English formatting (natural, side/gender collapsed) ----------
+    function greats(n){ var s = ''; for(var i = 0; i < n; i++) s += 'great-'; return s; }   // n>=0
+    function ordinal(n){ var w = { 1:'first', 2:'second', 3:'third', 4:'fourth', 5:'fifth' }; return w[n] || (n + 'th'); }
+    function removedEn(r){ return r === 0 ? '' : r === 1 ? ' once removed' : r === 2 ? ' twice removed' : ' ' + r + ' times removed'; }
+    function fmtEn(d){
+      switch(d.cat){
+        case 'desc': {
+          if(d.d === 1) return d.g === 'f' ? 'daughter' : 'son';
+          return greats(d.d - 2) + 'grand' + (d.g === 'f' ? 'daughter' : 'son');
+        }
+        case 'anc': {
+          if(d.d === 1) return d.g === 'f' ? 'mother' : 'father';
+          return greats(d.d - 2) + 'grand' + (d.g === 'f' ? 'mother' : 'father');
+        }
+        case 'sib': {
+          var base = d.g === 'f' ? 'sister' : 'brother';
+          return d.half ? 'half-' + base : base;
+        }
+        case 'nib': {
+          var nn = d.g === 'f' ? 'niece' : 'nephew';
+          if(d.k === 1) return nn;
+          return greats(d.k - 2) + 'grand-' + nn;             // grand-nephew, great-grand-nephew…
+        }
+        case 'uncle': {
+          var un = d.g === 'f' ? 'aunt' : 'uncle';
+          if(d.dA === 2) return un;
+          return greats(d.dA - 3) + 'great-' + un;            // great-uncle, great-great-uncle…
+        }
+        case 'cousin': {
+          // ordinal = how many generations to the common ancestor (min side) minus 1;
+          // removed = the generation gap between the two cousins.
+          var ord = Math.min(d.dA, d.dB) - 1;
+          return ordinal(ord) + ' cousin' + removedEn(Math.abs(d.dA - d.dB));
+        }
       }
-      if(dA === 1 && dB >= 2){                         // B descends from A's sibling
-        return niblingTerm(dB - 1, gB, gender(nodeBelowLca(bId, L.id)));
-      }
-      if(dB === 1 && dA >= 2){                         // B is A's ancestor's sibling
-        return uncleTerm(dA, sideA, gB);
-      }
-      return cousinTerm(dA, dB, sideA, gB, gender(nodeBelowLca(bId, L.id))); // cousins & beyond
+      return '';
     }
 
+    function fmtBlood(d, lang){ return lang === 'en' ? fmtEn(d) : fmtAr(d); }
+
+    // Arabic-only helpers for composing in-law phrases.
     function genitive(term){
       var map = { 'أخ':'الأخ','أخت':'الأخت','أب':'الأب','أم':'الأم','ابن':'الابن','ابنة':'الابنة','بنت':'البنت','عم':'العم','عمة':'العمة','خال':'الخال','خالة':'الخالة' };
       if(map[term]) return map[term];
@@ -146,8 +198,7 @@
       if(term.indexOf('أخت') === 0) return 'الأخت';
       return term;
     }
-    // Construct (إضافة) form: drop the leading "ال" from the LAST word so a term
-    // like "ابن العم" reads naturally before "الزوج" -> "ابن عم الزوج".
+    // Construct (إضافة) form: drop the leading "ال" from the LAST word.
     function construct(term){
       var w = String(term).split(' ');
       var last = w[w.length - 1];
@@ -155,60 +206,78 @@
       return w.join(' ');
     }
 
-    function relate(aId, bId){
-      if(aId === bId) return 'الشخص نفسه';
+    // Back-compat: the Arabic blood term as a string (used by older callers/tests).
+    function bloodRelation(aId, bId){ var d = bloodDesc(aId, bId); return d ? fmtAr(d) : null; }
+
+    function relate(aId, bId, lang){
+      var en = lang === 'en';
+      if(aId === bId) return en ? 'the same person' : 'الشخص نفسه';
       var A = P(aId), B = P(bId);
       if(!A || !B) return '';
 
-      if((A.spouseIds || []).indexOf(bId) !== -1) return gender(bId) === 'f' ? 'زوجة' : 'زوج';
+      if((A.spouseIds || []).indexOf(bId) !== -1) return en ? (gender(bId) === 'f' ? 'wife' : 'husband') : (gender(bId) === 'f' ? 'زوجة' : 'زوج');
 
-      var bl = bloodRelation(aId, bId);
-      if(bl) return bl;
+      var bd = bloodDesc(aId, bId);
+      if(bd) return fmtBlood(bd, lang);
 
       // B is a blood relative of A's spouse
       var sA = firstSpouse(aId);
       if(sA){
-        var rb = bloodRelation(sA, bId);
-        if(rb){
-          if(rb === 'أب') return 'حمو (والد الزوج/الزوجة)';
-          if(rb === 'أم') return 'حماة (والدة الزوج/الزوجة)';
+        var rbd = bloodDesc(sA, bId);
+        if(rbd){
+          var isFather = rbd.cat === 'anc' && rbd.d === 1 && rbd.g === 'm';
+          var isMother = rbd.cat === 'anc' && rbd.d === 1 && rbd.g === 'f';
+          if(en){
+            if(isFather) return 'father-in-law';
+            if(isMother) return 'mother-in-law';
+            if(rbd.cat === 'sib') return gender(bId) === 'f' ? 'sister-in-law' : 'brother-in-law';
+            return (gender(sA) === 'f' ? 'wife' : 'husband') + "'s " + fmtEn(rbd);
+          }
+          if(isFather) return 'حمو (والد الزوج/الزوجة)';
+          if(isMother) return 'حماة (والدة الزوج/الزوجة)';
           var sw = gender(sA) === 'f' ? 'الزوجة' : 'الزوج';
-          if(rb.indexOf('أخت') === 0) return 'أخت ' + sw;
-          if(rb.indexOf('أخ') === 0) return 'أخو ' + sw;
-          return construct(rb) + ' ' + sw;   // e.g. "ابن العم" -> "ابن عم الزوج"
+          if(rbd.cat === 'sib') return (rbd.g === 'f' ? 'أخت ' : 'أخو ') + sw;
+          return construct(fmtAr(rbd)) + ' ' + sw;
         }
       }
       // A is a blood relative of B's spouse
       var sB = firstSpouse(bId);
       if(sB){
-        var ra = bloodRelation(aId, sB);
-        if(ra){
-          if(ra === 'ابن') return gender(bId) === 'f' ? 'زوجة الابن (كنّة)' : '';
-          if(ra === 'ابنة' || ra === 'بنت') return 'زوج البنت (صهر)';
-          return (gender(bId) === 'f' ? 'زوجة ' : 'زوج ') + genitive(ra);
+        var rad = bloodDesc(aId, sB);
+        if(rad){
+          var isSon = rad.cat === 'desc' && rad.d === 1 && rad.g === 'm';
+          var isDaughter = rad.cat === 'desc' && rad.d === 1 && rad.g === 'f';
+          if(en){
+            if(isSon) return gender(bId) === 'f' ? 'daughter-in-law' : 'son-in-law';
+            if(isDaughter) return 'son-in-law';
+            return fmtEn(rad) + "'s " + (gender(bId) === 'f' ? 'wife' : 'husband');
+          }
+          if(isSon) return gender(bId) === 'f' ? 'زوجة الابن (كنّة)' : '';
+          if(isDaughter) return 'زوج البنت (صهر)';
+          return (gender(bId) === 'f' ? 'زوجة ' : 'زوج ') + genitive(fmtAr(rad));
         }
       }
       // A and B are each married, and their two spouses are blood relatives.
-      // Siblings -> سِلفة (two wives) / عديل (two husbands); otherwise a descriptive
-      // phrase, e.g. wives of two paternal cousins -> «زوجة ابن عم الزوج».
       if(sA && sB && sA !== sB){
-        var rr = bloodRelation(sA, sB);                 // how B's spouse relates to A's spouse
-        if(rr){
-          if(rr.indexOf('أخ') === 0){                   // spouses are siblings
+        var rrd = bloodDesc(sA, sB);
+        if(rrd){
+          if(rrd.cat === 'sib'){
+            if(en) return gender(bId) === 'f' ? 'sister-in-law' : 'brother-in-law';
             if(gender(aId) === 'f' && gender(bId) === 'f') return 'سِلفة';
             if(gender(aId) === 'm' && gender(bId) === 'm') return 'عديل';
           }
-          var connector = gender(sA) === 'm' ? 'الزوج' : 'الزوجة';   // A's spouse
-          return (gender(bId) === 'f' ? 'زوجة ' : 'زوج ') + construct(rr) + ' ' + connector;
+          if(en) return 'relative by marriage';
+          var connector = gender(sA) === 'm' ? 'الزوج' : 'الزوجة';
+          return (gender(bId) === 'f' ? 'زوجة ' : 'زوج ') + construct(fmtAr(rrd)) + ' ' + connector;
         }
       }
-      return 'قرابة بعيدة';
+      return en ? 'distant relative' : 'قرابة بعيدة';
     }
 
-    return { relate: relate, bloodRelation: bloodRelation, _lca: lca, _father: fatherOf, _mother: motherOf };
+    return { relate: relate, bloodRelation: bloodRelation, bloodDesc: bloodDesc, _lca: lca, _father: fatherOf, _mother: motherOf };
   }
 
-  function ftKinship(people, aId, bId){ return make(people).relate(aId, bId); }
+  function ftKinship(people, aId, bId, lang){ return make(people).relate(aId, bId, lang); }
   ftKinship.make = make;
 
   if(typeof module !== 'undefined' && module.exports) module.exports = ftKinship;

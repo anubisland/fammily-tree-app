@@ -2836,7 +2836,7 @@
   }
   function showKinshipResult(aId, bId){
     var A = getPerson(aId), B = getPerson(bId);
-    var rel = (window.ftKinship ? window.ftKinship(state.people, aId, bId) : '');
+    var rel = (window.ftKinship ? window.ftKinship(state.people, aId, bId, state.lang) : '');
     // Use the pronoun matching B's gender only (هو for male, هي for female):
     //   «B»  هو/هي  ——  [term]  ——  لـ «A»
     var verb = (state.lang === 'en') ? 'is' : (B.gender === 'f' ? 'هي' : 'هو');

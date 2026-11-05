@@ -58,4 +58,12 @@ ok(en('me','chw')==='daughter-in-law', 'en daughter-in-law');
 ok(en('me','dauh')==='son-in-law', 'en son-in-law');
 ok(en('me','me')==='the same person', 'en self');
 
+// ── relationPath (for lighting the path on the tree) ───────────────────────
+ok(JSON.stringify(K.path(P,'me','gch'))==='["me","ch","gch"]', 'path me→grandson (straight down)');
+ok(JSON.stringify(K.path(P,'me','fa'))==='["me","fa"]', 'path me→father');
+ok(JSON.stringify(K.path(P,'me','cuz'))==='["me","fa","g1m","un","cuz"]', 'path me→cousin via common grandfather');
+ok(JSON.stringify(K.path(P,'me','neph'))==='["me","fa","sib","neph"]', 'path me→nephew via father');
+ok(JSON.stringify(K.path(P,'me','me'))==='["me"]', 'path self');
+ok(K.path(P,'me','wf')===null, 'no blood path to spouse → null');
+
 console.log(pass+' passed, '+fail+' failed'); process.exit(fail?1:0);

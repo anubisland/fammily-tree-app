@@ -209,6 +209,29 @@
     // Back-compat: the Arabic blood term as a string (used by older callers/tests).
     function bloodRelation(aId, bId){ var d = bloodDesc(aId, bId); return d ? fmtAr(d) : null; }
 
+    // Ordered id chain A → … → lowest common ancestor → … → B, for lighting the
+    // blood-relationship path on the tree. null when A and B share no ancestor
+    // (e.g. only related by marriage). Self returns [aId].
+    function relationPath(aId, bId){
+      if(aId === bId) return [aId];
+      var L = lca(aId, bId);
+      if(!L) return null;
+      function climb(id, steps){
+        var ids = [id], cur = id;
+        for(var i = 0; i < steps.length; i++){
+          cur = steps[i] === 'f' ? fatherOf(cur) : motherOf(cur);
+          if(!cur) return null;              // broken chain — bail rather than mislead
+          ids.push(cur);
+        }
+        return ids;
+      }
+      var aChain = climb(aId, L.pathA);        // [A, …, LCA]
+      var bChain = climb(bId, L.pathB);        // [B, …, LCA]
+      if(!aChain || !bChain) return null;
+      var down = bChain.slice(0, bChain.length - 1).reverse();   // LCA→B, excluding LCA
+      return aChain.concat(down);              // [A, …, LCA, …, B]
+    }
+
     function relate(aId, bId, lang){
       var en = lang === 'en';
       if(aId === bId) return en ? 'the same person' : 'الشخص نفسه';
@@ -274,11 +297,12 @@
       return en ? 'distant relative' : 'قرابة بعيدة';
     }
 
-    return { relate: relate, bloodRelation: bloodRelation, bloodDesc: bloodDesc, _lca: lca, _father: fatherOf, _mother: motherOf };
+    return { relate: relate, bloodRelation: bloodRelation, bloodDesc: bloodDesc, relationPath: relationPath, _lca: lca, _father: fatherOf, _mother: motherOf };
   }
 
   function ftKinship(people, aId, bId, lang){ return make(people).relate(aId, bId, lang); }
   ftKinship.make = make;
+  ftKinship.path = function(people, aId, bId){ return make(people).relationPath(aId, bId); };
 
   if(typeof module !== 'undefined' && module.exports) module.exports = ftKinship;
   global.ftKinship = ftKinship;

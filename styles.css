@@ -511,16 +511,26 @@
   .card.kin-b{ outline:3px solid var(--gold); outline-offset:2px; box-shadow:0 0 0 7px rgba(184,134,45,.24); transition:box-shadow .15s ease; }
   html.dark .card.kin-a{ box-shadow:0 0 0 7px rgba(46,139,114,.28); }
   html.dark .card.kin-b{ box-shadow:0 0 0 7px rgba(214,169,74,.28); }
-  /* Lit relationship path: a bright gold glow so it reads even when zoomed out. */
-  .card.kin-lit{ outline:3px solid #E8A317; outline-offset:2px; border-radius:16px; position:relative; z-index:2; animation:kinLitPulse 1.8s ease-in-out infinite; }
-  @keyframes kinLitPulse{ 0%,100%{ box-shadow:0 0 0 4px rgba(240,180,41,.30), 0 0 18px 3px rgba(240,180,41,.48); } 50%{ box-shadow:0 0 0 7px rgba(240,180,41,.48), 0 0 32px 8px rgba(240,180,41,.72); } }
-  /* Endpoints — the two chosen people — a larger, brighter halo so each stands out. */
-  .card.kin-lit-end{ outline:4px solid #F7C948; outline-offset:3px; z-index:3; animation:kinLitEnd 1.5s ease-in-out infinite; }
-  @keyframes kinLitEnd{ 0%,100%{ box-shadow:0 0 0 6px rgba(247,201,72,.42), 0 0 30px 7px rgba(247,201,72,.62); } 50%{ box-shadow:0 0 0 12px rgba(247,201,72,.58), 0 0 52px 14px rgba(247,201,72,.92); } }
-  /* Connector: vivid gold, thick, and non-scaling so it stays bold at any zoom. */
-  svg.links path.lit{ stroke:#F0B429; stroke-width:5; vector-effect:non-scaling-stroke; stroke-linecap:round; filter:drop-shadow(0 0 4px rgba(240,180,41,.95)); animation:kinLitStroke 1.5s ease-in-out infinite; }
-  @keyframes kinLitStroke{ 0%,100%{ stroke-width:4; opacity:.9; } 50%{ stroke-width:7; opacity:1; } }
-  @media (prefers-reduced-motion: reduce){ .card.kin-lit, .card.kin-lit-end, svg.links path.lit{ animation:none; } }
+  /* Lit relationship path. The tree's own connectors are already gold/tan, so the
+     path only reads if (a) the other lines fade and (b) the path is a distinct
+     saturated colour, not another gold. */
+  body.kin-lighting svg.links path:not(.lit){ opacity:.15; }   /* fade the tree's own lines */
+  /* The path connector: vivid amber-orange, thick, non-scaling (bold at any zoom). */
+  svg.links path.lit{ stroke:#FF7A00; stroke-width:6; vector-effect:non-scaling-stroke; stroke-linecap:round; filter:drop-shadow(0 0 5px rgba(255,122,0,.95)); animation:kinLitStroke 1.4s ease-in-out infinite; }
+  @keyframes kinLitStroke{ 0%,100%{ stroke-width:5; opacity:.92; } 50%{ stroke-width:8; opacity:1; } }
+  /* Intermediate path cards: warm amber tint + outline + glow. */
+  .card.kin-lit{ background:#FBE6C0; outline:3px solid #E8900F; outline-offset:2px; border-radius:16px; position:relative; z-index:2; animation:kinLitPulse 1.8s ease-in-out infinite; }
+  @keyframes kinLitPulse{ 0%,100%{ box-shadow:0 0 0 4px rgba(232,144,15,.30), 0 0 18px 3px rgba(232,144,15,.46); } 50%{ box-shadow:0 0 0 7px rgba(232,144,15,.48), 0 0 30px 7px rgba(232,144,15,.70); } }
+  html.dark .card.kin-lit{ background:#4a3410; }
+  /* Endpoint A (the FIRST person you picked): emerald background + emerald halo. */
+  .card.kin-end-a{ background:#D6EFE4; outline:4px solid var(--emerald); outline-offset:3px; border-radius:16px; position:relative; z-index:3; animation:kinEndA 1.4s ease-in-out infinite; }
+  @keyframes kinEndA{ 0%,100%{ box-shadow:0 0 0 5px rgba(15,91,75,.38), 0 0 28px 6px rgba(15,91,75,.52); } 50%{ box-shadow:0 0 0 10px rgba(15,91,75,.52), 0 0 48px 12px rgba(15,91,75,.82); } }
+  html.dark .card.kin-end-a{ background:#123a30; }
+  /* Endpoint B (the SECOND person you picked): deep-gold background + gold halo. */
+  .card.kin-end-b{ background:#F7CE7A; outline:4px solid #C97A00; outline-offset:3px; border-radius:16px; position:relative; z-index:3; animation:kinEndB 1.4s ease-in-out infinite; }
+  @keyframes kinEndB{ 0%,100%{ box-shadow:0 0 0 5px rgba(201,122,0,.42), 0 0 28px 7px rgba(201,122,0,.6); } 50%{ box-shadow:0 0 0 11px rgba(201,122,0,.56), 0 0 50px 13px rgba(201,122,0,.9); } }
+  html.dark .card.kin-end-b{ background:#5a3f0e; }
+  @media (prefers-reduced-motion: reduce){ .card.kin-lit, .card.kin-end-a, .card.kin-end-b, svg.links path.lit{ animation:none; } }
   .kin-path-bar{ position:fixed; top:0; inset-inline:0; z-index:60; background:var(--gold); color:var(--ink); display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 16px; padding-top:max(10px, env(safe-area-inset-top)); box-shadow:0 4px 16px rgba(43,33,24,.22); font-size:13.5px; font-weight:700; font-family:var(--f-body); }
   .kin-path-bar button{ background:rgba(43,33,24,.14); border:1px solid rgba(43,33,24,.24); color:var(--ink); border-radius:9px; padding:6px 14px; font-size:12.5px; font-weight:700; font-family:var(--f-body); cursor:pointer; flex-shrink:0; }
   .kin-path-bar button:active{ opacity:.8; }

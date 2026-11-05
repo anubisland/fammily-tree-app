@@ -1436,6 +1436,7 @@
     var svg = document.getElementById('linksSvg');
     var canvas = document.getElementById('canvas');
     svg.innerHTML = '';
+    document.body.classList.toggle('kin-lighting', !!litPath);   // dim the tree's own lines while a path is lit
     // Cover the canvas content box in its own (untransformed) layout pixels.
     svg.style.width = canvas.scrollWidth + 'px';
     svg.style.height = canvas.scrollHeight + 'px';
@@ -2856,10 +2857,18 @@
   }
   /* ---- Lit relationship path on the tree (Family-Archive-style) ---- */
   function applyLitClasses(){
-    document.querySelectorAll('.card.kin-lit, .card.kin-lit-end').forEach(function(c){ c.classList.remove('kin-lit'); c.classList.remove('kin-lit-end'); });
+    document.querySelectorAll('.card.kin-lit, .card.kin-end-a, .card.kin-end-b').forEach(function(c){ c.classList.remove('kin-lit','kin-end-a','kin-end-b'); });
+    document.body.classList.toggle('kin-lighting', !!litPath);   // dims the tree's own connectors so the path pops
     if(!litPath) return;
-    litPath.forEach(function(id){ var c = kinCard(id); if(c) c.classList.add('kin-lit'); });
-    if(litEnds) litEnds.forEach(function(id){ var c = kinCard(id); if(c) c.classList.add('kin-lit-end'); });   // the two chosen people: stronger halo
+    var endA = litEnds ? litEnds[0] : null, endB = litEnds ? litEnds[1] : null;
+    litPath.forEach(function(id){
+      var c = kinCard(id); if(!c) return;
+      // The two chosen people get a distinct tinted background + halo (A emerald, B gold);
+      // everyone between them gets the path glow.
+      if(id === endA) c.classList.add('kin-end-a');
+      else if(id === endB) c.classList.add('kin-end-b');
+      else c.classList.add('kin-lit');
+    });
   }
   function clearLitPath(){
     litPath = null; litEnds = null;

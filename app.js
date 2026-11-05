@@ -1415,16 +1415,19 @@
     var rt = (FAN_MAX_R - FAN_CENTER_R) / Math.max(1, fanOpts.generations);
     var lay = window.ftFan.layout(state.people, centerId, { generations: fanOpts.generations, mode: fanOpts.mode });
     var esc = escapeHtml;
-    var lit = litPath, ends = litEnds || [];
+    var lit = litPath, endA = litEnds ? litEnds[0] : null, endB = litEnds ? litEnds[1] : null;
     var segs = '', labels = '';
     lay.nodes.forEach(function(n){
       var rInner = FAN_CENTER_R + (n.depth - 1) * rt, rOuter = FAN_CENTER_R + n.depth * rt, rMid = (rInner + rOuter) / 2;
       var sh = window.ftFan.shadeFor(n.branchIndex, n.depth);
       var d = window.ftFan.arcPath(cx, cy, rInner, rOuter, n.startAngle, n.endAngle);
-      var onLit = lit && lit.has(n.id);
+      var onLit = lit && lit.has(n.id), isEnd = (n.id === endA || n.id === endB);
       var dim = lit && !onLit;
-      var stroke = onLit ? '#F97316' : '#FFFFFF', sw = onLit ? 4.5 : 1.5;
-      segs += '<path d="'+d+'" fill="'+sh.fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"'+(dim?' opacity="0.3"':'')+'></path>';
+      // Lit styling comes from CSS classes so it can GLOW + FLASH: endpoints change
+      // colour (A emerald, B gold) and pulse; the path between them is a bright glow.
+      var cls = onLit ? (n.id === endA ? 'fan-lit-a' : n.id === endB ? 'fan-lit-b' : 'fan-lit') : '';
+      var strokeAttr = onLit ? '' : ' stroke="#FFFFFF" stroke-width="1.5"';
+      segs += '<path d="'+d+'" fill="'+sh.fill+'"'+(cls?' class="'+cls+'"':'')+strokeAttr+(dim?' opacity="0.3"':'')+'></path>';
       // Label — RADIAL (along the radius, inner→outer) so even narrow wedges read:
       // a thin wedge has little arc width but the full ring thickness lengthwise.
       var span = Math.abs(n.endAngle - n.startAngle);
@@ -1433,7 +1436,8 @@
       var tx = cx + rMid * Math.cos(mid), ty = cy + rMid * Math.sin(mid);
       var deg = mid * 180 / Math.PI; var norm = ((deg % 360) + 360) % 360; if(norm > 90 && norm < 270) deg += 180;   // keep upright
       var fs = n.depth <= 1 ? 15 : (n.depth === 2 ? 13 : 12);
-      labels += '<g transform="rotate('+deg.toFixed(2)+' '+tx.toFixed(1)+' '+ty.toFixed(1)+')"><text x="'+tx.toFixed(1)+'" y="'+ty.toFixed(1)+'" text-anchor="middle" dominant-baseline="central" fill="'+sh.text+'" font-size="'+fs+'" font-weight="700" font-family="Amiri, Cairo, serif" style="pointer-events:none">'+esc(fanShortName(n.id))+'</text></g>';
+      var tFill = isEnd ? '#FFFFFF' : sh.text;   // endpoints recolour to emerald/gold → white text reads on both
+      labels += '<g transform="rotate('+deg.toFixed(2)+' '+tx.toFixed(1)+' '+ty.toFixed(1)+')"><text x="'+tx.toFixed(1)+'" y="'+ty.toFixed(1)+'" text-anchor="middle" dominant-baseline="central" fill="'+tFill+'" font-size="'+fs+'" font-weight="700" font-family="Amiri, Cairo, serif" style="pointer-events:none">'+esc(fanShortName(n.id))+'</text></g>';
     });
     // ring guides
     var guides = '';
@@ -1449,9 +1453,10 @@
     var cName = fanShortName(centerId);
     var cText = '<text x="'+cx+'" y="'+(cy + (full ? (spouse? -6 : 4) : -40))+'" text-anchor="middle" dominant-baseline="central" fill="#F6EFDD" font-size="18" font-weight="800" font-family="Amiri, Cairo, serif">'+esc(cName)+'</text>';
     if(spouse) cText += '<text x="'+cx+'" y="'+(cy + (full ? 20 : -16))+'" text-anchor="middle" dominant-baseline="central" fill="#EAD9AE" font-size="13" font-weight="600" font-family="Cairo, sans-serif">'+esc(fanShortName(spouse.id))+'</text>';
-    var centerCircle = '<circle id="fanCenterCircle" cx="'+cx+'" cy="'+cy+'" r="'+FAN_CENTER_R+'" fill="var(--emerald)" stroke="'+(centerLit?'#F97316':'#FFFFFF')+'" stroke-width="'+(centerLit?5:3)+'" style="cursor:pointer"></circle>';
+    var cCls = centerLit ? (centerId === endA ? 'fan-lit-a' : centerId === endB ? 'fan-lit-b' : 'fan-lit') : '';
+    var centerCircle = '<circle id="fanCenterCircle" cx="'+cx+'" cy="'+cy+'" r="'+FAN_CENTER_R+'" fill="var(--emerald)"'+(cCls?' class="'+cCls+'"':' stroke="#FFFFFF" stroke-width="3"')+' style="cursor:pointer"></circle>';
 
-    return '<svg id="fanSvg" viewBox="0 0 '+FAN_W+' '+vbH+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">'+
+    return '<svg id="fanSvg" class="fan-svg" viewBox="0 0 '+FAN_W+' '+vbH+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">'+
       guides + segs + centerCircle + cText + labels + '</svg>';
   }
 
@@ -3088,7 +3093,18 @@
   function showLitBar(n){
     var bar = document.getElementById('kinPathBar');
     if(!bar){ bar = document.createElement('div'); bar.id = 'kinPathBar'; bar.className = 'kin-path-bar'; document.body.appendChild(bar); }
-    bar.innerHTML = '<span>'+escapeHtml(tf('kinPathBar', { n: localeDigits(n) }))+'</span><button type="button" id="kinPathClearBtn">'+t('kinPathClear')+'</button>';
+    // Keep the worded relationship on screen alongside the lit diagram: «B» is <term> to «A».
+    var relHtml = '';
+    if(litEnds && litEnds.length === 2 && window.ftKinship){
+      var A = litEnds[0], B = litEnds[1];
+      var term = window.ftKinship(state.people, A, B, state.lang);
+      var nameA = ownName(getPerson(A), state.lang) || fullNameOf(getPerson(A));
+      var nameB = ownName(getPerson(B), state.lang) || fullNameOf(getPerson(B));
+      relHtml = '<span class="kpb-rel">🔗 «'+escapeHtml(nameB)+'» <span class="kpb-term">'+escapeHtml(term)+'</span> '+t('kinshipTo')+' «'+escapeHtml(nameA)+'»</span>';
+    } else {
+      relHtml = '<span class="kpb-rel">'+escapeHtml(tf('kinPathBar', { n: localeDigits(n) }))+'</span>';
+    }
+    bar.innerHTML = relHtml + '<button type="button" id="kinPathClearBtn">'+t('kinPathClear')+'</button>';
     document.getElementById('kinPathClearBtn').onclick = clearLitPath;
   }
 

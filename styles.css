@@ -551,6 +551,16 @@
   .fan-chip.active{ background:var(--gold); color:var(--ink); border-color:var(--gold); }
   .fan-chip:active{ opacity:.85; }
   .fan-svg-wrap{ width:100%; max-width:720px; margin:0 auto; }
+  /* Kinship highlight on the fan: the path glows bright, the two chosen people
+     change colour (A emerald, B gold) and flash — mirroring the normal tree. */
+  svg.fan-svg .fan-lit{ stroke:#FF7A00; stroke-width:5; filter:drop-shadow(0 0 4px rgba(255,122,0,.95)); animation:fanLitPulse 1.3s ease-in-out infinite; }
+  @keyframes fanLitPulse{ 0%,100%{ stroke-width:4; } 50%{ stroke-width:7; } }
+  svg.fan-svg .fan-lit-a{ fill:#0F5B4B; stroke:#4FE6AE; stroke-width:4.5; filter:drop-shadow(0 0 7px rgba(16,185,129,.95)); animation:fanFlash 0.85s ease-in-out infinite; }
+  svg.fan-svg .fan-lit-b{ fill:#C97A00; stroke:#FFD24A; stroke-width:4.5; filter:drop-shadow(0 0 7px rgba(240,180,41,.98)); animation:fanFlash 0.85s ease-in-out infinite; }
+  @keyframes fanFlash{ 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
+  @media (prefers-reduced-motion: reduce){ svg.fan-svg .fan-lit, svg.fan-svg .fan-lit-a, svg.fan-svg .fan-lit-b{ animation:none; } }
+  .kpb-rel{ flex:1; min-width:0; font-size:13px; font-weight:700; }
+  .kpb-rel .kpb-term{ color:#1E3A8A; }
   .kin-result{ text-align:center; padding:14px 0 18px; }
   .kin-result .kin-name{ font-size:15px; color:var(--ink-soft); line-height:2; }
   .kin-result .kin-name b{ color:var(--ink); font-family:var(--f-head); font-size:18px; }

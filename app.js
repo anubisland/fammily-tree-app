@@ -150,6 +150,13 @@
     menuDesc:{ar:'إدارة بيانات الشجرة', en:'Manage tree data'},
     menuImage:{ar:'📷 تصدير الشجرة كصورة', en:'📷 Export tree as image'},
     imgExporting:{ar:'جارِ تجهيز الصورة…', en:'Preparing image…'},
+    viewTreeBtn:{ar:'🌳 عادية', en:'🌳 Tree'},
+    viewFanBtn:{ar:'🌞 مروحية', en:'🌞 Fan'},
+    fanHalf:{ar:'نصف دائرية', en:'Half'},
+    fanFull:{ar:'دائرية', en:'Full'},
+    fanCenter:{ar:'المركز', en:'Center'},
+    fanPng:{ar:'صورة', en:'PNG'},
+    fanPdf:{ar:'PDF', en:'PDF'},
     imgExportDone:{ar:'تم حفظ صورة الشجرة ✓', en:'Tree image saved ✓'},
     imgExportFail:{ar:'تعذّر تصدير الصورة — تحقّق من الاتصال', en:'Image export failed — check your connection'},
     menuExport:{ar:'⬇ تنزيل نسخة احتياطية', en:'⬇ Download backup'},
@@ -1364,6 +1371,168 @@
     });
   }
 
+  /* ============================================================
+     Fan chart (الشجرة المروحية) — a descendant sunburst view, toggled from the
+     tree tab. Geometry comes from the pure ftFan engine; this builds the SVG,
+     controls, export and the kinship highlight, in the Family-Archive style.
+     ============================================================ */
+  var fanMode = false;
+  var fanOpts = { generations: 4, mode: 'half', centerId: null };
+  var FAN_W = 1000, FAN_CX = 500, FAN_CY = 500, FAN_CENTER_R = 85, FAN_MAX_R = 470;
+
+  // "First + father name" only (per the owner's rule) — the lineage is implied by
+  // the ring position, so the full nasab would just crowd the wheel.
+  function fanShortName(id){
+    var p = getPerson(id); if(!p) return '';
+    var full = (ownName(p, state.lang) || '').trim();
+    var parts = full.split(/\s+/).filter(Boolean);
+    return parts.slice(0, 2).join(' ') || full;
+  }
+
+  function syncFanView(){
+    var stage = document.getElementById('stage'), fanStage = document.getElementById('fanStage'), toolbar = document.getElementById('toolbar');
+    var tBtn = document.getElementById('viewTree'), fBtn = document.getElementById('viewFan');
+    if(tBtn) tBtn.classList.toggle('active', !fanMode);
+    if(fBtn) fBtn.classList.toggle('active', fanMode);
+    if(stage) stage.style.display = fanMode ? 'none' : 'block';
+    if(fanStage) fanStage.style.display = fanMode ? 'block' : 'none';
+    if(toolbar) toolbar.style.display = fanMode ? 'none' : 'flex';   // zoom/export toolbar is tree-only
+    if(fanMode) renderFan();
+  }
+  function setTreeView(mode){ fanMode = (mode === 'fan'); syncFanView(); }
+
+  function fanCenterId(){
+    if(fanOpts.centerId && getPerson(fanOpts.centerId)) return fanOpts.centerId;
+    return (viewRootId && getPerson(viewRootId)) ? viewRootId : state.rootId;
+  }
+
+  function buildFanSvg(centerId){
+    var full = fanOpts.mode === 'full';
+    var cx = FAN_CX, cy = FAN_CY;
+    var vbH = full ? 1000 : 560;
+    var rt = (FAN_MAX_R - FAN_CENTER_R) / Math.max(1, fanOpts.generations);
+    var lay = window.ftFan.layout(state.people, centerId, { generations: fanOpts.generations, mode: fanOpts.mode });
+    var esc = escapeHtml;
+    var lit = litPath, ends = litEnds || [];
+    var segs = '', labels = '';
+    lay.nodes.forEach(function(n){
+      var rInner = FAN_CENTER_R + (n.depth - 1) * rt, rOuter = FAN_CENTER_R + n.depth * rt, rMid = (rInner + rOuter) / 2;
+      var sh = window.ftFan.shadeFor(n.branchIndex, n.depth);
+      var d = window.ftFan.arcPath(cx, cy, rInner, rOuter, n.startAngle, n.endAngle);
+      var onLit = lit && lit.has(n.id);
+      var dim = lit && !onLit;
+      var stroke = onLit ? '#F97316' : '#FFFFFF', sw = onLit ? 4.5 : 1.5;
+      segs += '<path d="'+d+'" fill="'+sh.fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"'+(dim?' opacity="0.3"':'')+'></path>';
+      // label — skip when the wedge is too small to hold text
+      var span = Math.abs(n.endAngle - n.startAngle);
+      if(span * rMid < 24 || rt < 26) return;
+      var mid = (n.startAngle + n.endAngle) / 2;
+      var tx = cx + rMid * Math.cos(mid), ty = cy + rMid * Math.sin(mid);
+      var deg = mid * 180 / Math.PI + 90; var norm = ((deg % 360) + 360) % 360; if(norm > 90 && norm < 270) deg += 180;
+      var fs = n.depth <= 1 ? 15 : (n.depth === 2 ? 13 : 11);
+      labels += '<g transform="rotate('+deg.toFixed(2)+' '+tx.toFixed(1)+' '+ty.toFixed(1)+')"><text x="'+tx.toFixed(1)+'" y="'+ty.toFixed(1)+'" text-anchor="middle" dominant-baseline="central" fill="'+sh.text+'" font-size="'+fs+'" font-weight="700" font-family="Amiri, Cairo, serif" style="pointer-events:none">'+esc(fanShortName(n.id))+'</text></g>';
+    });
+    // ring guides
+    var guides = '';
+    for(var g = 1; g <= fanOpts.generations; g++){
+      var rr = FAN_CENTER_R + g * rt;
+      if(full) guides += '<circle cx="'+cx+'" cy="'+cy+'" r="'+rr+'" fill="none" stroke="#E2E8F0" stroke-width="1"></circle>';
+      else guides += '<path d="'+window.ftFan.arcPath(cx, cy, rr-0.01, rr, Math.PI, 2*Math.PI).split('Z')[0]+'" fill="none" stroke="#E2E8F0" stroke-width="1"></path>';
+    }
+    // centre disc + name(s)
+    var cP = getPerson(centerId);
+    var spouse = cP && cP.spouseIds && cP.spouseIds.length ? getPerson(cP.spouseIds[0]) : null;
+    var centerLit = lit && lit.has(centerId);
+    var cName = fanShortName(centerId);
+    var cText = '<text x="'+cx+'" y="'+(cy + (full ? (spouse? -6 : 4) : -40))+'" text-anchor="middle" dominant-baseline="central" fill="#F6EFDD" font-size="18" font-weight="800" font-family="Amiri, Cairo, serif">'+esc(cName)+'</text>';
+    if(spouse) cText += '<text x="'+cx+'" y="'+(cy + (full ? 20 : -16))+'" text-anchor="middle" dominant-baseline="central" fill="#EAD9AE" font-size="13" font-weight="600" font-family="Cairo, sans-serif">'+esc(fanShortName(spouse.id))+'</text>';
+    var centerCircle = '<circle cx="'+cx+'" cy="'+cy+'" r="'+FAN_CENTER_R+'" fill="var(--emerald)" stroke="'+(centerLit?'#F97316':'#FFFFFF')+'" stroke-width="'+(centerLit?5:3)+'"></circle>';
+
+    return '<svg id="fanSvg" viewBox="0 0 '+FAN_W+' '+vbH+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">'+
+      guides + segs + centerCircle + cText + labels + '</svg>';
+  }
+
+  function renderFan(){
+    var host = document.getElementById('fanStage'); if(!host) return;
+    if(!state.rootId || !getPerson(state.rootId)){ host.innerHTML = ''; return; }
+    var centerId = fanCenterId(); fanOpts.centerId = centerId;
+    function chip(active, act, val, label){ return '<button type="button" class="fan-chip'+(active?' active':'')+'" data-fan="'+act+'" data-val="'+val+'">'+label+'</button>'; }
+    var modeChips = '<div class="fan-group">'+chip(fanOpts.mode==='half','mode','half',t('fanHalf'))+chip(fanOpts.mode==='full','mode','full',t('fanFull'))+'</div>';
+    var genChips = '<div class="fan-group">'+[3,4,5].map(function(g){ return chip(fanOpts.generations===g,'gen',g, localeDigits(g)); }).join('')+'</div>';
+    var centerBtn = '<button type="button" class="fan-chip" id="fanCenterBtn">🎯 '+t('fanCenter')+': <b>'+escapeHtml(fanShortName(centerId))+'</b></button>';
+    var exportBtns = '<button type="button" class="fan-chip" id="fanPng">🖼 '+t('fanPng')+'</button>'+
+                     '<button type="button" class="fan-chip" id="fanPdf">🖨 '+t('fanPdf')+'</button>';
+    host.innerHTML = '<div class="fan-controls">'+modeChips+genChips+centerBtn+exportBtns+'</div>'+
+      '<div class="fan-svg-wrap" id="fanSvgWrap">'+buildFanSvg(centerId)+'</div>';
+    wireFanControls();
+  }
+
+  function wireFanControls(){
+    var host = document.getElementById('fanStage');
+    host.querySelectorAll('[data-fan]').forEach(function(b){
+      b.onclick = function(){
+        var k = b.getAttribute('data-fan'), v = b.getAttribute('data-val');
+        if(k === 'mode') fanOpts.mode = v;
+        else if(k === 'gen') fanOpts.generations = parseInt(v, 10);
+        renderFan();
+      };
+    });
+    var cb = document.getElementById('fanCenterBtn');
+    if(cb) cb.onclick = function(){ pickFanCenter(); };
+    var png = document.getElementById('fanPng'); if(png) png.onclick = function(){ exportFan('png'); };
+    var pdf = document.getElementById('fanPdf'); if(pdf) pdf.onclick = function(){ exportFan('pdf'); };
+    // Tapping a segment re-centres the wheel on that person.
+    host.querySelectorAll('#fanSvg path[fill]').forEach(function(){});
+    var svg = document.getElementById('fanSvg');
+    if(svg){
+      var lay = window.ftFan.layout(state.people, fanOpts.centerId, { generations: fanOpts.generations, mode: fanOpts.mode });
+      var paths = svg.querySelectorAll('path[fill]');
+      // paths order = guides(skipped, fill none) then segs; match segs by index.
+      var segPaths = Array.prototype.filter.call(svg.querySelectorAll('path'), function(p){ return p.getAttribute('fill') && p.getAttribute('fill') !== 'none'; });
+      lay.nodes.forEach(function(n, i){ if(segPaths[i]){ segPaths[i].style.cursor = 'pointer'; segPaths[i].onclick = function(){ fanOpts.centerId = n.id; renderFan(); }; } });
+    }
+  }
+
+  function pickFanCenter(){
+    var ppl = state.people, ids = Object.keys(ppl);
+    openSheet('<h3>🎯 '+t('fanCenter')+'</h3>'+
+      '<div class="field"><input type="text" id="fanSearch" placeholder="'+escapeHtml(t('searchPlaceholder'))+'"></div>'+
+      '<div class="lk-results" id="fanResults"></div>');
+    var input = document.getElementById('fanSearch'), results = document.getElementById('fanResults');
+    function show(list){
+      results.innerHTML = list.map(function(id){ return '<button class="lk-result" data-id="'+escapeHtml(id)+'">'+escapeHtml(fullNameOf(ppl[id]))+'</button>'; }).join('');
+      results.querySelectorAll('.lk-result').forEach(function(b){ b.onclick = function(){ fanOpts.centerId = b.getAttribute('data-id'); closeSheet(); renderFan(); }; });
+    }
+    show(ids.slice(0, 10));
+    input.addEventListener('input', function(){
+      var q = this.value.trim().toLowerCase();
+      show((q ? ids.filter(function(id){ return fullNameOf(ppl[id]).toLowerCase().indexOf(q) !== -1; }) : ids).slice(0, 12));
+    });
+    input.focus();
+  }
+
+  async function exportFan(kind){
+    var wrap = document.getElementById('fanSvgWrap'); if(!wrap) return;
+    toast(t('imgExporting'));
+    try{
+      await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+        'sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H');
+      var scale = Math.min(2, (window.devicePixelRatio || 1) * 1.4);
+      var canvas = await window.html2canvas(wrap, { backgroundColor: getComputedStyle(document.body).getPropertyValue('--paper') || '#F2E9D8', scale: scale, useCORS: true });
+      var name = (famNameOf().trim() || 'العائلة') + ' - مروحة';
+      canvas.toBlob(function(blob){
+        var url = URL.createObjectURL(blob);
+        if(kind === 'png'){
+          var a = document.createElement('a'); a.href = url; a.download = name + '.png';
+          document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+        } else {
+          // Open the rendered image in a new tab; the viewer prints / saves it as PDF.
+          window.open(url, '_blank'); setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+        }
+      }, 'image/png');
+    }catch(e){ console.error('fan export failed', e); alert(t('imgExportFail')); }
+  }
+
   function render(){
     renderStats();
     var emptyWrap = document.getElementById('emptyWrap');
@@ -1378,6 +1547,9 @@
 
     if(!state.rootId || !getPerson(state.rootId)){
       emptyWrap.style.display = 'flex'; canvas.style.display = 'none'; toolbar.style.display = 'none';
+      var vtE = document.getElementById('viewToggle'); if(vtE) vtE.style.display = 'none';
+      var fsE = document.getElementById('fanStage'); if(fsE) fsE.style.display = 'none';
+      fanMode = false;
       var mvb = document.getElementById('meViewBar'); if(mvb){ mvb.style.display = 'none'; }
       var svgEmpty = document.getElementById('linksSvg');
       svgEmpty.innerHTML = '';
@@ -1401,6 +1573,11 @@
     treeRoot.appendChild(renderUnit(displayRoot));
     fillPhotoRefs(treeRoot);   // resolve any Storage photo paths to URLs
     if(litPath) applyLitClasses();   // re-glow the relationship path after a rebuild
+    var vtR = document.getElementById('viewToggle');
+    if(vtR){ vtR.style.display = 'flex';
+      var tb = document.getElementById('viewTree'), fb = document.getElementById('viewFan');
+      if(tb) tb.textContent = t('viewTreeBtn'); if(fb) fb.textContent = t('viewFanBtn'); }
+    syncFanView();   // honour the current tree/fan mode
     renderMeViewBar(displayRoot);
     document.getElementById('familyTitle').textContent = famNameOf() || t('appName');
     /* Title centered above the root couple, inside the canvas — so it scales and
@@ -3154,6 +3331,11 @@
     exportingImage = false;
   }
   window.__ftExportTreeImage = exportTreeImage;
+  (function wireViewToggle(){
+    var tBtn = document.getElementById('viewTree'), fBtn = document.getElementById('viewFan');
+    if(tBtn){ tBtn.textContent = t('viewTreeBtn'); tBtn.onclick = function(){ setTreeView('tree'); }; }
+    if(fBtn){ fBtn.textContent = t('viewFanBtn'); fBtn.onclick = function(){ setTreeView('fan'); }; }
+  })();
   document.getElementById('zoomIn').addEventListener('click', function(){ zoom = Math.min(1.6, zoom + 0.1); applyZoom(); requestAnimationFrame(drawLinks); });
   document.getElementById('zoomOut').addEventListener('click', function(){ zoom = Math.max(0.4, zoom - 0.1); applyZoom(); requestAnimationFrame(drawLinks); });
 

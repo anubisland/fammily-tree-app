@@ -1448,7 +1448,7 @@
     var cName = fanShortName(centerId);
     var cText = '<text x="'+cx+'" y="'+(cy + (full ? (spouse? -6 : 4) : -40))+'" text-anchor="middle" dominant-baseline="central" fill="#F6EFDD" font-size="18" font-weight="800" font-family="Amiri, Cairo, serif">'+esc(cName)+'</text>';
     if(spouse) cText += '<text x="'+cx+'" y="'+(cy + (full ? 20 : -16))+'" text-anchor="middle" dominant-baseline="central" fill="#EAD9AE" font-size="13" font-weight="600" font-family="Cairo, sans-serif">'+esc(fanShortName(spouse.id))+'</text>';
-    var centerCircle = '<circle cx="'+cx+'" cy="'+cy+'" r="'+FAN_CENTER_R+'" fill="var(--emerald)" stroke="'+(centerLit?'#F97316':'#FFFFFF')+'" stroke-width="'+(centerLit?5:3)+'"></circle>';
+    var centerCircle = '<circle id="fanCenterCircle" cx="'+cx+'" cy="'+cy+'" r="'+FAN_CENTER_R+'" fill="var(--emerald)" stroke="'+(centerLit?'#F97316':'#FFFFFF')+'" stroke-width="'+(centerLit?5:3)+'" style="cursor:pointer"></circle>';
 
     return '<svg id="fanSvg" viewBox="0 0 '+FAN_W+' '+vbH+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">'+
       guides + segs + centerCircle + cText + labels + '</svg>';
@@ -1487,15 +1487,18 @@
     if(rb) rb.onclick = function(){ fanOpts.centerId = (viewRootId && getPerson(viewRootId)) ? viewRootId : state.rootId; renderFan(); };
     var png = document.getElementById('fanPng'); if(png) png.onclick = function(){ exportFan('png'); };
     var pdf = document.getElementById('fanPdf'); if(pdf) pdf.onclick = function(){ exportFan('pdf'); };
-    // Tapping a segment re-centres the wheel on that person.
-    host.querySelectorAll('#fanSvg path[fill]').forEach(function(){});
+    // Tapping a person: while the relationship finder is active it PICKS that person
+    // (so kinship works on the fan too); otherwise it re-centres the wheel on them.
+    function onFanPick(id){ if(kinshipMode){ pickKinship(id); } else { fanOpts.centerId = id; renderFan(); } }
     var svg = document.getElementById('fanSvg');
     if(svg){
       var lay = window.ftFan.layout(state.people, fanOpts.centerId, { generations: fanOpts.generations, mode: fanOpts.mode });
-      var paths = svg.querySelectorAll('path[fill]');
-      // paths order = guides(skipped, fill none) then segs; match segs by index.
+      // segs are the fill!=none paths, in layout order (guides come first with fill none).
       var segPaths = Array.prototype.filter.call(svg.querySelectorAll('path'), function(p){ return p.getAttribute('fill') && p.getAttribute('fill') !== 'none'; });
-      lay.nodes.forEach(function(n, i){ if(segPaths[i]){ segPaths[i].style.cursor = 'pointer'; segPaths[i].onclick = function(){ fanOpts.centerId = n.id; renderFan(); }; } });
+      lay.nodes.forEach(function(n, i){ if(segPaths[i]){ segPaths[i].style.cursor = 'pointer'; segPaths[i].onclick = function(){ onFanPick(n.id); }; } });
+      // the centre person is pickable too
+      var centerCircleEl = document.getElementById('fanCenterCircle');
+      if(centerCircleEl) centerCircleEl.onclick = function(){ onFanPick(fanOpts.centerId); };
     }
   }
 
@@ -3057,13 +3060,15 @@
     litPath = null; litEnds = null;
     applyLitClasses();
     var bar = document.getElementById('kinPathBar'); if(bar) bar.remove();
-    drawLinks();
+    if(fanMode) renderFan(); else drawLinks();
   }
   function lightKinshipPath(ids){
     if(!ids || ids.length < 2) return;
     litPath = new Set(ids);
     litEnds = [ids[0], ids[ids.length - 1]];
-    // Expand any collapsed ancestor so every card on the path is actually rendered.
+    // On the fan: just re-draw it with the path lit (no tree layout needed).
+    if(fanMode){ renderFan(); showLitBar(ids.length); return; }
+    // On the normal tree: expand any collapsed ancestor so every card renders, then glow.
     var changed = false;
     ids.forEach(function(id){
       var cur = getPerson(id), guard = 0;

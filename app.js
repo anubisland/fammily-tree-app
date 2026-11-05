@@ -396,6 +396,9 @@
     kinshipConnector:{ar:'قرابة', en:'relationship'},
     kinshipTo:{ar:'لـ', en:'to'},
     kinshipClose:{ar:'إغلاق', en:'Close'},
+    kinLightBtn:{ar:'✨ إضاءة المسار على الشجرة', en:'✨ Light the path on the tree'},
+    kinPathBar:{ar:'⚡ مسار القرابة مُضيء ({n} أفراد)', en:'⚡ Relationship path lit ({n} people)'},
+    kinPathClear:{ar:'إطفاء الإضاءة', en:'Turn off'},
     unnamedFamily:{ar:'عائلتي', en:'My family'},
     homeSectionsEyebrow:{ar:'أقسام العائلة', en:'Sections'},
     cardTree:{ar:'الشجرة', en:'Tree'},
@@ -546,6 +549,9 @@
   // When non-null, we are viewing ANOTHER tree read-only; the user's real state is
   // parked in linkedView.savedState and must never be written over or persisted.
   var linkedView = null;
+  // The lit relationship path: a Set of person ids on the A→…→B blood chain, so
+  // the tree render + drawLinks glow those cards and their connectors. null = off.
+  var litPath = null;
   var zoom = 1;
   var saveTimer = null;
   var pendingPhoto = null;
@@ -1392,6 +1398,7 @@
     treeRoot.innerHTML = '';
     treeRoot.appendChild(renderUnit(displayRoot));
     fillPhotoRefs(treeRoot);   // resolve any Storage photo paths to URLs
+    if(litPath) applyLitClasses();   // re-glow the relationship path after a rebuild
     renderMeViewBar(displayRoot);
     document.getElementById('familyTitle').textContent = famNameOf() || t('appName');
     /* Title centered above the root couple, inside the canvas — so it scales and
@@ -1431,11 +1438,20 @@
     svg.style.width = canvas.scrollWidth + 'px';
     svg.style.height = canvas.scrollHeight + 'px';
 
+    // A connector (parentCouple → child) glows when the child is on the lit path
+    // and that child's parent couple holds a path member (the bloodline parent OR
+    // its spouse — the path may ascend through the mother, who is a spouse card).
+    function coupleOnPath(pid){
+      if(litPath.has(pid)) return true;
+      var pp = getPerson(pid);
+      return !!(pp && (pp.spouseIds || []).some(function(s){ return litPath.has(s); }));
+    }
     document.querySelectorAll('.children-row').forEach(function(row){
       if(row.classList.contains('collapsed')) return;
       var parentId = row.dataset.parentUnit;
       var coupleEl = document.querySelector('.couple[data-couple-for="'+(window.CSS && CSS.escape ? CSS.escape(parentId) : parentId)+'"]');
       if(!coupleEl) return;
+      var parentLit = litPath && coupleOnPath(parentId);
       var cp = offsetInCanvas(coupleEl, canvas);
       var startX = cp.x + coupleEl.offsetWidth/2;
       var startY = cp.y + coupleEl.offsetHeight;
@@ -1449,6 +1465,8 @@
         var midY = startY + (endY - startY) * 0.55;
         var path = document.createElementNS('http://www.w3.org/2000/svg','path');
         path.setAttribute('d', 'M '+startX+' '+startY+' C '+startX+' '+midY+', '+endX+' '+midY+', '+endX+' '+endY);
+        var childId = childCouple.dataset.coupleFor;
+        if(parentLit && litPath.has(childId)) path.setAttribute('class', 'lit');
         svg.appendChild(path);
       }
     });
@@ -2834,6 +2852,43 @@
       showKinshipResult(aId, id);
     }
   }
+  /* ---- Lit relationship path on the tree (Family-Archive-style) ---- */
+  function applyLitClasses(){
+    document.querySelectorAll('.card.kin-lit').forEach(function(c){ c.classList.remove('kin-lit'); });
+    if(!litPath) return;
+    litPath.forEach(function(id){ var c = kinCard(id); if(c) c.classList.add('kin-lit'); });
+  }
+  function clearLitPath(){
+    litPath = null;
+    applyLitClasses();
+    var bar = document.getElementById('kinPathBar'); if(bar) bar.remove();
+    drawLinks();
+  }
+  function lightKinshipPath(ids){
+    if(!ids || ids.length < 2) return;
+    litPath = new Set(ids);
+    // Expand any collapsed ancestor so every card on the path is actually rendered.
+    var changed = false;
+    ids.forEach(function(id){
+      var cur = getPerson(id), guard = 0;
+      while(cur && guard++ < 128){ if(cur.collapsed){ cur.collapsed = false; changed = true; } cur = getPerson(cur.parentId); }
+    });
+    if(changed){ scheduleSave(); render(); }
+    showTab('tree');
+    setTimeout(function(){
+      applyLitClasses();
+      drawLinks();
+      showLitBar(ids.length);
+      var first = kinCard(ids[0]); if(first) first.scrollIntoView({ behavior:'smooth', block:'center', inline:'center' });
+    }, 140);
+  }
+  function showLitBar(n){
+    var bar = document.getElementById('kinPathBar');
+    if(!bar){ bar = document.createElement('div'); bar.id = 'kinPathBar'; bar.className = 'kin-path-bar'; document.body.appendChild(bar); }
+    bar.innerHTML = '<span>'+escapeHtml(tf('kinPathBar', { n: localeDigits(n) }))+'</span><button type="button" id="kinPathClearBtn">'+t('kinPathClear')+'</button>';
+    document.getElementById('kinPathClearBtn').onclick = clearLitPath;
+  }
+
   function showKinshipResult(aId, bId){
     var A = getPerson(aId), B = getPerson(bId);
     var rel = (window.ftKinship ? window.ftKinship(state.people, aId, bId, state.lang) : '');
@@ -2842,6 +2897,10 @@
     var verb = (state.lang === 'en') ? 'is' : (B.gender === 'f' ? 'هي' : 'هو');
     var dotA = '<span class="kin-dot kin-dot-a"></span>';
     var dotB = '<span class="kin-dot kin-dot-b"></span>';
+    var pathIds = (window.ftKinship && window.ftKinship.path) ? window.ftKinship.path(state.people, aId, bId) : null;
+    var lightBtn = (pathIds && pathIds.length > 1)
+      ? '<button class="primary-btn" id="kin_light" style="margin-bottom:10px; background:var(--gold); color:var(--ink);">'+t('kinLightBtn')+'</button>'
+      : '';
     openSheet(
       '<h3>🔗 '+t('kinshipTitle')+'</h3>'+
       '<div class="kin-result">'+
@@ -2849,8 +2908,11 @@
         '<div class="kin-term">'+escapeHtml(rel)+'</div>'+
         '<div class="kin-name">'+t('kinshipTo')+' '+dotA+'<b>'+escapeHtml(fullNameOf(A))+'</b></div>'+
       '</div>'+
+      lightBtn+
       '<button class="primary-btn" id="kin_close">'+t('kinshipClose')+'</button>'
     );
+    var kl = document.getElementById('kin_light');
+    if(kl) kl.onclick = function(){ closeSheet(); endKinship(); lightKinshipPath(pathIds); };
     document.getElementById('kin_close').onclick = closeSheet;
   }
   window.__ftStartKinship = startKinship;

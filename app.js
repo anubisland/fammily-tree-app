@@ -551,7 +551,9 @@
   var linkedView = null;
   // The lit relationship path: a Set of person ids on the A→…→B blood chain, so
   // the tree render + drawLinks glow those cards and their connectors. null = off.
+  // litEnds holds [A, B] (the two chosen people) for a stronger endpoint halo.
   var litPath = null;
+  var litEnds = null;
   var zoom = 1;
   var saveTimer = null;
   var pendingPhoto = null;
@@ -2854,12 +2856,13 @@
   }
   /* ---- Lit relationship path on the tree (Family-Archive-style) ---- */
   function applyLitClasses(){
-    document.querySelectorAll('.card.kin-lit').forEach(function(c){ c.classList.remove('kin-lit'); });
+    document.querySelectorAll('.card.kin-lit, .card.kin-lit-end').forEach(function(c){ c.classList.remove('kin-lit'); c.classList.remove('kin-lit-end'); });
     if(!litPath) return;
     litPath.forEach(function(id){ var c = kinCard(id); if(c) c.classList.add('kin-lit'); });
+    if(litEnds) litEnds.forEach(function(id){ var c = kinCard(id); if(c) c.classList.add('kin-lit-end'); });   // the two chosen people: stronger halo
   }
   function clearLitPath(){
-    litPath = null;
+    litPath = null; litEnds = null;
     applyLitClasses();
     var bar = document.getElementById('kinPathBar'); if(bar) bar.remove();
     drawLinks();
@@ -2867,6 +2870,7 @@
   function lightKinshipPath(ids){
     if(!ids || ids.length < 2) return;
     litPath = new Set(ids);
+    litEnds = [ids[0], ids[ids.length - 1]];
     // Expand any collapsed ancestor so every card on the path is actually rendered.
     var changed = false;
     ids.forEach(function(id){

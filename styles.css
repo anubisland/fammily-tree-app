@@ -511,14 +511,16 @@
   .card.kin-b{ outline:3px solid var(--gold); outline-offset:2px; box-shadow:0 0 0 7px rgba(184,134,45,.24); transition:box-shadow .15s ease; }
   html.dark .card.kin-a{ box-shadow:0 0 0 7px rgba(46,139,114,.28); }
   html.dark .card.kin-b{ box-shadow:0 0 0 7px rgba(214,169,74,.28); }
-  /* Lit relationship path: a calm gold glow on the cards + connectors on the chain. */
-  .card.kin-lit{ outline:3px solid var(--gold); outline-offset:2px; border-radius:16px; animation:kinLitPulse 1.9s ease-in-out infinite; }
-  @keyframes kinLitPulse{ 0%,100%{ box-shadow:0 0 0 5px rgba(184,134,45,.18), 0 0 14px 2px rgba(184,134,45,.26); } 50%{ box-shadow:0 0 0 8px rgba(184,134,45,.30), 0 0 26px 5px rgba(184,134,45,.48); } }
-  html.dark .card.kin-lit{ animation:kinLitPulseDark 1.9s ease-in-out infinite; }
-  @keyframes kinLitPulseDark{ 0%,100%{ box-shadow:0 0 0 5px rgba(214,169,74,.22), 0 0 14px 2px rgba(214,169,74,.30); } 50%{ box-shadow:0 0 0 8px rgba(214,169,74,.36), 0 0 28px 6px rgba(214,169,74,.55); } }
-  svg.links path.lit{ stroke:var(--gold); stroke-width:4; filter:drop-shadow(0 0 5px rgba(184,134,45,.6)); animation:kinLitStroke 1.9s ease-in-out infinite; }
-  @keyframes kinLitStroke{ 0%,100%{ opacity:.75; } 50%{ opacity:1; } }
-  @media (prefers-reduced-motion: reduce){ .card.kin-lit, svg.links path.lit{ animation:none; } }
+  /* Lit relationship path: a bright gold glow so it reads even when zoomed out. */
+  .card.kin-lit{ outline:3px solid #E8A317; outline-offset:2px; border-radius:16px; position:relative; z-index:2; animation:kinLitPulse 1.8s ease-in-out infinite; }
+  @keyframes kinLitPulse{ 0%,100%{ box-shadow:0 0 0 4px rgba(240,180,41,.30), 0 0 18px 3px rgba(240,180,41,.48); } 50%{ box-shadow:0 0 0 7px rgba(240,180,41,.48), 0 0 32px 8px rgba(240,180,41,.72); } }
+  /* Endpoints — the two chosen people — a larger, brighter halo so each stands out. */
+  .card.kin-lit-end{ outline:4px solid #F7C948; outline-offset:3px; z-index:3; animation:kinLitEnd 1.5s ease-in-out infinite; }
+  @keyframes kinLitEnd{ 0%,100%{ box-shadow:0 0 0 6px rgba(247,201,72,.42), 0 0 30px 7px rgba(247,201,72,.62); } 50%{ box-shadow:0 0 0 12px rgba(247,201,72,.58), 0 0 52px 14px rgba(247,201,72,.92); } }
+  /* Connector: vivid gold, thick, and non-scaling so it stays bold at any zoom. */
+  svg.links path.lit{ stroke:#F0B429; stroke-width:5; vector-effect:non-scaling-stroke; stroke-linecap:round; filter:drop-shadow(0 0 4px rgba(240,180,41,.95)); animation:kinLitStroke 1.5s ease-in-out infinite; }
+  @keyframes kinLitStroke{ 0%,100%{ stroke-width:4; opacity:.9; } 50%{ stroke-width:7; opacity:1; } }
+  @media (prefers-reduced-motion: reduce){ .card.kin-lit, .card.kin-lit-end, svg.links path.lit{ animation:none; } }
   .kin-path-bar{ position:fixed; top:0; inset-inline:0; z-index:60; background:var(--gold); color:var(--ink); display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 16px; padding-top:max(10px, env(safe-area-inset-top)); box-shadow:0 4px 16px rgba(43,33,24,.22); font-size:13.5px; font-weight:700; font-family:var(--f-body); }
   .kin-path-bar button{ background:rgba(43,33,24,.14); border:1px solid rgba(43,33,24,.24); color:var(--ink); border-radius:9px; padding:6px 14px; font-size:12.5px; font-weight:700; font-family:var(--f-body); cursor:pointer; flex-shrink:0; }
   .kin-path-bar button:active{ opacity:.8; }

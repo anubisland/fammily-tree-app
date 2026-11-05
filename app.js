@@ -1378,7 +1378,7 @@
      controls, export and the kinship highlight, in the Family-Archive style.
      ============================================================ */
   var fanMode = false;
-  var fanOpts = { generations: 4, mode: 'half', centerId: null };
+  var fanOpts = { generations: 4, mode: 'half' };   // the centre follows the me-view (viewRootId), like the normal tree
   var FAN_W = 1000, FAN_CX = 500, FAN_CY = 500, FAN_CENTER_R = 85, FAN_MAX_R = 470;
 
   // "First + father name" only (per the owner's rule) — the lineage is implied by
@@ -1402,8 +1402,9 @@
   }
   function setTreeView(mode){ fanMode = (mode === 'fan'); syncFanView(); }
 
+  // The fan centre IS the me-view person ("شجرتي"), unified with the normal tree —
+  // set via a person's profile ("شجرتي من هنا"), the picker, or a tap.
   function fanCenterId(){
-    if(fanOpts.centerId && getPerson(fanOpts.centerId)) return fanOpts.centerId;
     return (viewRootId && getPerson(viewRootId)) ? viewRootId : state.rootId;
   }
 
@@ -1457,12 +1458,12 @@
   function renderFan(){
     var host = document.getElementById('fanStage'); if(!host) return;
     if(!state.rootId || !getPerson(state.rootId)){ host.innerHTML = ''; return; }
-    var centerId = fanCenterId(); fanOpts.centerId = centerId;
+    var centerId = fanCenterId();
     function chip(active, act, val, label){ return '<button type="button" class="fan-chip'+(active?' active':'')+'" data-fan="'+act+'" data-val="'+val+'">'+label+'</button>'; }
     var modeChips = '<div class="fan-group">'+chip(fanOpts.mode==='half','mode','half',t('fanHalf'))+chip(fanOpts.mode==='full','mode','full',t('fanFull'))+'</div>';
     var genChips = '<div class="fan-group">'+[3,4,5].map(function(g){ return chip(fanOpts.generations===g,'gen',g, localeDigits(g)); }).join('')+'</div>';
-    var rootDefault = (viewRootId && getPerson(viewRootId)) ? viewRootId : state.rootId;
-    var resetBtn = (centerId !== rootDefault) ? '<button type="button" class="fan-chip" id="fanResetBtn">'+t('fanReset')+'</button>' : '';
+    // reset shows only when the view is centred away from the family root (me-view active)
+    var resetBtn = (viewRootId && getPerson(viewRootId)) ? '<button type="button" class="fan-chip" id="fanResetBtn">'+t('fanReset')+'</button>' : '';
     var centerBtn = '<button type="button" class="fan-chip" id="fanCenterBtn">🎯 '+t('fanCenter')+': <b>'+escapeHtml(fanShortName(centerId))+'</b></button>' + resetBtn;
     var exportBtns = '<button type="button" class="fan-chip" id="fanPng">🖼 '+t('fanPng')+'</button>'+
                      '<button type="button" class="fan-chip" id="fanPdf">🖨 '+t('fanPdf')+'</button>';
@@ -1484,21 +1485,22 @@
     var cb = document.getElementById('fanCenterBtn');
     if(cb) cb.onclick = function(){ pickFanCenter(); };
     var rb = document.getElementById('fanResetBtn');
-    if(rb) rb.onclick = function(){ fanOpts.centerId = (viewRootId && getPerson(viewRootId)) ? viewRootId : state.rootId; renderFan(); };
+    if(rb) rb.onclick = function(){ clearMeView(); };   // back to the family root (same as the normal tree)
     var png = document.getElementById('fanPng'); if(png) png.onclick = function(){ exportFan('png'); };
     var pdf = document.getElementById('fanPdf'); if(pdf) pdf.onclick = function(){ exportFan('pdf'); };
     // Tapping a person: while the relationship finder is active it PICKS that person
-    // (so kinship works on the fan too); otherwise it re-centres the wheel on them.
-    function onFanPick(id){ if(kinshipMode){ pickKinship(id); } else { fanOpts.centerId = id; renderFan(); } }
+    // (so kinship works on the fan too); otherwise it opens their profile — where
+    // "شجرتي من هنا" re-centres both views, exactly like tapping a card on the normal tree.
+    function onFanPick(id){ if(kinshipMode){ pickKinship(id); } else { openProfile(id); } }
     var svg = document.getElementById('fanSvg');
     if(svg){
-      var lay = window.ftFan.layout(state.people, fanOpts.centerId, { generations: fanOpts.generations, mode: fanOpts.mode });
+      var lay = window.ftFan.layout(state.people, fanCenterId(), { generations: fanOpts.generations, mode: fanOpts.mode });
       // segs are the fill!=none paths, in layout order (guides come first with fill none).
       var segPaths = Array.prototype.filter.call(svg.querySelectorAll('path'), function(p){ return p.getAttribute('fill') && p.getAttribute('fill') !== 'none'; });
       lay.nodes.forEach(function(n, i){ if(segPaths[i]){ segPaths[i].style.cursor = 'pointer'; segPaths[i].onclick = function(){ onFanPick(n.id); }; } });
       // the centre person is pickable too
       var centerCircleEl = document.getElementById('fanCenterCircle');
-      if(centerCircleEl) centerCircleEl.onclick = function(){ onFanPick(fanOpts.centerId); };
+      if(centerCircleEl) centerCircleEl.onclick = function(){ onFanPick(fanCenterId()); };
     }
   }
 
@@ -1510,7 +1512,7 @@
     var input = document.getElementById('fanSearch'), results = document.getElementById('fanResults');
     function show(list){
       results.innerHTML = list.map(function(id){ return '<button class="lk-result" data-id="'+escapeHtml(id)+'">'+escapeHtml(fullNameOf(ppl[id]))+'</button>'; }).join('');
-      results.querySelectorAll('.lk-result').forEach(function(b){ b.onclick = function(){ fanOpts.centerId = b.getAttribute('data-id'); closeSheet(); renderFan(); }; });
+      results.querySelectorAll('.lk-result').forEach(function(b){ b.onclick = function(){ centerTreeOn(b.getAttribute('data-id')); }; });   // sets the me-view centre (closes sheet + renders)
     }
     show(ids.slice(0, 10));
     input.addEventListener('input', function(){

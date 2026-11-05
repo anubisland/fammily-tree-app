@@ -155,6 +155,7 @@
     fanHalf:{ar:'نصف دائرية', en:'Half'},
     fanFull:{ar:'دائرية', en:'Full'},
     fanCenter:{ar:'المركز', en:'Center'},
+    fanReset:{ar:'🏠 الجذر', en:'🏠 Root'},
     fanPng:{ar:'صورة', en:'PNG'},
     fanPdf:{ar:'PDF', en:'PDF'},
     imgExportDone:{ar:'تم حفظ صورة الشجرة ✓', en:'Tree image saved ✓'},
@@ -1423,13 +1424,14 @@
       var dim = lit && !onLit;
       var stroke = onLit ? '#F97316' : '#FFFFFF', sw = onLit ? 4.5 : 1.5;
       segs += '<path d="'+d+'" fill="'+sh.fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"'+(dim?' opacity="0.3"':'')+'></path>';
-      // label — skip when the wedge is too small to hold text
+      // Label — RADIAL (along the radius, inner→outer) so even narrow wedges read:
+      // a thin wedge has little arc width but the full ring thickness lengthwise.
       var span = Math.abs(n.endAngle - n.startAngle);
-      if(span * rMid < 24 || rt < 26) return;
+      if(rt < 24 || span * rMid < 11) return;   // skip only when truly too cramped
       var mid = (n.startAngle + n.endAngle) / 2;
       var tx = cx + rMid * Math.cos(mid), ty = cy + rMid * Math.sin(mid);
-      var deg = mid * 180 / Math.PI + 90; var norm = ((deg % 360) + 360) % 360; if(norm > 90 && norm < 270) deg += 180;
-      var fs = n.depth <= 1 ? 15 : (n.depth === 2 ? 13 : 11);
+      var deg = mid * 180 / Math.PI; var norm = ((deg % 360) + 360) % 360; if(norm > 90 && norm < 270) deg += 180;   // keep upright
+      var fs = n.depth <= 1 ? 15 : (n.depth === 2 ? 13 : 12);
       labels += '<g transform="rotate('+deg.toFixed(2)+' '+tx.toFixed(1)+' '+ty.toFixed(1)+')"><text x="'+tx.toFixed(1)+'" y="'+ty.toFixed(1)+'" text-anchor="middle" dominant-baseline="central" fill="'+sh.text+'" font-size="'+fs+'" font-weight="700" font-family="Amiri, Cairo, serif" style="pointer-events:none">'+esc(fanShortName(n.id))+'</text></g>';
     });
     // ring guides
@@ -1459,7 +1461,9 @@
     function chip(active, act, val, label){ return '<button type="button" class="fan-chip'+(active?' active':'')+'" data-fan="'+act+'" data-val="'+val+'">'+label+'</button>'; }
     var modeChips = '<div class="fan-group">'+chip(fanOpts.mode==='half','mode','half',t('fanHalf'))+chip(fanOpts.mode==='full','mode','full',t('fanFull'))+'</div>';
     var genChips = '<div class="fan-group">'+[3,4,5].map(function(g){ return chip(fanOpts.generations===g,'gen',g, localeDigits(g)); }).join('')+'</div>';
-    var centerBtn = '<button type="button" class="fan-chip" id="fanCenterBtn">🎯 '+t('fanCenter')+': <b>'+escapeHtml(fanShortName(centerId))+'</b></button>';
+    var rootDefault = (viewRootId && getPerson(viewRootId)) ? viewRootId : state.rootId;
+    var resetBtn = (centerId !== rootDefault) ? '<button type="button" class="fan-chip" id="fanResetBtn">'+t('fanReset')+'</button>' : '';
+    var centerBtn = '<button type="button" class="fan-chip" id="fanCenterBtn">🎯 '+t('fanCenter')+': <b>'+escapeHtml(fanShortName(centerId))+'</b></button>' + resetBtn;
     var exportBtns = '<button type="button" class="fan-chip" id="fanPng">🖼 '+t('fanPng')+'</button>'+
                      '<button type="button" class="fan-chip" id="fanPdf">🖨 '+t('fanPdf')+'</button>';
     host.innerHTML = '<div class="fan-controls">'+modeChips+genChips+centerBtn+exportBtns+'</div>'+
@@ -1479,6 +1483,8 @@
     });
     var cb = document.getElementById('fanCenterBtn');
     if(cb) cb.onclick = function(){ pickFanCenter(); };
+    var rb = document.getElementById('fanResetBtn');
+    if(rb) rb.onclick = function(){ fanOpts.centerId = (viewRootId && getPerson(viewRootId)) ? viewRootId : state.rootId; renderFan(); };
     var png = document.getElementById('fanPng'); if(png) png.onclick = function(){ exportFan('png'); };
     var pdf = document.getElementById('fanPdf'); if(pdf) pdf.onclick = function(){ exportFan('pdf'); };
     // Tapping a segment re-centres the wheel on that person.

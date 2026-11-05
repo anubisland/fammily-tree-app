@@ -534,6 +534,23 @@
   .kin-path-bar{ position:fixed; top:0; inset-inline:0; z-index:60; background:var(--gold); color:var(--ink); display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 16px; padding-top:max(10px, env(safe-area-inset-top)); box-shadow:0 4px 16px rgba(43,33,24,.22); font-size:13.5px; font-weight:700; font-family:var(--f-body); }
   .kin-path-bar button{ background:rgba(43,33,24,.14); border:1px solid rgba(43,33,24,.24); color:var(--ink); border-radius:9px; padding:6px 14px; font-size:12.5px; font-weight:700; font-family:var(--f-body); cursor:pointer; flex-shrink:0; }
   .kin-path-bar button:active{ opacity:.8; }
+  /* View toggle (tree ⇄ fan) + fan-chart stage */
+  .view-toggle{ display:flex; gap:0; justify-content:center; padding:8px 10px 0; }
+  .vt-btn{ flex:0 0 auto; min-width:100px; padding:8px 16px; font-family:var(--f-body); font-size:13px; font-weight:700; color:var(--ink-soft); background:var(--card); border:1px solid var(--line); cursor:pointer; }
+  .vt-btn:first-child{ border-radius:0 11px 11px 0; }   /* RTL: first (tree) on the right */
+  .vt-btn:last-child{ border-radius:11px 0 0 11px; border-inline-start:none; }
+  .vt-btn.active{ background:var(--emerald); color:#F6EFDD; border-color:var(--emerald); }
+  .fan-stage{ padding:8px 6px 20px; overflow:auto; -webkit-overflow-scrolling:touch; }
+  .fan-controls{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; align-items:center; padding:6px 8px 12px; }
+  .fan-group{ display:inline-flex; gap:0; }
+  .fan-chip{ padding:6px 12px; font-family:var(--f-body); font-size:12.5px; font-weight:600; color:var(--ink); background:var(--card); border:1px solid var(--line); border-radius:9px; cursor:pointer; }
+  .fan-chip b{ font-weight:800; color:var(--emerald); }
+  .fan-group .fan-chip{ border-radius:0; }
+  .fan-group .fan-chip:first-child{ border-radius:0 9px 9px 0; }
+  .fan-group .fan-chip:last-child{ border-radius:9px 0 0 9px; border-inline-start:none; }
+  .fan-chip.active{ background:var(--gold); color:var(--ink); border-color:var(--gold); }
+  .fan-chip:active{ opacity:.85; }
+  .fan-svg-wrap{ width:100%; max-width:720px; margin:0 auto; }
   .kin-result{ text-align:center; padding:14px 0 18px; }
   .kin-result .kin-name{ font-size:15px; color:var(--ink-soft); line-height:2; }
   .kin-result .kin-name b{ color:var(--ink); font-family:var(--f-head); font-size:18px; }

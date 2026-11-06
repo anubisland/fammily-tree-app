@@ -1426,7 +1426,12 @@
       // Lit styling comes from CSS classes so it can GLOW + FLASH: endpoints change
       // colour (A emerald, B gold) and pulse; the path between them is a bright glow.
       var cls = onLit ? (n.id === endA ? 'fan-lit-a' : n.id === endB ? 'fan-lit-b' : 'fan-lit') : '';
-      var strokeAttr = onLit ? '' : ' stroke="#FFFFFF" stroke-width="1.5"';
+      // While picking two people for kinship, mark the first-picked person (feedback,
+      // since the fan has no cards to carry the tree's kin-a highlight).
+      var picked = !cls && kinshipMode && (n.id === kinshipA);
+      if(picked){ cls = 'fan-pick-a'; }
+      if(picked) isEnd = true;   // white label on the recoloured segment
+      var strokeAttr = (onLit || picked) ? '' : ' stroke="#FFFFFF" stroke-width="1.5"';
       segs += '<path d="'+d+'" fill="'+sh.fill+'"'+(cls?' class="'+cls+'"':'')+strokeAttr+(dim?' opacity="0.3"':'')+'></path>';
       // Label — RADIAL (along the radius, inner→outer) so even narrow wedges read:
       // a thin wedge has little arc width but the full ring thickness lengthwise.
@@ -1453,7 +1458,7 @@
     var cName = fanShortName(centerId);
     var cText = '<text x="'+cx+'" y="'+(cy + (full ? (spouse? -6 : 4) : -40))+'" text-anchor="middle" dominant-baseline="central" fill="#F6EFDD" font-size="18" font-weight="800" font-family="Amiri, Cairo, serif">'+esc(cName)+'</text>';
     if(spouse) cText += '<text x="'+cx+'" y="'+(cy + (full ? 20 : -16))+'" text-anchor="middle" dominant-baseline="central" fill="#EAD9AE" font-size="13" font-weight="600" font-family="Cairo, sans-serif">'+esc(fanShortName(spouse.id))+'</text>';
-    var cCls = centerLit ? (centerId === endA ? 'fan-lit-a' : centerId === endB ? 'fan-lit-b' : 'fan-lit') : '';
+    var cCls = centerLit ? (centerId === endA ? 'fan-lit-a' : centerId === endB ? 'fan-lit-b' : 'fan-lit') : (kinshipMode && centerId === kinshipA ? 'fan-pick-a' : '');
     var centerCircle = '<circle id="fanCenterCircle" cx="'+cx+'" cy="'+cy+'" r="'+FAN_CENTER_R+'" fill="var(--emerald)"'+(cCls?' class="'+cCls+'"':' stroke="#FFFFFF" stroke-width="3"')+' style="cursor:pointer"></circle>';
 
     return '<svg id="fanSvg" class="fan-svg" viewBox="0 0 '+FAN_W+' '+vbH+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">'+
@@ -3022,6 +3027,7 @@
     document.body.classList.remove('kinship-mode');
     var el = document.getElementById('kinshipBanner'); if(el) el.remove();
     if(keepHighlights !== true) clearKinHighlights();
+    if(fanMode) renderFan();   // clear the fan's pick highlight (unless the lit path takes over)
   }
   function kinCard(id){ return document.querySelector('.card[data-id="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]'); }
   function updateKinshipBanner(){
@@ -3039,6 +3045,7 @@
     if(kinshipMode === 'pick1'){
       kinshipA = id; kinshipMode = 'pick2';
       var card = kinCard(id); if(card) card.classList.add('kin-a');
+      if(fanMode) renderFan();   // show the first pick on the wheel
       updateKinshipBanner();
     } else if(kinshipMode === 'pick2'){
       if(id === kinshipA){ return; }

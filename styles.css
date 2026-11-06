@@ -558,9 +558,12 @@
   svg.fan-svg .fan-lit-a{ fill:#0F5B4B; stroke:#4FE6AE; stroke-width:4.5; filter:drop-shadow(0 0 7px rgba(16,185,129,.95)); animation:fanFlash 0.85s ease-in-out infinite; }
   svg.fan-svg .fan-lit-b{ fill:#C97A00; stroke:#FFD24A; stroke-width:4.5; filter:drop-shadow(0 0 7px rgba(240,180,41,.98)); animation:fanFlash 0.85s ease-in-out infinite; }
   @keyframes fanFlash{ 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
+  /* First-pick feedback while choosing two people for kinship (steady, not flashing). */
+  svg.fan-svg .fan-pick-a{ fill:#0F5B4B; stroke:#4FE6AE; stroke-width:4.5; filter:drop-shadow(0 0 6px rgba(16,185,129,.9)); }
+  svg.fan-svg .fan-pick-b{ fill:#C97A00; stroke:#FFD24A; stroke-width:4.5; filter:drop-shadow(0 0 6px rgba(240,180,41,.95)); }
   @media (prefers-reduced-motion: reduce){ svg.fan-svg .fan-lit, svg.fan-svg .fan-lit-a, svg.fan-svg .fan-lit-b{ animation:none; } }
-  .kpb-rel{ flex:1; min-width:0; font-size:13px; font-weight:700; }
-  .kpb-rel .kpb-term{ color:#1E3A8A; }
+  .kpb-rel{ flex:1; min-width:0; font-size:13px; font-weight:700; color:#FFFFFF; text-shadow:0 1px 2px rgba(0,0,0,.35); }
+  .kpb-rel .kpb-term{ color:#FFFFFF; font-weight:800; }
   .kin-result{ text-align:center; padding:14px 0 18px; }
   .kin-result .kin-name{ font-size:15px; color:var(--ink-soft); line-height:2; }
   .kin-result .kin-name b{ color:var(--ink); font-family:var(--f-head); font-size:18px; }
